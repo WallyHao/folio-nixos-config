@@ -1,0 +1,8 @@
+/.agents/
+/.aws/
+/.codex/
+/result
+/result-*
+*.qcow2
+*.raw
+*.log
