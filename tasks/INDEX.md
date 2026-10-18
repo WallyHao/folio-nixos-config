@@ -23,6 +23,8 @@ choices locally without replacing the specified architecture.
 
 ## Current state
 
+- Agent transition: read [HANDOFF.md](HANDOFF.md) for the exact committed baseline,
+  uncommitted Stage 04 work, pending test command and retained evidence.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
