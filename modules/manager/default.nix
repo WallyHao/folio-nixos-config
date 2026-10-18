@@ -50,6 +50,7 @@ in
   packages = {
     inherit normalizer runtime;
     cli = client.cli;
+    config-client = client.adapters.config;
     input = prepareInput;
     atomic = runtime.atomic;
     cli-support = pkgs.writeTextDir "share/folio/client-common.sh" (

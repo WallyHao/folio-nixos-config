@@ -7,7 +7,9 @@ its own operations. Root Nix composition lives in the manager module.
 Status: foundation, durable user configuration, Foot deployment, root deployment
 and system-owned power actions have passed isolated UEFI guest tests. A standalone
 UEFI image and module-owned VM lifecycle are implemented. Later modules below
-remain the implementation contract until their stages pass. No development-host
+remain the implementation contract until their stages pass. Owned Zen/OBS Flatpak
+lifecycle and regular-file configuration delivery have passed an isolated guest
+gate; GUI appearance and capture evidence remain for the desktop stage. No development-host
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
 
@@ -522,7 +524,8 @@ folio config show|edit|import|export [--system]
 folio modules list|enable|disable NAME [--system]
 folio plan|build|apply|rollback [--system]
 folio status [--system]
-folio applications list|install|update|remove|reconcile ...
+folio apps init|list|install|update|remove|reconcile|adopt|prepare ...
+folio apps rollback|resume|status REVISION_OR_TASK_ID ...
 folio --system system reboot|poweroff
 folio vm build|start|stop|status ...
 ```
@@ -621,6 +624,43 @@ All Flatpak applications belong to `applications`. Install as the user with
 `--user`; initialize Flathub explicitly from its official repository descriptor.
 The bootstrap app set is Zen (`app.zen_browser.zen`) and OBS
 (`com.obsproject.Studio`). Typst stays in `terminal` through Nix.
+
+The current application entry is `folio apps` in user scope. Enable/apply its
+system contribution for Flatpak infrastructure and its user contribution for the
+subscriber and generated manifest. Then use:
+
+```sh
+folio apps init
+folio apps prepare all
+folio apps install all --offline
+folio apps list
+folio apps update zen
+folio apps reconcile zen --offline
+folio apps adopt obs
+folio apps remove obs
+folio apps rollback REVISION_ID all --offline
+folio apps status TASK_ID
+folio apps resume TASK_ID
+```
+
+Mutations accept `zen`, `obs`, or `all`, optional `--offline` and
+`--request-id ID`; `--no-wait` is a global option. `prepare` downloads and records
+complete resolved transactions without deploying apps. Offline work requires
+those retained plans and matching cached refs, including locale and graphics
+extensions. Initial pinned installation requires the target commit to resolve
+from that preparation; a different available branch head is rejected. Existing
+installed pinned apps use explicit commit updates. Historical rollback currently
+requires local retained content and matching refs; missing/changed refs return
+unavailable before effects. Shared deployed runtimes are preserved; a historical
+plan requiring a different shared runtime is unavailable.
+
+Set the Zen app's `zen-profile` to an existing relative profile directory recorded
+in its sandbox `profiles.ini`, then build/apply the user configuration and run
+reconcile. Missing profiles or stale manifests leave configuration pending.
+`--adopt-files` allows first ownership of existing supported files, retaining
+unique backups. Unexpected edits to an already owned file must be resolved before
+resuming its recorded task. Workspace seeding and OBS Qt appearance remain
+explicitly unsupported; scenes, logins, databases and sessions remain app-owned.
 
 The application model records ID, remote, branch, architecture, enabled state,
 version policy, optional requested commit, configuration settings and managed

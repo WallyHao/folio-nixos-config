@@ -160,6 +160,11 @@ for job in "$state/vm/jobs/"*/job.json; do
   jq -e '.phase != "queued" and .phase != "building" and .phase != "starting" and .phase != "running"' \
     "$job" >/dev/null || { echo 'Stop active VM jobs before offline maintenance' >&2; exit 4; }
 done
+for task in "$state/applications/tasks/"*.json; do
+  jq -e '(.recoveryRequired != true) and (.phase=="succeeded" or .phase=="failed" or .phase=="interrupted")' "$task" >/dev/null || {
+    echo 'Finish or explicitly recover application tasks before offline maintenance' >&2; exit 4;
+  }
+done
 if [[ "$action" != restore && -e "$state/schema-transaction.json" ]]; then
   echo 'An incomplete schema transaction requires explicit restore' >&2; exit 4
 fi

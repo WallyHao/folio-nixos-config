@@ -13,6 +13,7 @@ let
       repository = sysrepoModule.packages.tools;
       atomicWrite = catalogue.manager.packages.atomic;
       cliSupport = catalogue.manager.packages.cli-support;
+      configClient = catalogue.manager.packages.config-client;
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
       systemConfiguration = portableSystem;
@@ -41,6 +42,9 @@ let
     system = import ../../system/default.nix { inherit pkgs lib; };
     terminal = import ../../terminal/default.nix { inherit pkgs lib; };
     vm = import ../../vm/default.nix { inherit pkgs lib; };
+    applications = import ../../applications/default.nix { inherit pkgs lib; };
+    desktop = import ../../desktop/default.nix { inherit pkgs lib; };
+    devices = import ../../devices/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   defaults = lib.genAttrs [ "system" "user" ] (scope: import ./defaults.nix { inherit scope; });
@@ -63,6 +67,7 @@ let
       environment = (configuration scope)."folio-environment:environment";
     in
     {
+      configurationDigest = if prepared != null && prepared.scope == scope then prepared.configurationDigest else null;
       identity = {
         inherit scope;
         environment = environment.name;
@@ -94,6 +99,8 @@ let
           prepared.systemDescriptor.capabilities
         else
           {
+            flatpak-provisioned = lib.any (entry: entry.name == "applications" && (entry.enabled or false))
+              (configuration "system")."folio-environment:environment".modules;
             kvm-access-configured = lib.any (
               entry: entry.name == "vm" && (entry.enabled or false)
             ) (configuration "system")."folio-environment:environment".modules;
@@ -275,6 +282,12 @@ in
       repository = collection.packages.sysrepo-tools;
       prepareInput = collection.packages.manager-input;
     };
+    applications = lib.makeOverridable ({ cache ? null, plans ? null }: import ../../applications/tests/guest.nix {
+      inherit pkgs inputs bootstrap cache plans;
+      source = pkgs.folio.source;
+      prepareInput = collection.packages.manager-input;
+      modules = adapters "system";
+    }) { };
     configuration = import ../tests/configuration.nix {
       inherit pkgs bootstrap;
       runtime = collection.packages.manager-runtime;

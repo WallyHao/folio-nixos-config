@@ -23,6 +23,9 @@
     ++ (
       if scope == "system" then
         [
+          { name = "applications"; enabled = true; }
+          { name = "desktop"; enabled = true; }
+          { name = "devices"; enabled = true; }
           {
             name = "system";
             enabled = true;
@@ -35,6 +38,14 @@
         ]
       else
         [
+          {
+            name = "applications";
+            enabled = true;
+            "folio-applications:applications".app = [
+              { name = "zen"; ref = "app/app.zen_browser.zen/x86_64/stable"; selected = true; }
+              { name = "obs"; ref = "app/com.obsproject.Studio/x86_64/stable"; selected = true; }
+            ];
+          }
           {
             name = "terminal";
             enabled = true;

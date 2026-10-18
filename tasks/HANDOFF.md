@@ -1,5 +1,51 @@
 # Implementation Handoff
 
+## Session quota policy (codex2, 2026-10-18)
+
+- The user requires continued implementation, with a pause when the codex2
+  five-hour quota falls below 5%, then continuation after quota recovery.
+- Current account home is `/home/sylphy/.codex-account2`; do not use the other
+  account's telemetry. Local checker: `/tmp/folio-codex2-quota/check.sh`, bound to
+  this session. It reads only session rate-limit events, not authentication data.
+  Run it periodically and before expensive work. Exit 75 means pause; 76 means
+  reset time passed but fresh telemetry must confirm recovery. A reset timestamp
+  alone does not establish renewed quota. Keep the conversation active while
+  waiting, with bounded sleeps, rather than ending and promising a scheduled wake.
+- Last observed remaining quota: 38%; reset 2026-10-19 02:27:46 Asia/Shanghai.
+- Stage 05's completion record below supersedes the initial incomplete boundary.
+  Both native helper packages compile;
+  regular-file safety checks passed using
+  `/nix/store/vi7wz7hw3gwymj13772c2pphb42b8x75-folio-applications-files-0.1.0/bin/folio-applications-files`.
+  Evidence: `/tmp/folio-application-files.THR6B3`. Continue the worker, public
+  subscriber/CLI wiring and bounded real guest gate are now complete.
+
+## Required next boundary: restore the agreed layout
+
+The owner explicitly requested completion of the current Stage 05 first, followed
+by correction of all implemented module layouts to `STRUCTURE.md`, before moving
+on to later stages. Read that file in full. In particular, keep Nix implementation
+in `src/`, client adapters/resources in `cli/`, and C subscribers/Shell operations
+in `runtime/`, with outer `tests/`. Current manager, sysrepo, system, VM and
+applications files mix these categories under `src/`; this must be corrected,
+including package/source/test references. Preserve working behavior and avoid
+empty placeholder trees. The later root-only product documentation rule remains
+applicable: do not add module READMEs or a documentation tree merely to match the
+older example. Record and validate the actual moved paths and CLI contracts.
+
+## Stage 05 completion boundary (2026-10-18)
+
+Stage 05 passed its real guest gate; see `tasks/05-applications.md` for exact
+invocations and limits. Commit subject:
+`feat(applications): reconcile owned flatpak apps and configuration`.
+The final guest output is
+`/nix/store/jmfysaabzbyqmw6fhlayps697j33l91k-vm-test-run-folio-owned-applications`.
+Actual two-app deployment, real operational state, explicit adoption, preservation
+of an independently installed local Flatpak, regular files/profile/pending/stale
+manifest behavior, retained/unavailable rollback and conflict/resume passed.
+Keep caches/plans outside source and reuse them for affected integration checks.
+The next work is the layout correction above, not Stage 06 yet. Do not retain the
+current mixed `src/` arrangement as the final architecture.
+
 ## Stage 04 completion boundary (2026-10-18)
 
 This section supersedes all historical boundaries below. Stage 04 is complete;

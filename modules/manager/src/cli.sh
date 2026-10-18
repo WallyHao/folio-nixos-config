@@ -38,6 +38,8 @@ Commands:
   rollback REVISION_ID [--rebuild]          Restore retained desired data and closure
   cleanup [--apply]                        Preview or remove unreferenced deployment records
   vm build|start|stop|status|cleanup ID     Manage a disposable user VM
+  apps list|init|install|update|remove|reconcile|adopt|rollback|prepare|resume|status
+                                          Manage owned user Flatpak applications
   --system system reboot|poweroff          Accept a guest power request
 
 User configuration operations require the manager subscriber for writes.
@@ -48,7 +50,7 @@ HELP
 fi
 [[ "$environment" == portable ]] || emit_error invalid 'Unknown environment' 2
 command=${arguments[0]}
-if "$no_wait" && [[ "$command" != build && "$command" != apply && "$command" != vm ]]; then
+if "$no_wait" && [[ "$command" != build && "$command" != apply && "$command" != vm && "$command" != apps ]]; then
   emit_error invalid '--no-wait applies to deployment tasks and VM builds' 2
 fi
 adapter=$(jq -er --arg command "$command" '.[$command].path' @commands@ 2>/dev/null) || {
