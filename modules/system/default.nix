@@ -3,6 +3,7 @@ let
   power = import ./src/power.nix { inherit pkgs; };
 in
 {
+  subscribers.system = [ "folio-system.service" ];
   packages = {
     runtime = power.runtime;
   };

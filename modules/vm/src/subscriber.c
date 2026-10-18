@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <jansson.h>
 #include <libyang/libyang.h>
 #include <limits.h>
@@ -7,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/wait.h>
 #include <sysrepo.h>
 #include <unistd.h>
@@ -81,6 +83,13 @@ int main(void)
             state ? "" : "/.local/state") >= (int)sizeof(repository) ||
         snprintf(shm, sizeof(shm), "%s/folio/sysrepo", runtime) >= (int)sizeof(shm)) return 1;
     snprintf(prefix, sizeof(prefix), "folio_user_%u", (unsigned)geteuid());
+    char lock_path[PATH_MAX];
+    if (snprintf(lock_path, sizeof(lock_path), "%s%s/folio/repository.lock", state ? state : home,
+            state ? "" : "/.local/state") >= (int)sizeof(lock_path)) return 1;
+    int repository_lock = open(lock_path, O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+    if (repository_lock < 0 || flock(repository_lock, LOCK_SH | LOCK_NB)) {
+        fprintf(stderr, "Repository is unavailable or under offline maintenance\n"); return 3;
+    }
     setenv("SYSREPO_REPOSITORY_PATH", repository, 1);
     setenv("SYSREPO_SHM_DIR", shm, 1); setenv("SYSREPO_SHM_PREFIX", prefix, 1);
     unsetenv("SYSREPO_PLUGINS_PATH");

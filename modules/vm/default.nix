@@ -4,6 +4,7 @@ let
   runtime = import ./src/runtime.nix { inherit pkgs tools; };
 in
 {
+  subscribers.user = [ "folio-vm.service" ];
   packages = {
     inherit tools;
     image = import ./src/image.nix { inherit pkgs lib tools; };

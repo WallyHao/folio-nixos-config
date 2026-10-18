@@ -34,6 +34,24 @@ export SYSREPO_SHM_DIR=$runtime/sysrepo
 export SYSREPO_SHM_PREFIX=$prefix
 unset SYSREPO_PLUGINS_PATH
 
+if [[ "$action" == init ]]; then mkdir -p "$state" "$runtime"; fi
+[[ -d "$state" ]] || { echo 'Repository is not initialized' >&2; exit 3; }
+exec 5<>"$state/repository.lock"
+if [[ "$scope" == system && $(id -u) == 0 ]]; then
+  chgrp folio-operators "$state/repository.lock"
+  chmod 0660 "$state/repository.lock"
+fi
+flock -s -w 30 5
+if [[ -e "$state/schema-transaction.json" ]]; then
+  if [[ "$action" != init ]]; then
+    echo 'Repository is under offline schema maintenance' >&2; exit 3
+  fi
+  case "$(jq -er .phase "$state/schema-transaction.json")" in
+    installed|restored-pending-activation) ;;
+    *) echo 'Schema transaction requires offline recovery before initialization' >&2; exit 3 ;;
+  esac
+fi
+
 case "$action" in
   ctl) exec sysrepoctl "$@" ;;
   cfg) exec sysrepocfg "$@" ;;

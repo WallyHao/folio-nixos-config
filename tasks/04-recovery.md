@@ -98,3 +98,82 @@ prerequisites for application lifecycle work, not indefinitely deferred features
   migration/restore evidence and explicit reference-aware cleanup. Stage remains
   in progress; none of these commands are claimed implemented yet.
 - Submilestone subject: `fix(manager): reconcile interrupted deployment effects`.
+
+## Offline paired maintenance submilestone (2026-10-18)
+
+- Continued the incoming uncommitted sysrepo maintenance implementation rather
+  than replacing it. Added kernel connection-lock inspection, a scoped repository
+  lock shared by all registered subscribers/clients, and the schema transaction
+  barrier. The public catalogue publishes subscriber and migration registries.
+- Repository primitives snapshot raw data/models, normalized startup/running
+  exports, configuration/deployment journals and GC roots. Candidate preparation
+  validates isolated real repositories and retains failed candidates on retry.
+  Changed schemas without a revision are rejected; migration edges bind exact
+  model hashes and must advance revisions monotonically. Closure binding checks
+  bootstrap/configuration identity and the scoped account before installation.
+- Added `folio-manager-maintain SCOPE BOOTSTRAP snapshot|upgrade|restore ID
+  [FROZEN_SOURCE]`, independent of manager RPC availability. It rejects active
+  tasks/VM jobs and unresolved recovery, takes the scoped mutation lock, stops
+  registered consumers and journals their prior active state. Runtime service
+  conditions retain quiescence across NixOS activation; runtime masks alone did
+  not override the generated `/etc/systemd/system` units in the real guest.
+- Upgrade builds immutable candidate source/bootstrap/closure as the scoped user
+  or unprivileged `folio-builder`. It checks frozen input and migrated data before
+  installation, activates/verifies the paired closure and publishes a rooted
+  maintenance revision. A failed installation/activation attempts paired restore;
+  failed restoration leaves its barrier and consumer conditions for explicit
+  retry. Consumers restart only after releasing the mutation lock; actual status
+  RPC readiness is required when the manager was previously active.
+- Reviewed Sylphy adoption/profile authority again at
+  `9cba023d90c4485b33a91e2d12724b6920580580`; retained Folio's existing profile,
+  unique adoption backups and recorded closure verification instead of copying
+  the reference's manager architecture.
+- Isolated primitive command passed:
+  `bash modules/sysrepo/tests/maintenance.sh /nix/store/11ffiizjcz07ixan9vpsv6yzbd5p5ncc-folio-bootstrap /nix/store/lc5zb32lw5kihmaawarm86b3d1mp710s-folio-repository /nix/store/qpwwzclv90lxvkxxx3xpvc3yl5am9v2z-folio-repository-maintain /nix/store/6f3nm8f6x7qsfyzw2ljvw1chylrcqw8f-folio-manager-runtime`.
+  Evidence: `/tmp/folio-repository-maintenance.KLXUpp`. Covered a real occupied
+  subscriber, stale snapshot refusal, same-revision schema refusal, a failing
+  hash-bound test migration, explicit preparation retry/evidence retention,
+  invalid closure refusal, denied restore and the missing-live-directory boundary.
+  The closure fixture deliberately refuses activation; this is repository/binding
+  evidence only. Later engine changes adjust the system candidate umask/primary group;
+  system coverage belongs to the scoped guest gate below.
+- Affected shared-lock checks passed in one batch:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.foundation path:.#checks.x86_64-linux.configuration path:.#checks.x86_64-linux.catalogue`.
+  Outputs: `/nix/store/p3z0zymk9335sj5g1h65xmsfnix2w6d6-folio-foundation`,
+  `/nix/store/g7r0kj5g2x14fjvlzxrigv2lnsln75a4-folio-configuration-integration`,
+  `/nix/store/8nhk87cpdy591c0ngmz5bjj728ihb4s9-folio-catalogue-contract`.
+  Later C diagnostic changes affect only root permission errors; the new system
+  candidate permissions and coordinator are covered by the guest gate, without another
+  full suite repetition.
+- Stage remains **in progress**. Production migration transforms, a successful
+  additive/meaning-changing schema transition, general retained-revision rollback
+  (including old-protocol rebuild), and explicit reference-aware cleanup remain.
+  The current production migration registry is empty. No application/desktop
+  stage or physical hardware acceptance is claimed.
+- Scoped guest gate passed:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.recovery`.
+  Output `/nix/store/6rxa51zzrs5d1ids8f6f4cpj4dr126rk-vm-test-run-folio-deployment-recovery`;
+  build log `/tmp/folio-recovery-paired-gate7.log`, expanded log
+  `/tmp/folio-paired-passed7.log`. Proved root/user snapshot restore of matching
+  desired data and actual closure, retained root failure barrier and successful
+  explicit retry, unchanged boot ID, real manager RPC readiness, rooted backups
+  and root candidate installation/healthy publication followed by paired restore.
+  The candidate has unchanged production models: this is not evidence of a
+  successful schema transformation. Existing interruption/authorization/reboot/
+  clean-poweroff assertions also passed in the same bounded fixture.
+- Failed focused gate iterations exposed premature service restart, wrong root
+  datastore group and absent optional services. The root JSON datastore uses the
+  caller's primary group for replacement files: candidate commands now use
+  `setpriv --regid folio-operators --keep-groups`, matching the provisioned service.
+  Consumer stopping skips an optional not-found unit while retaining its activation
+  condition. Added explicit root permission diagnostics and RPC readiness checks.
+- After that guest gate, factored the already-tested snapshot closure identity
+  check into a helper and reused it immediately before explicit/automatic restore
+  activation, so a mismatched retained artifact cannot be activated. The final
+  package passed ShellCheck/build via
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#manager-runtime`;
+  output `/nix/store/r6qvqkzai04nyybs8sy13bcnwmn75jxj-folio-manager-runtime`,
+  log `/tmp/folio-maintenance-runtime-identity.log`. Reused the guest's positive
+  snapshot identity and failed-missing-closure cases instead of repeating its
+  complete fixture for this additional identical validation.
+- Submilestone subject: `feat(manager): coordinate offline paired repository recovery`.

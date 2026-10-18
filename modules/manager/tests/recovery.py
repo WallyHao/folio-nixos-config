@@ -53,6 +53,61 @@ with subtest("failed profile restoration stays visible and blocks apply"):
     assert folio("status")["data"]["health"] == "healthy"
     assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() == user_profile
 
+with subtest("offline root restore pairs desired data and closure and retains a failed restore barrier"):
+    system_state = "/var/lib/folio/deployments"
+    current = json.loads(machine.succeed("cat " + system_state + "/current.json"))
+    metadata = json.loads(machine.succeed("cat " + current["artifact"] + "/folio-system.json"))
+    bootstrap = metadata["bootstrap"]
+    command = "folio-manager-maintain system " + bootstrap
+    boot_id = machine.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+    machine.succeed(command + " snapshot paired-root > /tmp/paired-snapshot.json")
+    user("timeout 30 bash -c 'until folio --json --system status >/dev/null 2>&1; do sleep 0.2; done'")
+    desired = folio("--system config show")["data"]["configuration"]
+    changed = json.loads(json.dumps(desired))
+    changed["folio-environment:environment"]["preferences"]["font-size"] = 24
+    write_fault("/tmp/changed-system.json", changed, True)
+    folio("--system config import /tmp/changed-system.json")
+    transaction = "/var/lib/folio/backups/repositories/paired-root/transaction.json"
+    record = json.loads(machine.succeed("cat " + transaction))
+    broken = dict(record)
+    broken["oldArtifact"] = "/nix/store/00000000000000000000000000000000-folio-missing-closure"
+    write_fault(transaction, broken, True)
+    machine.fail(command + " restore paired-root")
+    machine.succeed("test -f /var/lib/folio/schema-transaction.json")
+    machine.fail("systemctl is-active --quiet folio-manager.service")
+    write_fault(transaction, record, True)
+    machine.succeed(command + " restore paired-root > /tmp/paired-restore.json")
+    user("timeout 30 bash -c 'until folio --json --system status >/dev/null 2>&1; do sleep 0.2; done'")
+    restored = folio("--system config show")["data"]["configuration"]
+    assert restored == desired
+    assert machine.succeed("readlink -f /nix/var/nix/profiles/system").strip() == current["artifact"]
+    assert machine.succeed("readlink -f /run/current-system").strip() == current["artifact"]
+    assert machine.succeed("cat /proc/sys/kernel/random/boot_id").strip() == boot_id
+    machine.succeed("test ! -e /var/lib/folio/schema-transaction.json")
+    machine.succeed("test -L /var/lib/folio/backups/repositories/paired-root/artifact-root")
+    revision = json.loads(machine.succeed("cat " + system_state + "/revisions/" + current["planId"] + ".json"))
+    machine.succeed(command + " upgrade paired-upgrade " + revision["source"] + " > /tmp/paired-upgrade.json")
+    user("timeout 30 bash -c 'until folio --json --system status >/dev/null 2>&1; do sleep 0.2; done'")
+    assert folio("--system status")["data"]["health"] == "healthy"
+    machine.succeed(command + " restore paired-upgrade > /tmp/paired-upgrade-restored.json")
+    user("timeout 30 bash -c 'until folio --json --system status >/dev/null 2>&1; do sleep 0.2; done'")
+
+with subtest("offline user restore retains the matching managed files and desired configuration"):
+    current = user_record(user_state + "/current.json")
+    metadata = user_record(current["artifact"] + "/folio-home.json")
+    command = "folio-manager-maintain user " + metadata["bootstrap"]
+    user(command + " snapshot paired-user > /tmp/paired-user-snapshot.json")
+    user("timeout 30 bash -c 'until folio --json status >/dev/null 2>&1; do sleep 0.2; done'")
+    desired = folio("config show")["data"]["configuration"]
+    changed = json.loads(json.dumps(desired))
+    changed["folio-environment:environment"]["preferences"]["font-size"] = 24
+    save(changed)
+    user(command + " restore paired-user > /tmp/paired-user-restore.json")
+    user("timeout 30 bash -c 'until folio --json status >/dev/null 2>&1; do sleep 0.2; done'")
+    assert folio("config show")["data"]["configuration"] == desired
+    assert folio("status")["data"]["health"] == "healthy"
+    assert "font=Maple Mono NF CN:size=18" in user("cat /home/folio/.config/foot/foot.ini")
+
 with subtest("root recovery restores only a recorded profile while the guest stays running"):
     system_state = "/var/lib/folio/deployments"
     current = json.loads(machine.succeed("cat " + system_state + "/current.json"))

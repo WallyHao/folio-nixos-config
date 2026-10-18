@@ -3,7 +3,7 @@ let
   system = "x86_64-linux";
   basePkgs = import inputs.nixpkgs { inherit system; };
   sysrepoModule = import ../../sysrepo/default.nix {
-    pkgs = basePkgs;
+    inherit pkgs;
     lib = basePkgs.lib;
   };
   # Explicit public build resources; no module imports another's private files.
@@ -13,6 +13,8 @@ let
       repository = sysrepoModule.packages.tools;
       atomicWrite = catalogue.manager.packages.atomic;
       cliSupport = catalogue.manager.packages.cli-support;
+      normalizer = catalogue.manager.packages.normalizer;
+      repositoryMaintenance = sysrepoModule.packages.maintenance;
       systemConfiguration = portableSystem;
       source = lib.fileset.toSource {
         root = ../../..;
@@ -155,6 +157,8 @@ let
       )
     } $out/catalogue.json
     cp ${pkgs.writeText "identities.json" (builtins.toJSON identities)} $out/identities.json
+    cp ${pkgs.writeText "migrations.json" (builtins.toJSON collection.migrations)} $out/migrations.json
+    cp ${pkgs.writeText "subscribers.json" (builtins.toJSON collection.subscribers)} $out/subscribers.json
     cp ${
       pkgs.writeText "descriptor.json" (
         builtins.toJSON {
@@ -189,6 +193,8 @@ in
             pkgs.writeText "folio-home.json" (
               builtins.toJSON {
                 format = 1;
+                scope = "user";
+                bootstrap = toString bootstrap;
                 account = (context "user").identity.account;
                 home = (context "user").identity.home;
                 configurationDigest =

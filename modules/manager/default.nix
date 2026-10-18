@@ -33,6 +33,10 @@ let
   };
 in
 {
+  subscribers = {
+    user = [ "folio-manager.service" ];
+    system = [ "folio-manager.service" ];
+  };
   models = {
     system = [
       ./model/folio-environment.yang

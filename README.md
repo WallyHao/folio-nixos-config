@@ -127,6 +127,49 @@ failed restoration stay visible in `status` under `recovery`, degrade health and
 block further applies. Explicit managed rollback and schema migration are still
 under development; preserve those records and their GC roots.
 
+Offline paired maintenance is available through the separate
+`folio-manager-maintain SCOPE BOOTSTRAP ACTION ID [FROZEN_SOURCE]` command.
+`BOOTSTRAP` must identify the currently selected generation's immutable bootstrap,
+recorded in its `folio-home.json` or `folio-system.json`. Run user maintenance as
+the provisioned account with its real HOME and runtime directory; system
+maintenance requires root. For example, on a provisioned disposable user system:
+
+```sh
+artifact=$(readlink -e "${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager")
+bootstrap=$(jq -r .bootstrap "$artifact/folio-home.json")
+folio-manager-maintain user "$bootstrap" snapshot before-upgrade
+# Restore that snapshot's models, startup/running data and selected closure:
+folio-manager-maintain user "$bootstrap" restore before-upgrade
+```
+
+Snapshots require desired startup/running data to agree with the selected closure.
+The command rejects active deployment/VM jobs, unresolved effects and interrupted
+maintenance. It stops registered consumers, records their prior active state and
+uses runtime service conditions to prevent premature restart during activation.
+Repository mutations also require an exclusive repository lock and no real
+sysrepo connection locks. The scoped mutation lock precedes repository and
+initialization locks; consumers restart after the mutation lock is released.
+
+`upgrade ID FROZEN_SOURCE` builds a candidate bootstrap and closure from an
+immutable source containing `folio-input.json`; system builds run as
+`folio-builder`. The candidate configuration must exactly match the isolated
+migration result, model/tool identities and closure metadata. Successful
+installation activates and verifies the paired closure before publishing its
+maintenance revision. Installation/activation failure attempts to restore the
+original repository and closure. A failed restore retains the schema barrier,
+consumer conditions and journals; repeat `restore ID` after resolving the recorded
+failure. Restore is independent of the manager RPC service. Application data is
+outside these snapshots.
+
+Backups live in scoped `backups/repositories/ID/`, with raw repositories, normalized
+exports, model identities, coordinator/transaction journals and GC roots for both
+pairs. Partial candidate preparations are retained on explicit retry. Changed
+models without a new YANG revision are rejected. The migration registry currently
+has no production transforms: upgrades needing an unregistered transformation
+remain unavailable. General rollback of arbitrary retained revisions and explicit
+reference-aware cleanup are still Stage 04 work; do not delete backup roots or
+invoke repository primitive `finalize` as a substitute for paired verification.
+
 Status probes profile/configuration drift and actual startup persistence. The C
 subscriber also publishes configuration/state and deployment plans/tasks through
 the operational datastore, for example

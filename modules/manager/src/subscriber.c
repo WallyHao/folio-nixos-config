@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sysrepo.h>
@@ -216,6 +217,12 @@ int main(int argc, char **argv)
     }
     if (state[0] != '/' || snprintf(repository, sizeof(repository), "%s/folio/sysrepo", state) >= (int)sizeof(repository) ||
             snprintf(shared, sizeof(shared), "%s/folio/sysrepo", runtime) >= (int)sizeof(shared)) return 2;
+    char lock_path[PATH_MAX];
+    if (snprintf(lock_path, sizeof(lock_path), "%s/folio/repository.lock", state) >= (int)sizeof(lock_path)) return 2;
+    int repository_lock = open(lock_path, O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+    if (repository_lock < 0 || flock(repository_lock, LOCK_SH | LOCK_NB)) {
+        fprintf(stderr, "Repository is unavailable or under offline maintenance\n"); return 3;
+    }
     if (system_scope) snprintf(prefix, sizeof(prefix), "folio_system");
     else snprintf(prefix, sizeof(prefix), "folio_user_%lu", (unsigned long)getuid());
     if (setenv("SYSREPO_REPOSITORY_PATH", repository, 1) || setenv("SYSREPO_SHM_DIR", shared, 1) ||
@@ -238,7 +245,11 @@ int main(int argc, char **argv)
             mode_t permissions = 0;
             code = sr_get_module_ds_access(connection, module, SR_DS_STARTUP, &owner_name, &group_name, &permissions);
             if (code == SR_ERR_OK && (!owner_name || strcmp(owner_name, "root") || !group_name ||
-                    strcmp(group_name, "folio-operators") || permissions != 0660)) code = SR_ERR_UNAUTHORIZED;
+                    strcmp(group_name, "folio-operators") || permissions != 0660)) {
+                fprintf(stderr, "Unsafe startup access for %s: owner=%s group=%s mode=%04o\n",
+                    module, owner_name ?: "unknown", group_name ?: "unknown", (unsigned)permissions);
+                code = SR_ERR_UNAUTHORIZED;
+            }
             free(owner_name);
             free(group_name);
         }

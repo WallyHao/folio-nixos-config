@@ -23,8 +23,12 @@ choices locally without replacing the specified architecture.
 
 ## Current state
 
-- Agent transition: read [HANDOFF.md](HANDOFF.md) for the exact committed baseline,
-  uncommitted Stage 04 work, pending test command and retained evidence.
+- Agent transition: read [HANDOFF.md](HANDOFF.md) for the latest Stage 04 boundary,
+  retained evidence and remaining work.
+- Stage 04 continuation: offline repository primitives and a manager-owned paired
+  snapshot/upgrade/restore coordinator are implemented; see its task record for
+  focused validation. Production schema transforms, general retained-revision
+  rollback and explicit cleanup still precede Stage 05.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.

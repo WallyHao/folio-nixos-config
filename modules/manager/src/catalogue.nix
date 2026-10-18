@@ -32,6 +32,12 @@ rec {
         }
         // (entry.models or { });
         commands = entry.commands or { };
+        migrations = entry.migrations or [ ];
+        subscribers = {
+          system = [ ];
+          user = [ ];
+        }
+        // (entry.subscribers or { });
         nixosModule = entry.nixosModule or null;
         homeManagerModule = entry.homeManagerModule or null;
       }) catalogue;
@@ -71,6 +77,13 @@ rec {
           models
           packages
           ;
+        migrations = lib.concatMap (definition: definition.migrations) (builtins.attrValues definitions);
+        subscribers = lib.genAttrs scopes (
+          scope:
+          lib.unique (
+            lib.concatMap (definition: definition.subscribers.${scope}) (builtins.attrValues definitions)
+          )
+        );
       };
 
   select =

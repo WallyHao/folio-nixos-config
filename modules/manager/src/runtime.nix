@@ -47,6 +47,15 @@ let
         + text;
     };
   configuration = operation "folio-manager-configuration" (builtins.readFile ./configuration.sh);
+  maintenance = pkgs.writeShellApplication {
+    name = "folio-manager-maintain";
+    runtimeInputs = [
+      atomic repository normalizer prepareInput pkgs.folio.repositoryMaintenance
+      pkgs.coreutils pkgs.bash pkgs.jq pkgs.util-linux pkgs.nix pkgs.systemd
+      pkgs.findutils pkgs.diffutils pkgs.ripgrep
+    ];
+    text = builtins.readFile ./maintenance.sh;
+  };
   recovery = operation "folio-manager-recover" (builtins.readFile ./recover.sh);
   plan = operation "folio-manager-plan" (builtins.readFile ./plan.sh);
   worker = operation "folio-manager-worker" (builtins.readFile ./worker.sh);
@@ -63,6 +72,7 @@ pkgs.symlinkJoin {
   name = "folio-manager-runtime";
   passthru.atomic = atomic;
   paths = [
+    maintenance
     worker
     (pkgs.stdenv.mkDerivation {
       pname = "folio-manager-subscriber";

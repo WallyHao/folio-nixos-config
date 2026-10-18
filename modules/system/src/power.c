@@ -103,6 +103,10 @@ static int power(sr_session_ctx_t *session, uint32_t sub_id, const char *xpath,
 int main(void)
 {
     if (geteuid()) { fprintf(stderr, "The system power subscriber requires root provisioning\n"); return 1; }
+    int repository_lock = open("/var/lib/folio/repository.lock", O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+    if (repository_lock < 0 || flock(repository_lock, LOCK_SH | LOCK_NB)) {
+        fprintf(stderr, "Repository is unavailable or under offline maintenance\n"); return 3;
+    }
     setenv("SYSREPO_REPOSITORY_PATH", "/var/lib/folio/sysrepo", 1);
     setenv("SYSREPO_SHM_DIR", "/run/folio/sysrepo", 1);
     setenv("SYSREPO_SHM_PREFIX", "folio_system", 1);

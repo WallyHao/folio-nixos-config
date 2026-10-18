@@ -1,5 +1,48 @@
 # Implementation Handoff
 
+## Latest continuation boundary (2026-10-18)
+
+This section supersedes the historical incoming handoff below. Stage 04 remains
+in progress; do not start 05 yet. The incoming uncommitted maintenance work has
+been continued with a manager-owned offline coordinator and focused integration.
+See `tasks/04-recovery.md` for exact commands, actual evidence and limits.
+
+- New entry point: `folio-manager-maintain SCOPE BOOTSTRAP snapshot|upgrade|restore
+  ID [FROZEN_SOURCE]`, packaged in `manager-runtime`. BOOTSTRAP comes from the
+  selected closure's metadata. Never run its activation paths on the development
+  host. It quiesces registered consumers, builds as the scoped user/builder,
+  validates paired identities and restores data/models/closure together.
+- Repository primitives now retain incomplete candidates on explicit preparation
+  retry and validate bound closure scope/account/bootstrap/configuration. A changed
+  schema without a revision, a failing hash-bound test transform and invalid
+  closure binding were actually rejected using real isolated repositories.
+- Scoped guest gate passed at
+  `/nix/store/6rxa51zzrs5d1ids8f6f4cpj4dr126rk-vm-test-run-folio-deployment-recovery`;
+  log `/tmp/folio-recovery-paired-gate7.log`. Includes both scopes' paired restore,
+  failed root restore/barrier/retry, a real root candidate install and healthy
+  publication/restore, plus the existing bounded recovery/system assertions.
+- Important fixes: runtime masks do not override the generated `/etc` units;
+  journaled runtime ConditionPathExists drop-ins block consumers through
+  activation. The JSON datastore writes with the caller's primary group; system
+  candidates use `setpriv --regid folio-operators --keep-groups` and umask 0007.
+  Optional not-found consumer services are not errors. Restart success requires
+  real RPC readiness after releasing the mutation lock.
+- Final package compilation (after reusing the snapshot identity check before
+  restore activation) passed:
+  `/nix/store/r6qvqkzai04nyybs8sy13bcnwmn75jxj-folio-manager-runtime`.
+  See the task record for why the prior guest evidence was reused for this final
+  additional validation. Foundation/configuration/catalogue and isolated primitive
+  gates also passed; no full flake check was run.
+- Still open: production module-owned additive/meaning-changing migrations,
+  general retained-revision rollback with unsupported-protocol rebuild, explicit
+  reference-aware cleanup and the full Stage 04 completion gate. The production
+  migration registry remains empty; no later-stage implementation is claimed.
+- Reviewed submilestone subject:
+  `feat(manager): coordinate offline paired repository recovery`.
+  Obtain its SHA from `git log`; preserve any later unrelated work.
+
+## Historical incoming handoff (superseded by the section above)
+
 Updated: 2026-10-18, 13:21 UTC. The owner requested a handoff to another agent.
 Implementation is stopped at this boundary; preserve the uncommitted work below.
 
