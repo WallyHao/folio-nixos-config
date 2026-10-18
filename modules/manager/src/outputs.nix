@@ -50,6 +50,7 @@ let
         environment = environment.name;
         platform = environment.platform;
       }
+      // lib.optionalAttrs (scope == "system") { users = environment.users; }
       // lib.optionalAttrs (scope == "user") {
         account = environment.account;
         home =
@@ -145,6 +146,7 @@ in
   };
   nixosConfigurations.portable = inputs.nixpkgs.lib.nixosSystem {
     inherit system;
+    specialArgs.folioBootstrap = bootstrap;
     modules = adapters "system";
   };
   homeConfigurations.folio = inputs.home-manager.lib.homeManagerConfiguration {
@@ -191,6 +193,18 @@ in
     ];
   };
   checks.${system} = {
+    system-scope = import ../tests/system-scope.nix {
+      inherit pkgs inputs bootstrap;
+      source = lib.fileset.toSource {
+        root = ../../..;
+        fileset = lib.fileset.unions [
+          ../../../flake.nix
+          ../../../flake.lock
+          ../../../modules
+        ];
+      };
+      modules = adapters "system";
+    };
     user-deployment = import ../tests/user-deployment.nix {
       inherit pkgs inputs bootstrap;
       source = lib.fileset.toSource {

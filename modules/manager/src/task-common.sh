@@ -1,6 +1,7 @@
 mkdir -p "$state/deployments/plans" "$state/deployments/tasks" \
   "$state/deployments/builds" "$state/deployments/roots"
 profile=${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager
+if [[ "$scope" == system ]]; then profile=/nix/var/nix/profiles/system; fi
 plan=
 task_reply() {
   jq -cn --arg id "$1" --slurpfile task "$state/deployments/tasks/$1.json" \
@@ -54,7 +55,7 @@ managed_files_match() {
 plan_current() {
   current_configuration >"$work/current.json"
   [[ $(digest_file "$work/current.json") == "$(jq -er .configurationDigest "$plan")" ]] || return 1
-  jq -cS . "$FOLIO_BOOTSTRAP/system-descriptor.json" >"$work/descriptor.json"
+  jq -cS . "$descriptor_path" >"$work/descriptor.json"
   [[ $(digest_file "$work/descriptor.json") == "$(jq -er .descriptorDigest "$plan")" ]] || return 1
   [[ $(readlink -e "$profile" || true) == "$(jq -r .beforeProfile "$plan")" ]] || return 1
 }

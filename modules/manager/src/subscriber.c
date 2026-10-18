@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <jansson.h>
 #include <libyang/libyang.h>
 #include <limits.h>
@@ -15,6 +16,7 @@
 #include <unistd.h>
 
 static volatile sig_atomic_t stopping;
+static int system_scope;
 static void stop(int signal_number) { (void)signal_number; stopping = 1; }
 
 /* An absent YANG value is omitted, rather than encoded as an untyped JSON null.
@@ -51,8 +53,8 @@ static const struct operation operations[] = {
 static int execute(const char *program, const char *input, json_t **result)
 {
     char directory[PATH_MAX], request[PATH_MAX], response[PATH_MAX];
-    const char *runtime = getenv("XDG_RUNTIME_DIR");
-    if (!runtime || snprintf(directory, sizeof(directory), "%s/folio/callback-XXXXXX", runtime) >= (int)sizeof(directory) ||
+    const char *runtime = getenv("FOLIO_RUNTIME_ROOT");
+    if (!runtime || snprintf(directory, sizeof(directory), "%s/callback-XXXXXX", runtime) >= (int)sizeof(directory) ||
             !mkdtemp(directory)) return -1;
     if (snprintf(request, sizeof(request), "%s/request", directory) >= (int)sizeof(request) ||
             snprintf(response, sizeof(response), "%s/response", directory) >= (int)sizeof(response)) {
@@ -113,9 +115,12 @@ static int callback(sr_session_ctx_t *session, uint32_t sub_id, const char *xpat
     const struct operation *operation = private_data;
     if (event == SR_EV_ABORT) return SR_ERR_OK;
     struct passwd *owner = getpwuid(geteuid());
-    const char *client = sr_session_get_user(session);
-    if (!owner || !client || strcmp(owner->pw_name, client)) {
-        sr_session_set_error_message(session, "RPC session identity does not own this user repository");
+    /* This is the subscriber's implicit session identity, not a requester name.
+     * sysrepo checks the sender's real session user against module permissions;
+     * kernel directory/SHM permissions restrict which local users can dispatch. */
+    const char *subscriber_user = sr_session_get_user(session);
+    if (!owner || !subscriber_user || strcmp(owner->pw_name, subscriber_user)) {
+        sr_session_set_error_message(session, "Callback session does not match the subscriber owner");
         return SR_ERR_UNAUTHORIZED;
     }
     char *request = NULL;
@@ -190,13 +195,19 @@ cleanup:
 
 int main(int argc, char **argv)
 {
-    if (argc != 3 || strcmp(argv[1], "user")) {
-        fprintf(stderr, "Usage: folio-manager-subscriber user BOOTSTRAP_DIRECTORY\n");
+    if (argc != 3 || (strcmp(argv[1], "user") && strcmp(argv[1], "system"))) {
+        fprintf(stderr, "Usage: folio-manager-subscriber user|system BOOTSTRAP_DIRECTORY\n");
         return 2;
+    }
+    system_scope = !strcmp(argv[1], "system");
+    if (system_scope && geteuid() != 0) {
+        fprintf(stderr, "The system subscriber must be provisioned and run as root\n");
+        return 1;
     }
     umask(0077);
     const char *home = getenv("HOME"), *state = getenv("XDG_STATE_HOME"), *runtime = getenv("XDG_RUNTIME_DIR");
     char repository[PATH_MAX], shared[PATH_MAX], prefix[64], fallback[PATH_MAX];
+    if (system_scope) { state = "/var/lib"; runtime = "/run"; }
     if (!home || !runtime || runtime[0] != '/') return 2;
     if (!state || !state[0]) {
         if (snprintf(fallback, sizeof(fallback), "%s/.local/state", home) >= (int)sizeof(fallback)) return 2;
@@ -204,24 +215,46 @@ int main(int argc, char **argv)
     }
     if (state[0] != '/' || snprintf(repository, sizeof(repository), "%s/folio/sysrepo", state) >= (int)sizeof(repository) ||
             snprintf(shared, sizeof(shared), "%s/folio/sysrepo", runtime) >= (int)sizeof(shared)) return 2;
-    snprintf(prefix, sizeof(prefix), "folio_user_%lu", (unsigned long)getuid());
+    if (system_scope) snprintf(prefix, sizeof(prefix), "folio_system");
+    else snprintf(prefix, sizeof(prefix), "folio_user_%lu", (unsigned long)getuid());
     if (setenv("SYSREPO_REPOSITORY_PATH", repository, 1) || setenv("SYSREPO_SHM_DIR", shared, 1) ||
-            setenv("SYSREPO_SHM_PREFIX", prefix, 1) || setenv("FOLIO_BOOTSTRAP", argv[2], 1)) return 1;
+            setenv("SYSREPO_SHM_PREFIX", prefix, 1) || setenv("FOLIO_BOOTSTRAP", argv[2], 1) ||
+            setenv("FOLIO_SCOPE", argv[1], 1)) return 1;
+    char runtime_root[PATH_MAX];
+    if (snprintf(runtime_root, sizeof(runtime_root), "%s/folio", runtime) >= (int)sizeof(runtime_root) ||
+            setenv("FOLIO_RUNTIME_ROOT", runtime_root, 1)) return 1;
     unsetenv("SYSREPO_PLUGINS_PATH");
-    json_t *recovery = NULL;
-    if (execute(RECOVERY_OPERATION, "{}", &recovery) ||
-            strcmp(json_string_value(json_object_get(recovery, "status")) ?: "", "success")) {
-        json_decref(recovery);
-        fprintf(stderr, "Configuration recovery failed; subscribers were not started\n");
-        return 1;
-    }
-    json_decref(recovery);
     sr_conn_ctx_t *connection = NULL;
     sr_session_ctx_t *session = NULL;
     sr_subscription_ctx_t *subscription = NULL;
     int code = sr_connect(SR_CONN_DEFAULT, &connection);
+    if (code == SR_ERR_OK && system_scope) {
+        struct group *operators = getgrnam("folio-operators");
+        if (!operators) code = SR_ERR_UNAUTHORIZED;
+        for (size_t i = 0; code == SR_ERR_OK && i < 2; ++i) {
+            const char *module = i ? "folio-deployment" : "folio-environment";
+            char *owner_name = NULL, *group_name = NULL;
+            mode_t permissions = 0;
+            code = sr_get_module_ds_access(connection, module, SR_DS_STARTUP, &owner_name, &group_name, &permissions);
+            if (code == SR_ERR_OK && (!owner_name || strcmp(owner_name, "root") || !group_name ||
+                    strcmp(group_name, "folio-operators") || permissions != 0660)) code = SR_ERR_UNAUTHORIZED;
+            free(owner_name);
+            free(group_name);
+        }
+    }
+    json_t *recovery = NULL;
+    if (code == SR_ERR_OK && (execute(RECOVERY_OPERATION, "{}", &recovery) ||
+            strcmp(json_string_value(json_object_get(recovery, "status")) ?: "", "success"))) {
+        fprintf(stderr, "Configuration recovery failed; subscribers were not started\n");
+        code = SR_ERR_CALLBACK_FAILED;
+    }
+    json_decref(recovery);
     if (code == SR_ERR_OK) code = sr_session_start(connection, SR_DS_RUNNING, &session);
     for (size_t i = 0; code == SR_ERR_OK && i < sizeof(operations) / sizeof(operations[0]); ++i) {
+        /* System deployment handlers are not registered until their privileged
+         * worker and target validation are implemented and tested. */
+        if (system_scope && strcmp(operations[i].xpath, "/folio-environment:configuration-commit") &&
+                strcmp(operations[i].xpath, "/folio-deployment:status")) continue;
         code = sr_rpc_subscribe_tree(session, operations[i].xpath, callback, (void *)&operations[i], 0, 0, &subscription);
     }
     if (code == SR_ERR_OK) code = sr_oper_get_subscribe(session, "folio-environment", "/folio-environment:environment",
@@ -231,7 +264,7 @@ int main(int argc, char **argv)
     if (code == SR_ERR_OK) {
         signal(SIGTERM, stop);
         signal(SIGINT, stop);
-        fprintf(stderr, "Folio manager user subscriptions ready\n");
+        fprintf(stderr, "Folio manager %s subscriptions ready\n", argv[1]);
         while (!stopping) sleep(1);
     } else {
         fprintf(stderr, "Unable to subscribe: %s\n", sr_strerror(code));

@@ -21,6 +21,11 @@ let
       "user"
     ]
     && prepared.configuration."folio-environment:environment".scope == prepared.scope
+    &&
+      prepared.systemDescriptor.environment == prepared.configuration."folio-environment:environment".name
+    &&
+      prepared.systemDescriptor.platform
+      == prepared.configuration."folio-environment:environment".platform
     && prepared.configurationDigest == digest prepared.configuration
     && prepared.descriptorDigest == digest prepared.systemDescriptor
     && prepared.models == identities.models.${prepared.scope}

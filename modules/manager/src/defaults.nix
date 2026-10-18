@@ -51,7 +51,7 @@
             name = "folio";
             uid = 1000;
             home = "/home/folio";
-            groups = [ "wheel" ];
+            groups = [ "folio-operators" ];
             login-shell = "bash";
           }
         ];

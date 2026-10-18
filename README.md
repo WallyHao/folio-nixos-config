@@ -4,8 +4,9 @@ Folio is a NixOS configuration framework built around module-owned YANG models
 and sysrepo. One CLI manages system and user configuration; each module executes
 its own operations. Root Nix composition lives in the manager module.
 
-Status: foundation, durable user configuration and Foot deployment are implemented
-and tested in an isolated NixOS guest. System deployment and later modules below
+Status: foundation, durable user configuration, Foot deployment and system-scoped
+configuration services are implemented and tested in isolated NixOS guests.
+System deployment and later modules below
 remain the implementation contract until their stages pass. No development-host
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
@@ -47,7 +48,8 @@ User-ordered arrays and RFC 7951 scalar encodings are preserved. A source snapsh
 containing `folio-input.json` consumes that data through pure Nix and rejects
 mismatched digests/model/tool identities. Resolved public preference values and
 their origins are recorded and checked; absent user overrides inherit the system
-descriptor's defaults. Real system descriptor publication remains Stage 03.
+descriptor's defaults. The provisioned system service publishes its compiled
+descriptor; standalone bootstrap retains an explicit bootstrap origin.
 
 For a separate root-identity/scope check, run
 `bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
@@ -128,6 +130,38 @@ preservation and operational-state evidence. The development-shell command
 `bash modules/manager/tests/build.sh . "$bootstrap"` separately checks immutable
 source capture and a real user worker surviving subscriber exit; it builds into
 isolated XDG roots and never activates on the development host.
+
+## System configuration foundation
+
+The disposable system adapter provisions `folio`, the dedicated
+`folio-operators` management group, an unprivileged `folio-builder` account and
+separate root/user subscribers. Lingering starts the user subscriber without
+selecting or applying a Home Manager generation. The builder is provisioned;
+system build/activation workers and the runnable UEFI image are still pending.
+
+An authorized operator can use `folio --system config show/edit/import/export`,
+`modules list/enable/disable` and `status`. Saves change desired data only.
+System plan/build/apply and power actions remain unregistered. There is no
+passwordless sudo rule or additional Nix trusted user.
+
+The root repository and SHM directories use the provisioned operator group and
+setgid mode 2770; root journals/plans remain private. Sysrepo checks the sender's
+actual session user against module permissions. Its callback session user is the
+subscriber identity, so it is not treated as an authenticated requester name.
+This is the documented local administrative group boundary, not per-user NACM.
+
+`/run/folio/public/system-descriptor.json` is root-owned, read-only compiled system
+identity/defaults/capabilities data. Saving desired settings does not republish
+them as applied. User snapshots bind this descriptor when available, including
+its digest, registered home and preference origins. The configuration-commit RPC
+carries `configuration-json` text and validates the document with libyang, keeping
+singleton lists/leaf-lists intact across the pinned library's RPC transport.
+
+Run `nix build --no-link .#checks.x86_64-linux.system-scope` to verify real
+operator/non-operator access, isolated desired stores, durable root commits,
+read-only actual descriptors and user plan binding in a disposable guest.
+UEFI boot, actual system updates, unchanged user generations across system apply,
+and externally observed power operations remain the rest of Stage 03.
 
 ## Development handoff
 

@@ -86,7 +86,15 @@ module folio-environment {
     description "Accept a private draft with optimistic concurrency and durable persistence.";
     input {
       leaf expected-digest { type digest; mandatory true; }
-      anydata configuration { mandatory true; description "Complete scoped RFC 7951 desired data."; }
+      leaf configuration-json {
+        type string { length '2..8388608'; }
+        mandatory true;
+        description
+          "Complete scoped RFC 7951 document, preserved as JSON text across the
+           RPC transport. The subscriber validates its contents with libyang.
+           This preserves singleton list and leaf-list shape across sysrepo's
+           opaque anydata serialization.";
+      }
     }
     output {
       leaf status { type result-status; mandatory true; }

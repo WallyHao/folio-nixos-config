@@ -8,6 +8,7 @@ shift 2
 umask 0077
 case "$scope" in
   system)
+    umask 0007
     state=/var/lib/folio
     runtime=/run/folio
     prefix=folio_system
@@ -51,6 +52,14 @@ exec 9>"$state/initialize.lock"
 flock -x -w 30 9
 mkdir -p "$SYSREPO_REPOSITORY_PATH" "$SYSREPO_SHM_DIR" \
   "$state/configuration" "$state/deployments" "$state/backups"
+if [[ "$scope" == system ]]; then
+  chmod 0750 "$state"
+  chmod 0755 "$runtime"
+  # Inherit the provisioned operator group even for clients whose primary group
+  # differs. The same library can still serve private ordinary-user instances.
+  chmod 2770 "$SYSREPO_REPOSITORY_PATH" "$SYSREPO_SHM_DIR"
+  chmod 0700 "$state/configuration" "$state/deployments" "$state/backups"
+fi
 
 identity=$(mktemp "$runtime/models.XXXXXX")
 trap 'rm -f "$identity"' EXIT
@@ -87,7 +96,9 @@ if sysrepoctl --list | awk '$1 == "folio-environment" { found=1 } END { exit !fo
 else
   install_args=()
   for model in "$models"/*.yang; do
-    install_args+=(--install "$model" --permissions 0600)
+    permissions=0600
+    [[ "$scope" != system ]] || permissions=0660
+    install_args+=(--install "$model" --permissions "$permissions")
   done
   sysrepoctl "${install_args[@]}" --search-dirs "$models" --init-data "$defaults"
 fi

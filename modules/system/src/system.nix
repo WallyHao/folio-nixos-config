@@ -1,5 +1,5 @@
 { context }:
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   # Disposable bootstrap fixture, never a physical installation description.
   system.stateVersion = "26.05";
@@ -15,9 +15,21 @@
     "nix-command"
     "flakes"
   ];
-  users.users.folio = {
-    isNormalUser = true;
-    uid = 1000;
-    home = "/home/folio";
-  };
+  users.users = lib.listToAttrs (
+    map (
+      user:
+      lib.nameValuePair user.name {
+        isNormalUser = true;
+        linger = true;
+        inherit (user) uid home;
+        extraGroups = user.groups or [ ];
+        shell =
+          if (user.login-shell or "bash") == "bash" then
+            pkgs.bashInteractive
+          else
+            throw "Folio: Zsh login-shell capability is not implemented yet";
+        initialPassword = "kl;'";
+      }
+    ) context.identity.users
+  );
 }

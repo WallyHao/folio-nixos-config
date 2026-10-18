@@ -1,9 +1,10 @@
-if (( $# != 2 )); then
-  echo 'Usage: folio-prepare-input CONFIGURATION.json BOOTSTRAP_DIRECTORY' >&2
+if (( $# < 2 || $# > 3 )); then
+  echo 'Usage: folio-prepare-input CONFIGURATION.json BOOTSTRAP_DIRECTORY [SYSTEM_DESCRIPTOR.json]' >&2
   exit 2
 fi
 configuration=$(realpath -e -- "$1")
 bootstrap=$(realpath -e -- "$2")
+descriptor=$(realpath -e -- "${3:-$bootstrap/system-descriptor.json}")
 scope=$(jq -er '."folio-environment:environment".scope' "$configuration")
 case "$scope" in
   system|user) ;;
@@ -12,7 +13,8 @@ esac
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 folio-normalize "$bootstrap/models/$scope" "$configuration" >"$work/configuration.json"
-jq -cS . "$bootstrap/system-descriptor.json" >"$work/descriptor.json"
+jq -ceS 'select(.format==1 and (.users|type)=="array" and (.preferences|type)=="object")' \
+  "$descriptor" >"$work/descriptor.json"
 configuration_digest=$(sha256sum <"$work/configuration.json")
 descriptor_digest=$(sha256sum <"$work/descriptor.json")
 jq -cnS --arg scope "$scope" \

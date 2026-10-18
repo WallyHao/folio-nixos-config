@@ -26,7 +26,7 @@ while IFS= read -r -d '' link; do
     *) reply invalid 'Source contains an escaping symlink'; exit 0 ;;
   esac
 done < <(find "$work/source" -type l -print0)
-folio-prepare-input "$work/configuration.json" "$FOLIO_BOOTSTRAP" >"$work/source/folio-input.json"
+folio-prepare-input "$work/configuration.json" "$FOLIO_BOOTSTRAP" "$descriptor_path" >"$work/source/folio-input.json"
 descriptor_home=$(jq -er --arg account "$account" '.systemDescriptor.users[] | select(.name==$account) | .home' \
   "$work/source/folio-input.json")
 if [[ "$descriptor_home" != "$HOME" ]]; then reply invalid 'HOME differs from the provisioned system descriptor'; exit 0; fi

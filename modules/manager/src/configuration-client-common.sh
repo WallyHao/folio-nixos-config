@@ -11,8 +11,8 @@ load_configuration() {
   configuration_digest=${configuration_digest%% *}
 }
 commit_configuration() {
-  jq -cn --arg digest "$configuration_digest" --slurpfile configuration "$work/draft.json" \
-    '{"folio-environment:configuration-commit":{"expected-digest":$digest,configuration:$configuration[0]}}' >"$work/rpc.json"
+  jq -cn --arg digest "$configuration_digest" --rawfile configuration "$work/draft.json" \
+    '{"folio-environment:configuration-commit":{"expected-digest":$digest,"configuration-json":$configuration}}' >"$work/rpc.json"
   if ! timeout --kill-after=2 32 folio-repository "$FOLIO_SCOPE" cfg \
       --rpc="$work/rpc.json" --format json --timeout 30 >"$work/result.json" 2>"$work/error"; then
     cat "$work/error" >&2
