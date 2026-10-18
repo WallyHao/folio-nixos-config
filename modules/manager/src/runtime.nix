@@ -37,7 +37,14 @@ let
         pkgs.diffutils
         prepareInput
       ];
-      text = builtins.readFile ./common.sh + "\n" + builtins.readFile ./task-common.sh + "\n" + text;
+      text =
+        builtins.readFile ./common.sh
+        + "\n"
+        + builtins.readFile ./task-common.sh
+        + "\n"
+        + builtins.readFile ./effects.sh
+        + "\n"
+        + text;
     };
   configuration = operation "folio-manager-configuration" (builtins.readFile ./configuration.sh);
   recovery = operation "folio-manager-recover" (builtins.readFile ./recover.sh);

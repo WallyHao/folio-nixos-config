@@ -221,6 +221,13 @@ in
     ];
   };
   checks.${system} = {
+    recovery = import ../tests/system-deployment.nix {
+      inherit pkgs inputs bootstrap;
+      recovery = true;
+      source = pkgs.folio.source;
+      modules = adapters "system";
+      prepareInput = collection.packages.manager-input;
+    };
     system-deployment = import ../tests/system-deployment.nix {
       inherit pkgs inputs bootstrap;
       source = lib.fileset.toSource {

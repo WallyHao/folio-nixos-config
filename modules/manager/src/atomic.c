@@ -13,7 +13,7 @@
 int main(int argc, char **argv)
 {
     char temporary[PATH_MAX], parent[PATH_MAX], buffer[16384];
-    int fd = -1, directory = -1, result = 1;
+    int fd = -1, directory = -1, result = 1, temporary_exists = 0;
     size_t total = 0;
     ssize_t count;
     if (argc != 2 || argv[1][0] != '/' || strlen(argv[1]) >= sizeof(parent)) {
@@ -36,10 +36,11 @@ int main(int argc, char **argv)
     if (snprintf(temporary, sizeof(temporary), "%s/.atomic-XXXXXX", parent) >= (int)sizeof(temporary)) {
         goto cleanup;
     }
-    fd = mkstemp(temporary);
+    fd = mkostemp(temporary, O_CLOEXEC);
     if (fd < 0) {
         goto cleanup;
     }
+    temporary_exists = 1;
     while ((count = read(STDIN_FILENO, buffer, sizeof(buffer))) != 0) {
         if (count < 0) {
             if (errno == EINTR) continue;
@@ -58,16 +59,19 @@ int main(int argc, char **argv)
             offset += written;
         }
     }
-    if (fsync(fd) || rename(temporary, argv[1]) || fsync(directory)) {
-        goto cleanup;
-    }
+    if (fsync(fd)) goto cleanup;
+    if (close(fd)) { fd = -1; goto cleanup; }
+    fd = -1;
+    if (rename(temporary, argv[1])) goto cleanup;
+    temporary_exists = 0;
+    if (fsync(directory)) goto cleanup;
     result = 0;
 cleanup:
     if (result) perror("Durable record write failed");
     if (fd >= 0) {
         close(fd);
-        if (result) unlink(temporary);
     }
+    if (temporary_exists) unlink(temporary);
     if (directory >= 0) close(directory);
     return result;
 }

@@ -118,6 +118,15 @@ tasks, successful builds and `current.json` live under the scoped `deployments/`
 explicit Nix GC roots retain source/worker/artifact closures. Cleanup and managed
 rollback remain Stage 04; interrupted activation reports failure or interruption.
 
+Deployment now retains matching configuration/model identities in scoped
+`deployments/revisions/`. On subscriber restart, recovery probes actual effects:
+it can finish an activation's recorded successful publication or restore only a
+profile selection when actual files/running system still match the before
+closure. It never repeats activation to infer success. Ambiguous effects and
+failed restoration stay visible in `status` under `recovery`, degrade health and
+block further applies. Explicit managed rollback and schema migration are still
+under development; preserve those records and their GC roots.
+
 Status probes profile/configuration drift and actual startup persistence. The C
 subscriber also publishes configuration/state and deployment plans/tasks through
 the operational datastore, for example

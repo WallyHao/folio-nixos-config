@@ -19,7 +19,8 @@ worker_exit() {
   local code=$?
   if ! "$finished"; then
     jq --arg message "$failure_message" --arg status "$failure_status" --arg now "$(date -u +%FT%TZ)" \
-      '.phase="failed" | .resultStatus=$status | .error=$message | .updatedAt=$now' "$record" |
+      '.phase="failed" | .resultStatus=$status | .error=$message | .updatedAt=$now |
+        .recoveryRequired=(.afterProfile != null)' "$record" |
       folio-atomic-write "$record" || true
   fi
   rm -rf "$work"
@@ -75,6 +76,7 @@ case "$operation_kind" in
   apply)
     lock_configuration
     recover_configuration
+    if has_pending_recovery; then failure_status=conflict; failure_message='Resolve interrupted deployment effects before applying'; exit 1; fi
     if ! plan_current; then failure_status=conflict; failure_message='Plan became stale before activation'; exit 1; fi
     artifact=$(jq -er .artifact "$state/deployments/builds/$plan_id.json")
     [[ "$artifact" == /nix/store/* ]]
@@ -93,12 +95,16 @@ case "$operation_kind" in
     if [[ -n "$before" ]]; then
       nix-store --realise "$before" --add-root "$state/deployments/roots/before-$task_id" --indirect >/dev/null
     fi
-    jq --arg before "$before" --arg after "$artifact" '.beforeProfile=$before | .afterProfile=$after' "$record" |
+    before_deployment=null
+    [[ ! -f "$state/deployments/current.json" ]] || before_deployment=$(jq -c . "$state/deployments/current.json")
+    jq --arg before "$before" --arg after "$artifact" --argjson previous "$before_deployment" \
+      '.beforeProfile=$before | .afterProfile=$after | .beforeDeployment=$previous | .effectPhase="prepared"' "$record" |
       folio-atomic-write "$record"
     update_task activating
     mkdir -p "$(dirname "$profile")"
     failure_message='Profile selection or scoped activation failed; recovery is required'
     nix-env --profile "$profile" --set "$artifact"
+    jq '.effectPhase="profile-selected"' "$record" | folio-atomic-write "$record"
     if [[ "$scope" == user ]]; then
       export HOME_MANAGER_BACKUP_EXT=folio-backup-$task_id
       unset HOME_MANAGER_BACKUP_OVERWRITE DRY_RUN SKIP_SANITY_CHECKS
@@ -109,6 +115,7 @@ case "$operation_kind" in
         .configurationDigest==$input[0].configurationDigest' "$artifact/folio-system.json" >/dev/null
       timeout --kill-after=10 "$timeout_seconds" "$artifact/bin/switch-to-configuration" switch
     fi
+    jq '.effectPhase="activation-returned"' "$record" | folio-atomic-write "$record"
     update_task verifying
     [[ $(selected_profile) == "$artifact" ]]
     if [[ "$scope" == user ]]; then managed_files_match "$artifact"
@@ -116,15 +123,7 @@ case "$operation_kind" in
       [[ $(readlink -e /run/current-system) == "$artifact" ]]
       [[ $(readlink -e /etc/localtime) == "$(readlink -e "$artifact/etc/localtime")" ]]
     fi
-    foot_digest=null
-    if [[ "$scope" == user && -f "$artifact/home-files/.config/foot/foot.ini" ]]; then
-      foot_digest=$(jq -cn --arg value "$(digest_file "$HOME/.config/foot/foot.ini")" '$value')
-    fi
-    jq -cnS --arg artifact "$artifact" --arg planId "$plan_id" --arg taskId "$task_id" \
-      --argjson footDigest "$foot_digest" --slurpfile plan "$plan" \
-      '{format:1,artifact:$artifact,planId:$planId,taskId:$taskId,source:$plan[0].source,
-        inputDigest:$plan[0].inputDigest,configurationDigest:$plan[0].configurationDigest,footDigest:$footDigest}' |
-      folio-atomic-write "$state/deployments/current.json"
+    publish_deployment "$record"
     ;;
   *) failure_message='Unknown recorded worker operation'; exit 2 ;;
 esac

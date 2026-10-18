@@ -5,6 +5,7 @@
   bootstrap,
   prepareInput,
   modules,
+  recovery ? false,
 }:
 let
   fixtureFlake = pkgs.writeText "folio-system-test-flake.nix" ''
@@ -34,7 +35,7 @@ let
     ln -s ../src/common.sh $out/modules/manager/tests/frozen-link
   '';
   descriptor = pkgs.runCommand "folio-system-test-descriptor" { nativeBuildInputs = [ pkgs.jq ]; } ''
-      jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
+    jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
   '';
   preparedSource =
     scope:
@@ -80,9 +81,15 @@ let
       ./system-guest.nix
     ];
   };
+  defaultUser =
+    (import (fixtureSource + "/modules/manager/src/outputs.nix") {
+      inputs = inputs // {
+        self.outPath = fixtureSource;
+      };
+    }).homeConfigurations.folio.activationPackage;
 in
 pkgs.testers.runNixOSTest {
-  name = "folio-system-deployment";
+  name = if recovery then "folio-deployment-recovery" else "folio-system-deployment";
   nodes.machine = { ... }: {
     imports = modules ++ [ ./system-guest.nix ];
     _module.args.folioBootstrap = bootstrap;
@@ -92,7 +99,8 @@ pkgs.testers.runNixOSTest {
       inputs.home-manager
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
-    ];
+    ]
+    ++ pkgs.lib.optional recovery defaultUser;
   };
   testScript = ''
     import datetime
@@ -122,6 +130,7 @@ pkgs.testers.runNixOSTest {
     plan = folio("plan --source /home/folio/source")["data"]["planId"]
     assert folio("build " + plan)["status"] == "success"
     assert folio("apply " + plan)["status"] == "success"
+    user_plan = plan
     user_profile = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
     user_digest = folio("config show")["data"]["digest"]
 
@@ -147,6 +156,12 @@ pkgs.testers.runNixOSTest {
         assert "font=Maple Mono NF CN:size=18" in user("cat /home/folio/.config/foot/foot.ini")
         descriptor = json.loads(user("cat /run/folio/public/system-descriptor.json"))
         assert descriptor["preferences"]["font-size"] == 20
+
+    ${pkgs.lib.optionalString recovery (
+      builtins.replaceStrings [ "@defaultGeneration@" ] [ (toString defaultUser) ] (
+        builtins.readFile ./recovery.py
+      )
+    )}
 
     with subtest("unauthorized and arbitrary activation requests have no effects"):
         profile = machine.succeed("readlink -f /run/current-system").strip()

@@ -15,8 +15,12 @@ if [[ -f "$state/configuration/transaction.json" ]]; then
   case "$phase" in saved|restored) ;; *) saved=false ;; esac
 fi
 if [[ "$health" == healthy && "$saved" == false ]]; then health=degraded; fi
+recovery_required=false
+if has_pending_recovery; then recovery_required=true; health=degraded; fi
 jq --arg digest "$desired_digest" --arg applied "$applied_digest" --arg health "$health" --argjson saved "$saved" \
+  --argjson recovery "$recovery_required" \
   '."folio-environment:environment".configuration={digest:$digest,saved:$saved,"recovery-required":($saved|not)} |
+   ."folio-environment:environment".configuration."recovery-required"=($recovery or ($saved|not)) |
    ."folio-environment:environment".state=({health:$health} + (if $applied=="" then {} else {"applied-digest":$applied} end))' \
   "$work/current.json" >"$work/observed.json"
 : >"$work/plans.jsonl"

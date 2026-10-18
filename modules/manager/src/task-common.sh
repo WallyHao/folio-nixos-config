@@ -34,13 +34,13 @@ recover_tasks() {
     phase=$(jq -er .phase "$record")
     case "$phase" in
       queued) start_task "$id" || return 1 ;;
-      validating|building|activating|verifying)
+      validating|building|activating|verifying|failed|interrupted)
+        if [[ "$phase" == failed || "$phase" == interrupted ]] &&
+            ! jq -e 'if has("recoveryRequired") then .recoveryRequired else .afterProfile != null end' "$record" >/dev/null; then continue; fi
         if ! systemctl "$manager_option" is-active --quiet "folio-task-$id.service"; then
           exec 6>"$state/deployments/tasks/$id.lock"
           if flock -n 6; then
-            jq '.phase="interrupted" | .resultStatus="unavailable" |
-              .error="Worker disappeared; inspect actual effects before recovery"' "$record" |
-              folio-atomic-write "$record"
+            reconcile_interrupted_task "$record"
           fi
           exec 6>&-
         fi ;;
@@ -61,6 +61,10 @@ managed_files_match() {
 applied_artifact_matches() {
   local artifact=$1
   [[ $(selected_profile) == "$artifact" ]] || return 1
+  artifact_effects_match "$artifact"
+}
+artifact_effects_match() {
+  local artifact=$1
   if [[ "$scope" == user ]]; then managed_files_match "$artifact"
   else
     [[ $(readlink -e /run/current-system) == "$artifact" ]] &&

@@ -22,6 +22,7 @@ if [[ "$operation_kind" == apply ]]; then
   fi
   lock_configuration
   recover_configuration
+  if has_pending_recovery; then reply conflict 'Resolve interrupted deployment effects before applying'; exit 0; fi
   if ! plan_current; then reply conflict 'Plan is stale; create a new plan'; exit 0; fi
 fi
 worker=@worker@/bin/folio-manager-worker

@@ -23,5 +23,11 @@ if [[ -f "$state/deployments/current.json" ]]; then
   fi
 fi
 if [[ "$health" == healthy && "$saved" == false ]]; then health=degraded; fi
+shopt -s nullglob
+task_records=("$state/deployments/tasks/"*.json)
+recovery=$(jq -cs '[.[] | select(.recoveryRequired==true) | {key:.id,value:{phase,beforeProfile,afterProfile,error}}] | from_entries' "${task_records[@]}" </dev/null)
+[[ "$recovery" == '{}' ]] || health=degraded
 jq -cn --arg desiredDigest "$desired_digest" --arg health "$health" --argjson applied "$applied" --argjson saved "$saved" \
-  '{status:"success",data:{"folio-deployment:result":{desiredDigest:$desiredDigest,configurationSaved:$saved,health:$health,applied:$applied}}}'
+  --argjson recovery "$recovery" \
+  '{status:"success",data:{"folio-deployment:result":({desiredDigest:$desiredDigest,configurationSaved:$saved,health:$health,applied:$applied}
+    + (if $recovery=={} then {} else {recovery:$recovery} end))}}'

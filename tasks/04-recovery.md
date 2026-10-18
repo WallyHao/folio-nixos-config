@@ -1,6 +1,6 @@
 # Stage 04: Fault recovery, migrations and managed rollback
 
-Dependencies: 03.
+Dependencies: 03. Status: in-progress.
 Expected commit: `feat(manager): recover deployments and restore retained revisions`.
 
 ## Objective and deliverables
@@ -52,3 +52,49 @@ and one scoped system VM recovery case, reusing Stage 03 fixtures/closures.
 Record journal/recovery entry points, backup/migration/offline restore commands,
 fault evidence, lock order, retained generations and rollback limits. These are
 prerequisites for application lifecycle work, not indefinitely deferred features.
+
+## Execution baseline (2026-10-18)
+
+- Stage 03 commit: `9c0e62a`; its system/VM gate passed before this stage started.
+- Reviewed manager's prepared/accepted configuration journal, task dispatch,
+  profile selection and activation boundaries, plus Sylphy's
+  `manager/scripts/home-authority.py` and `manager/nix/adoption.nix` at reference
+  revision `9cba023d90c4485b33a91e2d12724b6920580580`.
+- Preserve the existing scoped mutation locks, unique adoption backups and rooted
+  immutable inputs. Recovery must distinguish observable completed effects from
+  ambiguous partial activation; build success is insufficient evidence.
+
+## Effect reconciliation submilestone (2026-10-18)
+
+- Added durable before/profile-selected/activation-returned checkpoints and
+  retained revision records containing matching configuration, model/tool
+  identities, bootstrap, source, artifact and previous deployment identity.
+- Startup probes actual effects under the scoped mutation lock. It completes a
+  verified successful publication without reactivation, or restores only the
+  recorded profile while actual effects still match the before closure. Ambiguous
+  effects/restoration failure remain recovery-required, visible in status and
+  operational state, and block subsequent apply. No destructive retry is inferred.
+- Hardened atomic replacement to report close errors before rename and clean up
+  closed temporary files on failure; new revision directories are flushed before
+  publishing records. Existing unique adoption backups and GC roots are retained.
+- Real scoped VM command passed:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.recovery`.
+  Evidence `/nix/store/93fici1da0gkams85a38bgkq2xpnpsk0-vm-test-run-folio-deployment-recovery`;
+  log `/tmp/folio-recovery-effects-gate2.log`. Covered publication interruption,
+  actual denied user-profile restoration, visible degraded state/apply rejection,
+  successful later profile-only reconciliation and root profile restoration without
+  reboot or changing the running UTC system/user generation. Reused the Stage 03
+  UEFI fixture and its power/authorization assertions.
+- Service readiness uses actual RPC availability after startup reconciliation;
+  systemd's active state alone does not imply that subscriptions are ready.
+- After the atomic-close hardening, reran the affected real-repository gate:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.configuration`.
+  Passed: `/nix/store/djfi89fs8dsj1hwf31s9ygphjr2f7pyr-folio-configuration-integration`;
+  log `/tmp/folio-recovery-atomic-gate.log`. This includes denied durable writes
+  and both prepared-only and accepted-before-startup recovery. The scoped VM
+  evidence above covers unchanged activation/reconciliation behavior.
+- Remaining Stage 04 gate: explicit managed rollback, offline paired repository/
+  closure backup/restore, additive and meaning-changing migrations, failed
+  migration/restore evidence and explicit reference-aware cleanup. Stage remains
+  in progress; none of these commands are claimed implemented yet.
+- Submilestone subject: `fix(manager): reconcile interrupted deployment effects`.
