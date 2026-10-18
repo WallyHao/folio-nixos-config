@@ -4,7 +4,7 @@ Folio is a NixOS configuration framework built around module-owned YANG models
 and sysrepo. One CLI manages system and user configuration; each module executes
 its own operations. Root Nix composition lives in the manager module.
 
-Status: foundation implemented; deployment and runtime operations below remain
+Status: foundation and durable user configuration implemented; deployment operations below remain
 the implementation contract until their stages pass. See the runnable foundation
 workflow below and [STRUCTURE.md](STRUCTURE.md) for directory ownership. No Folio
 system has been installed or activated.
@@ -50,8 +50,34 @@ deployment are Stage 02; real descriptor publication is Stage 03.
 For a separate root-identity/scope check, run
 `bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
 It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
-it does not initialize system state on the development host. No `folio` runtime
-CLI, subscriptions, systemd services, apply, or rollback behavior is delivered yet.
+it does not initialize system state on the development host. User apply and
+rollback are not implemented yet.
+
+## User configuration development
+
+The `folio` package provides `config show/edit/import/export` and
+`modules list/enable/disable` in user scope. Writes use sysrepocfg and the real
+manager C subscriber. The Home Manager output installs `folio-manager.service`;
+it initializes the repository before subscribing and reconciles interrupted
+configuration commits first. It has not yet been activated as a Folio user.
+
+For isolated development, keep the scratch XDG paths from the foundation example
+and run `folio-manager-subscriber user "$bootstrap"` in the development shell.
+In another shell with the same XDG paths, use `folio --json config show`,
+`folio config edit`, or `folio config import FILE`. Exported documents contain
+desired RFC 7951 data, suitable for reviewing or importing; `show` returns the
+configuration with its digest. Stop the development subscriber when finished.
+
+Edits use private temporary documents and optimistic digest checks. Commits
+serialize writers and durably record prepared/accepted/saved phases. Recovery
+validates journal digests, restores prepared-only data, and rolls accepted data
+forward into running/startup before consumers start. A failed save remains a
+failure. JSON commands return one `{ status, data, error, taskId }` envelope;
+missing write subscribers return exit 3, validation exit 2, conflicts exit 4.
+Unimplemented deployment/status/rollback commands explicitly return exit 3.
+
+Run `nix build --no-link .#checks.x86_64-linux.configuration` for the bounded
+real-sysrepo commit/edit/conflict/failure/restart integration scenario.
 
 ## Development handoff
 

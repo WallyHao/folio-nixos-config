@@ -1,0 +1,3 @@
+lock_configuration
+recover_configuration
+reply success

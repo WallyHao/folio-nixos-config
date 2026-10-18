@@ -1,6 +1,6 @@
 # Stage 02: User configuration to Foot deployment
 
-Dependencies: 01.
+Dependencies: 01. Status: in-progress.
 Expected commit: `feat(manager): deploy frozen user foot configuration`.
 
 ## Objective and deliverables
@@ -56,3 +56,31 @@ Reuse closures/fixtures; no desktop boot after each CLI edit or host activation.
 
 Record working commands, derivations, service/worker names, profile/journal layout,
 digests/locks and actual observed Foot evidence. Record unavailable evidence honestly.
+
+## Configuration submilestone (2026-10-18)
+
+- Prerequisite foundation commit: `a5bded7`.
+- Implemented actual Bash/jq/sysrepocfg CLI config and module-selection commands,
+  collected public command adapters, real user C RPC subscription and owner/session
+  checks, bounded fixed-path operation execution, and Home Manager user service.
+- Configuration writes use private drafts, an expected digest and a mutation
+  lock. Atomic record replacement fsyncs file and directory. Prepared-only records
+  restore before-data; accepted records roll after-data into running/startup before
+  subscriptions start. Recovery validates journal digests and fails closed.
+- Reused inspected Sylphy home-authority principles (owned state, serialized
+  profile authority and durable journals), adapting implementation to C/Bash rather
+  than importing its Python or Rust manager. Source reference remains 9cba023d.
+- Passing check: `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.configuration`.
+  Evidence: `/nix/store/vc0hi0gw55jrycyjkr9n9iv55cwn3z6p-folio-configuration-integration`.
+  Real sysrepo/C callbacks cover commit persistence, private concurrent editing,
+  conflict/invalid-scope/unknown-module results, actual denied journal writes,
+  missing subscribers, accepted roll-forward and prepared rollback on restart.
+- Pure prepared-input rendering/digest checks pass after service composition was
+  added. Package build runs ShellCheck; C builds with `-Wall -Wextra -Werror`.
+- Configuration maintenance tests use isolated XDG roots. No host activation or
+  product system service was started. The Home Manager service is evaluated but
+  its live activation remains part of the remaining stage gate.
+- Submilestone subject: `feat(manager): persist user configuration through sysrepo`.
+- Remaining: immutable source capture/plans, durable independent workers/tasks,
+  managed profile/adoption/apply, observed Foot state and the full Stage 02 gate.
+  Deployment/status/rollback CLI commands explicitly report unavailable.

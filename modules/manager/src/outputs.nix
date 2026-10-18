@@ -1,7 +1,18 @@
 { inputs }:
 let
   system = "x86_64-linux";
-  pkgs = import inputs.nixpkgs { inherit system; };
+  basePkgs = import inputs.nixpkgs { inherit system; };
+  sysrepoModule = import ../../sysrepo/default.nix {
+    pkgs = basePkgs;
+    lib = basePkgs.lib;
+  };
+  # Explicit public build resources; no module imports another's private files.
+  pkgs = basePkgs // {
+    folio = {
+      sysrepo = sysrepoModule.packages.library;
+      repository = sysrepoModule.packages.tools;
+    };
+  };
   inherit (pkgs) lib;
   catalogueLib = import ./catalogue.nix { inherit lib; };
   catalogue = {
@@ -9,7 +20,7 @@ let
       inherit pkgs lib;
       cliCommands = collection.commands;
     };
-    sysrepo = import ../../sysrepo/default.nix { inherit pkgs lib; };
+    sysrepo = sysrepoModule;
     system = import ../../system/default.nix { inherit pkgs lib; };
     terminal = import ../../terminal/default.nix { inherit pkgs lib; };
   };
@@ -83,6 +94,16 @@ let
     ln -s ${models.user} $out/models/user
     cp ${pkgs.writeText "system.json" (builtins.toJSON defaults.system)} $out/system.json
     cp ${pkgs.writeText "user.json" (builtins.toJSON defaults.user)} $out/user.json
+    cp ${
+      pkgs.writeText "catalogue.json" (
+        builtins.toJSON (
+          lib.mapAttrs (_: d: {
+            scopes =
+              lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
+          }) collection.definitions
+        )
+      )
+    } $out/catalogue.json
     cp ${pkgs.writeText "identities.json" (builtins.toJSON identities)} $out/identities.json
     cp ${
       pkgs.writeText "descriptor.json" (
@@ -102,6 +123,7 @@ in
 {
   packages.${system} = collection.packages // {
     manager-bootstrap = bootstrap;
+    folio = collection.packages.manager-cli;
   };
   nixosConfigurations.portable = inputs.nixpkgs.lib.nixosSystem {
     inherit system;
@@ -109,6 +131,7 @@ in
   };
   homeConfigurations.folio = inputs.home-manager.lib.homeManagerConfiguration {
     inherit pkgs;
+    extraSpecialArgs.folioBootstrap = bootstrap;
     modules = adapters "user" ++ [
       {
         home.username = (context "user").identity.account;
@@ -129,6 +152,8 @@ in
       collection.packages.sysrepo-tools
       collection.packages.manager-normalizer
       collection.packages.manager-input
+      collection.packages.manager-cli
+      collection.packages.manager-runtime
     ];
     inputsFrom = [
       collection.packages.sysrepo-library
@@ -136,6 +161,12 @@ in
     ];
   };
   checks.${system} = {
+    configuration = import ../tests/configuration.nix {
+      inherit pkgs bootstrap;
+      runtime = collection.packages.manager-runtime;
+      cli = collection.packages.manager-cli;
+      repository = collection.packages.sysrepo-tools;
+    };
     catalogue = import ../tests/catalogue.nix { inherit pkgs catalogueLib; };
     foundation = import ../../sysrepo/tests/foundation.nix {
       inherit pkgs bootstrap;
