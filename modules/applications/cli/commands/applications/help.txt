@@ -1,0 +1,5 @@
+Usage: folio apps init|list|install|update|remove|reconcile|adopt|prepare [zen|obs|all]
+       folio apps rollback REVISION_ID [zen|obs|all]
+       folio apps resume|status TASK_ID
+Options: --offline, --adopt-files, --request-id ID.
+Use --no-wait before the command to stop waiting after acceptance.

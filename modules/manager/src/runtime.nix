@@ -11,7 +11,7 @@ let
     version = "0.1.0";
     dontUnpack = true;
     buildPhase = ''
-      $CC -std=c11 -Wall -Wextra -Werror -O2 ${./atomic.c} -o folio-atomic-write
+      $CC -std=c11 -Wall -Wextra -Werror -O2 ${../runtime/journal/atomic.c} -o folio-atomic-write
     '';
     installPhase = ''
       mkdir -p $out/bin
@@ -38,15 +38,15 @@ let
         prepareInput
       ];
       text =
-        builtins.readFile ./common.sh
+        builtins.readFile ../runtime/lib/common.sh
         + "\n"
-        + builtins.readFile ./task-common.sh
+        + builtins.readFile ../runtime/journal/common.sh
         + "\n"
-        + builtins.readFile ./effects.sh
+        + builtins.readFile ../runtime/lib/effects.sh
         + "\n"
         + text;
     };
-  configuration = operation "folio-manager-configuration" (builtins.readFile ./configuration.sh);
+  configuration = operation "folio-manager-configuration" (builtins.readFile ../runtime/operations/configuration.sh);
   maintenance = pkgs.writeShellApplication {
     name = "folio-manager-maintain";
     runtimeInputs = [
@@ -54,23 +54,23 @@ let
       pkgs.coreutils pkgs.bash pkgs.jq pkgs.util-linux pkgs.nix pkgs.systemd
       pkgs.findutils pkgs.diffutils pkgs.ripgrep
     ];
-    text = builtins.replaceStrings [ "@compatibilitySource@" ] [ (toString pkgs.folio.source) ] (builtins.readFile ./maintenance.sh);
+    text = builtins.replaceStrings [ "@compatibilitySource@" ] [ (toString pkgs.folio.source) ] (builtins.readFile ../runtime/operations/rollback.sh);
   };
   cleanup = pkgs.writeShellApplication {
     name = "folio-manager-cleanup";
     runtimeInputs = [ atomic pkgs.coreutils pkgs.jq pkgs.util-linux ];
-    text = builtins.readFile ./cleanup.sh;
+    text = builtins.readFile ../runtime/operations/cleanup.sh;
   };
-  recovery = operation "folio-manager-recover" (builtins.readFile ./recover.sh);
-  plan = operation "folio-manager-plan" (builtins.readFile ./plan.sh);
-  worker = operation "folio-manager-worker" (builtins.readFile ./worker.sh);
-  status = operation "folio-manager-status" (builtins.readFile ./status.sh);
-  observed = operation "folio-manager-observed" (builtins.readFile ./observed.sh);
+  recovery = operation "folio-manager-recover" (builtins.readFile ../runtime/journal/recover.sh);
+  plan = operation "folio-manager-plan" (builtins.readFile ../runtime/operations/plan.sh);
+  worker = operation "folio-manager-worker" (builtins.readFile ../runtime/operations/deploy.sh);
+  status = operation "folio-manager-status" (builtins.readFile ../runtime/operations/status.sh);
+  observed = operation "folio-manager-observed" (builtins.readFile ../runtime/callbacks/operational-data.sh);
   submission =
     kind:
     operation "folio-manager-${kind}" (
       "operation_kind=${kind}\n"
-      + builtins.replaceStrings [ "@worker@" ] [ "${worker}" ] (builtins.readFile ./submit.sh)
+      + builtins.replaceStrings [ "@worker@" ] [ "${worker}" ] (builtins.readFile ../runtime/operations/submit.sh)
     );
 in
 pkgs.symlinkJoin {
@@ -100,7 +100,7 @@ pkgs.symlinkJoin {
           -DSTATUS_OPERATION='"${status}/bin/folio-manager-status"' \
           -DOBSERVED_OPERATION='"${observed}/bin/folio-manager-observed"' \
           -DTIMEOUT_PROGRAM='"${pkgs.coreutils}/bin/timeout"' \
-          ${./subscriber.c} $(pkg-config --cflags --libs sysrepo libyang jansson) -o folio-manager-subscriber
+          ${../runtime/main.c} $(pkg-config --cflags --libs sysrepo libyang jansson) -o folio-manager-subscriber
       '';
       installPhase = ''
         mkdir -p $out/bin

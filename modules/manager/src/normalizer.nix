@@ -14,7 +14,7 @@ let
     buildInputs = [ libyang ];
     buildPhase = ''
       $CC -D_GNU_SOURCE -std=c11 -Wall -Wextra -Werror -O2 \
-        ${./normalize.c} $(pkg-config --cflags --libs libyang) -o folio-normalize-data
+        ${../runtime/snapshot/normalize.c} $(pkg-config --cflags --libs libyang) -o folio-normalize-data
     '';
     installPhase = ''
       mkdir -p $out/bin
@@ -29,6 +29,6 @@ writeShellApplication {
     jq
   ];
   text = ''
-    folio-normalize-data "$@" | jq -cS -f ${./normalize.jq}
+    folio-normalize-data "$@" | jq -cS -f ${../runtime/snapshot/normalize.jq}
   '';
 }

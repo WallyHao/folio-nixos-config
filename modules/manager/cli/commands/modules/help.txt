@@ -1,0 +1,2 @@
+Usage: folio modules list|enable NAME|disable NAME
+Change desired module selection; use plan/build/apply to deploy it.

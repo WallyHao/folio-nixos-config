@@ -1,32 +1,46 @@
 { pkgs, lib }:
-pkgs.stdenv.mkDerivation rec {
-  pname = "sysrepo";
-  version = "3.7.11";
-  src = pkgs.fetchFromGitHub {
-    owner = "sysrepo";
-    repo = "sysrepo";
-    rev = "v${version}";
-    hash = "sha256-v3FXY33PuM4/TXH49M6JBKweIry17TxS2ksIBm9X9wg=";
+let
+  quiescent = pkgs.stdenv.mkDerivation {
+    pname = "folio-repository-quiescent";
+    version = "0.1.0";
+    dontUnpack = true;
+    buildPhase = "$CC -std=c11 -Wall -Wextra -Werror -O2 ${../runtime/lib/quiescent.c} -o folio-repository-quiescent";
+    installPhase = "mkdir -p $out/bin; cp folio-repository-quiescent $out/bin/";
   };
-  nativeBuildInputs = [
-    pkgs.cmake
-    pkgs.pkg-config
-  ];
-  buildInputs = [ pkgs.libyang ];
-  cmakeFlags = [
-    "-DCMAKE_BUILD_TYPE=Release"
-    "-DCMAKE_INSTALL_LIBDIR=lib"
-    "-DCMAKE_INSTALL_INCLUDEDIR=include"
-    "-DREPO_PATH=${placeholder "out"}/var/lib/sysrepo"
-    "-DENABLE_EXAMPLES=OFF"
-    "-DENABLE_TESTS=OFF"
-    "-DENABLE_SYSREPO_PLUGIND=OFF"
-    "-DSYSREPO_UMASK=0007"
-  ];
-  meta = {
-    description = "Pinned sysrepo library and administration tools for Folio";
-    homepage = "https://github.com/sysrepo/sysrepo";
-    license = lib.licenses.bsd3;
-    platforms = [ "x86_64-linux" ];
+  library = import ./library.nix { inherit pkgs lib; };
+  tools = pkgs.writeShellApplication {
+    name = "folio-repository";
+    runtimeInputs = [
+      library
+      pkgs.coreutils
+      pkgs.util-linux
+      pkgs.jq
+      pkgs.diffutils
+      pkgs.gawk
+    ];
+    text = builtins.readFile ../runtime/operations/repository.sh;
+  };
+in
+{
+  packages = {
+    inherit library tools;
+    maintenance = pkgs.writeShellApplication {
+      name = "folio-repository-maintain";
+      runtimeInputs = [
+        library
+        quiescent
+        pkgs.folio.atomicWrite
+        pkgs.folio.normalizer
+        pkgs.coreutils
+        pkgs.jq
+        pkgs.util-linux
+        pkgs.gawk
+        pkgs.gnused
+        pkgs.diffutils
+        pkgs.nix
+      ];
+      text = builtins.readFile ../runtime/operations/maintenance.sh;
+    };
+    libyang = pkgs.libyang;
   };
 }

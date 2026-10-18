@@ -1,0 +1,2 @@
+Usage: folio --system system reboot|poweroff [--request-id ID]
+Submit an authorized system-owned power operation.

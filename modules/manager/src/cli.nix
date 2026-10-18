@@ -5,8 +5,8 @@
   runtime,
 }:
 let
-  common = builtins.replaceStrings [ "@normalizeFilter@" ] [ "${./normalize.jq}" ] (
-    builtins.readFile ./configuration-client-common.sh
+  common = builtins.replaceStrings [ "@normalizeFilter@" "@requestFilter@" ] [ "${../runtime/snapshot/normalize.jq}" "${../cli/commands/config/request.jq}" ] (
+    builtins.readFile ../cli/lib/transport.sh
   );
   client =
     name: source: shared:
@@ -17,19 +17,19 @@ let
         pkgs.coreutils
         pkgs.jq
       ];
-      text = builtins.readFile ./client-common.sh + "\n" + shared + "\n" + builtins.readFile source;
+      text = builtins.readFile ../cli/lib/output.sh + "\n" + shared + "\n" + builtins.readFile source;
     };
   adapters = {
-    config = client "folio-config" ./config-client.sh common;
-    modules = client "folio-modules" ./modules-client.sh common;
-    plan = client "folio-deployment" ./deployment-client.sh "";
+    config = client "folio-config" ../cli/commands/config/command.sh common;
+    modules = client "folio-modules" ../cli/commands/modules/command.sh common;
+    plan = client "folio-deployment" ../cli/commands/deploy/command.sh "";
     build = adapters.plan;
     apply = adapters.plan;
     status = adapters.plan;
     rollback = pkgs.writeShellApplication {
       name = "folio-maintenance";
       runtimeInputs = [ runtime pkgs.coreutils pkgs.jq ];
-      text = builtins.readFile ./client-common.sh + "\n" + builtins.readFile ./maintenance-client.sh;
+      text = builtins.readFile ../cli/lib/output.sh + "\n" + builtins.readFile ../cli/commands/rollback/command.sh;
     };
     cleanup = adapters.rollback;
   };
@@ -42,7 +42,10 @@ let
         [
           (toString (pkgs.writeText "folio-commands.json" (builtins.toJSON cliCommands)))
         ]
-        (builtins.readFile ./cli.sh);
+        (builtins.readFile ../cli/lib/arguments.sh + "\n"
+          + builtins.readFile ../cli/lib/help.sh + "\n"
+          + builtins.readFile ../cli/lib/commands.sh + "\n"
+          + builtins.readFile ../cli/bin/folio.sh);
   };
 in
 {

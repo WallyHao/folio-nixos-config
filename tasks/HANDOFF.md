@@ -21,6 +21,24 @@
 
 ## Required next boundary: restore the agreed layout
 
+Current correction state (2026-10-19): complete and ready for its reviewed
+commit. See `tasks/LAYOUT.md`. Nix/client/runtime sources and references are
+separated. Final recovery guest passed at
+`/nix/store/l21ckznc7bap75qgxk1ymknfkliinbc7-vm-test-run-folio-deployment-recovery`,
+log `/tmp/folio-layout-recovery-gate7.log` (125.86 seconds). Application guest
+passed at `/nix/store/7iibk628x9xvrjkxgms4wh0q42p1km6v-vm-test-run-folio-owned-applications`.
+Real foundation/configuration and actual pre-applications source compatibility
+build also passed. The new startup avoids waiting on an apply-held configuration
+lock; application mutations retain the saved-configuration barrier. Offline
+rebuild preserves frozen composition and copies src/cli/runtime together. Test
+fixtures retain lndir/Perl and native tooling for offline builds. No host activation.
+Expected correction subject:
+`refactor(modules): restore agreed source cli and runtime layout`.
+After its commit, continue Stage 06; its sources/task have only been inspected.
+Stage 05's preceding commit is `e3ab28a`.
+Quota sleep was honored below 5%; account2 recovered to 99% at 02:28. Current
+five-hour reset is 2026-10-19 07:28:11 Asia/Shanghai. Keep checking the same script.
+
 The owner explicitly requested completion of the current Stage 05 first, followed
 by correction of all implemented module layouts to `STRUCTURE.md`, before moving
 on to later stages. Read that file in full. In particular, keep Nix implementation
@@ -305,3 +323,13 @@ After the full Stage 04 gate and commit, continue 05 applications, 06 desktop,
 07 developer tools, 08 network/system and 09 integrated acceptance. Hardware
 acceptance remains separate and requires an actual target. The overall task is
 unfinished; the owner was told that remaining work is substantial.
+
+## Quota pause checkpoint (codex2, 2026-10-18 23:49 Asia/Shanghai)
+
+The account2 five-hour quota reached 4%; the owner requires sleep below 5%.
+Implementation work is paused until fresh telemetry confirms recovery after the
+expected 2026-10-19 02:27:46 reset. Do not switch accounts. Check using
+`/tmp/folio-codex2-quota/check.sh` before resuming. Layout correction is staged,
+not committed; final recovery guest exec session 42217 continues independently,
+with log `/tmp/folio-layout-recovery-gate5.log`. Inspect that outcome first after
+resuming. All other evidence/remaining work is recorded in `tasks/LAYOUT.md`.

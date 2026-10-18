@@ -23,13 +23,15 @@ choices locally without replacing the specified architecture.
 
 ## Current state
 
-- Agent transition: read [HANDOFF.md](HANDOFF.md) for the latest Stage 04 boundary,
+- Agent transition: read [HANDOFF.md](HANDOFF.md) for the latest implementation boundary,
   retained evidence and remaining work.
 - Stage 04 is complete: real module-owned opacity migrations, scoped paired
   restore, retained-revision rollback/rebuild and explicit protected cleanup passed
   their bounded gates in commit `7af1c09`. Stage 05 applications has passed its
-  bounded guest gate. Before Stage 06, correct all implemented module layouts to
-  STRUCTURE.md as explicitly requested by the owner.
+  bounded guest gate in commit `e3ab28a`.
+- The required layout correction in [LAYOUT.md](LAYOUT.md) passed its affected
+  checks, including real application and deployment-recovery guests. Continue
+  Stage 06 after committing that reviewed correction.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.

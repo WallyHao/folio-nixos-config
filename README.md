@@ -13,6 +13,12 @@ gate; GUI appearance and capture evidence remain for the desktop stage. No devel
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
 
+Implemented modules keep Nix implementation in `src/`, client entry points and
+command resources in `cli/`, subscribers and operations in `runtime/`, models in
+`model/`, and behavioral checks in the outer `tests/`. Module `default.nix` files
+expose those owned implementations. Manager composition remains
+`modules/manager/src/outputs.nix`; product documentation stays in this README.
+
 ## Foundation workflow
 
 The root Flake reuses Sylphy's pinned Nixpkgs/Home Manager inputs. Packages include

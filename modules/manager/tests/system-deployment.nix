@@ -32,7 +32,7 @@ let
     cp -R ${source}/. $out/
     chmod -R u+w $out
     cp ${fixtureFlake} $out/flake.nix
-    ln -s ../src/common.sh $out/modules/manager/tests/frozen-link
+    ln -s ../runtime/lib/common.sh $out/modules/manager/tests/frozen-link
   '';
   fixtureSource = if recovery then pkgs.runCommand "folio-legacy-schema-test-source" { } ''
     mkdir $out
@@ -124,7 +124,15 @@ pkgs.testers.runNixOSTest {
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
     ]
-    ++ pkgs.lib.optionals recovery [ defaultUser migrationSource migrationSeed.homeConfigurations.folio.activationPackage ];
+    ++ pkgs.lib.optionals recovery [
+      defaultUser migrationSource migrationSeed.homeConfigurations.folio.activationPackage
+      # Rebuilding retained source may produce a new wrapper derivation even
+      # when its runtime dependencies are unchanged. Keep the offline guest's
+      # native build tools available rather than bootstrapping a compiler there.
+      pkgs.stdenv pkgs.stdenvNoCC pkgs.stdenv.cc pkgs.pkg-config
+      pkgs.shellcheck-minimal pkgs.makeWrapper pkgs.makeBinaryWrapper pkgs.curl
+      pkgs.lndir pkgs.perl pkgs.jansson.dev pkgs.libyang.dev
+    ];
   };
   testScript = ''
     import datetime

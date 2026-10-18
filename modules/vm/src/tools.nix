@@ -19,5 +19,5 @@ pkgs.writeShellApplication {
         "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd"
         "${pkgs.OVMF.fd}/FV/OVMF_VARS.fd"
       ]
-      (builtins.readFile ./tool.sh);
+      (builtins.readFile ../runtime/operations/lifecycle.sh);
 }

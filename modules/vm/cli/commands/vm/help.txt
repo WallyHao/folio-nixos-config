@@ -1,0 +1,3 @@
+Usage: folio vm build JOB_ID SOURCE
+       folio vm start|stop|status|cleanup JOB_ID
+SOURCE must be an immutable store snapshot.

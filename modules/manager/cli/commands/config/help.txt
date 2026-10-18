@@ -1,0 +1,2 @@
+Usage: folio config show|edit|import FILE|export FILE
+Read or durably commit desired configuration.
