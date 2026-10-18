@@ -76,7 +76,23 @@ case "$action" in
     task_id=${1:-}
     [[ -z "$task_id" || "$task_id" =~ ^t-[a-f0-9]{32}$ ]] || finish invalid null 'Invalid task ID'
     jq -cn --arg id "$task_id" '{"folio-deployment:status":(if $id=="" then {} else {"task-id":$id} end)}' >"$work/rpc.json"
-    rpc
+    if ! rpc true; then
+      state=${XDG_STATE_HOME:-$HOME/.local/state}/folio
+      [[ "$FOLIO_SCOPE" != system ]] || state=/var/lib/folio
+      if [[ -n "$task_id" && -r "$state/deployments/tasks/$task_id.json" ]]; then
+        finish success "$(jq -cn --slurpfile task "$state/deployments/tasks/$task_id.json" '{offline:true,task:$task[0]}')" '' "$task_id"
+      fi
+      shopt -s nullglob
+      journals=("$state"/offline-coordinator-*.json)
+      if (( ${#journals[@]} )); then
+        maintenance=$(jq -cs '[.[] | select(.phase!="complete" and .phase!="restored" and .phase!="aborted") |
+          {key:.id,value:{phase,scope}}] | from_entries' "${journals[@]}")
+        if [[ "$maintenance" != '{}' ]]; then
+          finish success "$(jq -cn --argjson maintenance "$maintenance" '{offline:true,health:"degraded",maintenance:$maintenance}')"
+        fi
+      fi
+      finish unavailable null 'Manager subscriber is unavailable'
+    fi
     finish "$response_status" "$response_data" "$response_error" "$task_id" ;;
   *) finish invalid null 'Unsupported deployment command' ;;
 esac

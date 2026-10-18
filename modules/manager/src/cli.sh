@@ -35,12 +35,14 @@ Commands:
   plan [--source DIRECTORY]                Freeze configuration and source
   build|apply PLAN_ID [--request-id ID]     Build or activate a recorded plan
   status [TASK_ID]                         Query observed state or a task
+  rollback REVISION_ID [--rebuild]          Restore retained desired data and closure
+  cleanup [--apply]                        Preview or remove unreferenced deployment records
   vm build|start|stop|status|cleanup ID     Manage a disposable user VM
   --system system reboot|poweroff          Accept a guest power request
 
 User configuration operations require the manager subscriber for writes.
 Build/apply wait by default; --no-wait returns the durable task ID.
-Rollback is unavailable until its implementation stage.
+Offline system rollback/cleanup require root. User maintenance runs as its owner.
 HELP
   exit 0
 fi

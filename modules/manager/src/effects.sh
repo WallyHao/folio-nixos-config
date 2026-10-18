@@ -1,7 +1,16 @@
 # These helpers run under the scoped mutation lock. Task locks are acquired only
 # after it; workers use nonblocking task locks before waiting on that same lock.
+has_pending_maintenance() {
+  local pending
+  shopt -s nullglob
+  for pending in "$state"/offline-coordinator-*.json; do
+    if ! jq -e '.phase=="complete" or .phase=="restored" or .phase=="aborted"' "$pending" >/dev/null; then return 0; fi
+  done
+  return 1
+}
 has_pending_recovery() {
   local pending
+  if has_pending_maintenance; then return 0; fi
   shopt -s nullglob
   for pending in "$state/deployments/tasks/"*.json; do
     if jq -e '.recoveryRequired == true' "$pending" >/dev/null; then return 0; fi

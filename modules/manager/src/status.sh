@@ -27,7 +27,11 @@ shopt -s nullglob
 task_records=("$state/deployments/tasks/"*.json)
 recovery=$(jq -cs '[.[] | select(.recoveryRequired==true) | {key:.id,value:{phase,beforeProfile,afterProfile,error}}] | from_entries' "${task_records[@]}" </dev/null)
 [[ "$recovery" == '{}' ]] || health=degraded
+maintenance_records=("$state"/offline-coordinator-*.json)
+maintenance=$(jq -cs '[.[] | {key:.id,value:{phase,scope}}] | from_entries' "${maintenance_records[@]}" </dev/null)
+if has_pending_maintenance; then health=degraded; fi
 jq -cn --arg desiredDigest "$desired_digest" --arg health "$health" --argjson applied "$applied" --argjson saved "$saved" \
-  --argjson recovery "$recovery" \
+  --argjson recovery "$recovery" --argjson maintenance "$maintenance" \
   '{status:"success",data:{"folio-deployment:result":({desiredDigest:$desiredDigest,configurationSaved:$saved,health:$health,applied:$applied}
-    + (if $recovery=={} then {} else {recovery:$recovery} end))}}'
+    + (if $recovery=={} then {} else {recovery:$recovery} end)
+    + (if $maintenance=={} then {} else {maintenance:$maintenance} end))}}'

@@ -179,8 +179,10 @@ case "$action" in
       --arg bootstrap "$old_bootstrap" --arg artifact "$old_artifact" \
       '{format:1,id:$id,scope:$scope,backup:$backup,phase:"backed-up",oldBootstrap:$bootstrap,oldArtifact:$artifact}' |
       folio-atomic-write "$record" ;;
-  prepare)
-    [[ $# == 1 && -f "$record" ]] || emit invalid 'Prepare requires a snapshot and target bootstrap' 2
+  prepare|prepare-revision)
+    [[ -f "$record" ]] || emit invalid 'Prepare requires a snapshot and target bootstrap' 2
+    if [[ "$action" == prepare ]]; then [[ $# == 1 ]] || emit invalid 'Prepare requires a target bootstrap' 2
+    else [[ $# == 2 ]] || emit invalid 'Prepare-revision requires a target bootstrap and retained revision' 2; fi
     case "$(jq -er .phase "$record")" in
       backed-up|preparing) ;;
       *) emit conflict 'Snapshot is not ready for preparation' 4 ;;
@@ -196,10 +198,24 @@ case "$action" in
     phase preparing
     new_bootstrap=$1; immutable_directory "$new_bootstrap"
     inventory "$new_bootstrap" >"$backup/new-models.json"
-    cp "$backup/startup.json" "$backup/new-startup.json"
-    cp "$backup/running.json" "$backup/new-running.json"
-    migrate_document "$backup/new-startup.json"
-    migrate_document "$backup/new-running.json"
+    if [[ "$action" == prepare ]]; then
+      cp "$backup/startup.json" "$backup/new-startup.json"
+      cp "$backup/running.json" "$backup/new-running.json"
+      migrate_document "$backup/new-startup.json"
+      migrate_document "$backup/new-running.json"
+    else
+      revision=$2
+      [[ "$revision" == "$state/deployments/revisions/"* && -f "$revision" && ! -L "$revision" ]] ||
+        emit invalid 'Rollback requires a retained scoped revision' 2
+      jq -e --arg scope "$scope" --slurpfile identities "$new_bootstrap/identities.json" \
+        '.format==1 and .scope==$scope and .models==$identities[0].models[$scope] and .tools==$identities[0].tools' \
+        "$revision" >/dev/null || emit unavailable 'Retained models or tool identities require a compatible rebuild' 3
+      jq -cS .configuration "$revision" >"$work/revision.json"
+      folio-normalize "$new_bootstrap/models/$scope" "$work/revision.json" >"$backup/new-running.json"
+      revision_digest=$(sha256sum <"$backup/new-running.json"); revision_digest=${revision_digest%% *}
+      [[ "$revision_digest" == "$(jq -er .configurationDigest "$revision")" ]] || emit invalid 'Retained configuration digest mismatch' 2
+      cp "$backup/new-running.json" "$backup/new-startup.json"
+    fi
     mkdir "$backup/candidate-repository" "$backup/candidate-runtime"
     if [[ "$scope" == system ]]; then
       chgrp folio-operators "$backup/candidate-repository" "$backup/candidate-runtime"

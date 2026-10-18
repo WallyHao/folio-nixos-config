@@ -1,6 +1,7 @@
 if ! lock_configuration; then
   reply conflict 'Configuration is busy'; exit 0
 fi
+if has_pending_maintenance; then reply conflict 'Finish offline maintenance before editing desired data'; exit 0; fi
 if ! recover_configuration; then
   reply failure 'Configuration recovery is required'; exit 0
 fi

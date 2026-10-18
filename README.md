@@ -54,8 +54,8 @@ descriptor; standalone bootstrap retains an explicit bootstrap origin.
 For a separate root-identity/scope check, run
 `bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
 It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
-it does not initialize system state on the development host. Managed rollback
-remains Stage 04.
+it does not initialize system state on the development host. Managed rollback and
+offline maintenance are described below.
 
 ## User configuration development
 
@@ -79,7 +79,7 @@ validates journal digests, restores prepared-only data, and rolls accepted data
 forward into running/startup before consumers start. A failed save remains a
 failure. JSON commands return one `{ status, data, error, taskId }` envelope;
 missing write subscribers return exit 3, validation exit 2, conflicts exit 4.
-Unimplemented rollback explicitly returns exit 3; unsupported scopes return exit 2.
+Unavailable rollback protocols/inputs return exit 3; unsupported scopes return exit 2.
 
 Run `nix build --no-link .#checks.x86_64-linux.configuration` for the bounded
 real-sysrepo commit/edit/conflict/failure/restart integration scenario.
@@ -116,7 +116,7 @@ managed contribution while preserving application data. The profile is
 `$XDG_STATE_HOME/nix/profiles/home-manager` (default `~/.local/state/...`). Plans,
 tasks, successful builds and `current.json` live under the scoped `deployments/`;
 explicit Nix GC roots retain source/worker/artifact closures. Cleanup and managed
-rollback remain Stage 04; interrupted activation reports failure or interruption.
+rollback use the explicit maintenance commands below; interrupted activation reports failure or interruption.
 
 Deployment now retains matching configuration/model identities in scoped
 `deployments/revisions/`. On subscriber restart, recovery probes actual effects:
@@ -124,11 +124,11 @@ it can finish an activation's recorded successful publication or restore only a
 profile selection when actual files/running system still match the before
 closure. It never repeats activation to infer success. Ambiguous effects and
 failed restoration stay visible in `status` under `recovery`, degrade health and
-block further applies. Explicit managed rollback and schema migration are still
-under development; preserve those records and their GC roots.
+block further applies. Preserve those records and their GC roots for explicit
+managed rollback and schema migration.
 
 Offline paired maintenance is available through the separate
-`folio-manager-maintain SCOPE BOOTSTRAP ACTION ID [FROZEN_SOURCE]` command.
+`folio-manager-maintain SCOPE BOOTSTRAP ACTION ID [FROZEN_SOURCE_OR_REVISION]` command.
 `BOOTSTRAP` must identify the currently selected generation's immutable bootstrap,
 recorded in its `folio-home.json` or `folio-system.json`. Run user maintenance as
 the provisioned account with its real HOME and runtime directory; system
@@ -143,6 +143,9 @@ folio-manager-maintain user "$bootstrap" restore before-upgrade
 ```
 
 Snapshots require desired startup/running data to agree with the selected closure.
+Rollback can also capture an unapplied later desired revision: the snapshot records
+its desired data and the separately verified actual deployment digest, preserving
+that drift as evidence instead of calling it applied.
 The command rejects active deployment/VM jobs, unresolved effects and interrupted
 maintenance. It stops registered consumers, records their prior active state and
 uses runtime service conditions to prevent premature restart during activation.
@@ -164,11 +167,35 @@ outside these snapshots.
 Backups live in scoped `backups/repositories/ID/`, with raw repositories, normalized
 exports, model identities, coordinator/transaction journals and GC roots for both
 pairs. Partial candidate preparations are retained on explicit retry. Changed
-models without a new YANG revision are rejected. The migration registry currently
-has no production transforms: upgrades needing an unregistered transformation
-remain unavailable. General rollback of arbitrary retained revisions and explicit
-reference-aware cleanup are still Stage 04 work; do not delete backup roots or
-invoke repository primitive `finalize` as a substitute for paired verification.
+models without a new YANG revision are rejected. Terminal owns two hash-bound
+schema transitions: `2026-10-18` to `2026-10-19` adds opacity in percent; the next
+revision, `2026-10-20`, converts that value to a decimal unit fraction (`75` becomes
+`"0.75"`). Both schemas and their transforms remain module-owned. The Foot
+renderer consumes the fraction as background alpha. Unknown transformations
+remain unavailable; schema revisions are never changed in place.
+
+`folio rollback REVISION_ID` restores a retained revision's desired configuration,
+models and closure together. IDs come from `status`'s applied `revisionId` (or
+`planId` for an ordinary deployment) and scoped `deployments/revisions/`. Source,
+configuration, model, tool, account and closure identities are checked before
+installation. A later failed desired revision is preserved only in the before
+snapshot; boot does not reapply it after rollback. `--rebuild` reconstructs the old
+source using current manager/repository implementations while retaining its old
+models, adapters and lock. A rebuild must still prove a supported worker protocol
+and exact retained model/tool identities; incompatible source is unavailable.
+System rollback is an offline root operation, invoked as root with
+`folio --system rollback REVISION_ID [--rebuild]`; user rollback runs as its owner.
+
+`folio cleanup` previews eligible plans/tasks; `folio cleanup --apply` records the
+selection and removes only their deployment records and known GC-root links.
+Cleanup takes queue before mutation locks, excludes active/locked workers,
+current/previous successful revisions and every backup/recovery/upgrade reference,
+and preserves adoption backups and application data. It does not run global Nix
+GC or prune repository backups. System cleanup likewise requires root. `status`
+includes maintenance phases; while consumers are offline it can inspect readable
+scoped journals without opening the repository. Pending maintenance degrades
+health and blocks new configuration commits/applies. Do not delete backup roots
+or invoke repository primitive `finalize` as a substitute for paired verification.
 
 Status probes profile/configuration drift and actual startup persistence. The C
 subscriber also publishes configuration/state and deployment plans/tasks through

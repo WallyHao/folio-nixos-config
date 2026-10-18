@@ -49,7 +49,8 @@ jq -e '.status=="invalid" and .data.phase=="preparing"' "$test_root/result.json"
 [[ ! -e "$state/schema-transaction.json" ]]
 # An actual revision whose registered transform fails also leaves live data and
 # the snapshot intact. This is a test-only future model, never installed live.
-sed -i 's/revision 2026-10-18 {/revision 2026-10-19 {/' \
+installed_revision=$(jq -r '.[] | select(.name=="folio-terminal") | .revision' "$state/backups/repositories/migration/old-models.json")
+sed -i "s/revision $installed_revision {/revision 2099-01-01 {/" \
   "$test_root/changed-bootstrap/models/user/folio-terminal.yang"
 mkdir -p "$test_root/failing-migration/bin"
 printf '#!/bin/sh\nexit 42\n' >"$test_root/failing-migration/bin/folio-test-migrate"
@@ -57,8 +58,8 @@ chmod 0700 "$test_root/failing-migration/bin/folio-test-migrate"
 transform=$(nix-store --add "$test_root/failing-migration")/bin/folio-test-migrate
 old_hash=$(sha256sum <"$bootstrap/models/user/folio-terminal.yang"); old_hash=${old_hash%% *}
 new_hash=$(sha256sum <"$test_root/changed-bootstrap/models/user/folio-terminal.yang"); new_hash=${new_hash%% *}
-jq -cn --arg fromSha256 "$old_hash" --arg toSha256 "$new_hash" --arg transform "$transform" \
-  '[{module:"folio-terminal",from:"2026-10-18",to:"2026-10-19",fromSha256:$fromSha256,
+jq -cn --arg from "$installed_revision" --arg fromSha256 "$old_hash" --arg toSha256 "$new_hash" --arg transform "$transform" \
+  '[{module:"folio-terminal",from:$from,to:"2099-01-01",fromSha256:$fromSha256,
      toSha256:$toSha256,transform:$transform}]' >"$test_root/changed-bootstrap/migrations.json"
 changed_bootstrap=$(nix-store --add "$test_root/changed-bootstrap")
 expect 1 maintain prepare migration "$changed_bootstrap"

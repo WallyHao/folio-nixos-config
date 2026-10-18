@@ -54,7 +54,12 @@ let
       pkgs.coreutils pkgs.bash pkgs.jq pkgs.util-linux pkgs.nix pkgs.systemd
       pkgs.findutils pkgs.diffutils pkgs.ripgrep
     ];
-    text = builtins.readFile ./maintenance.sh;
+    text = builtins.replaceStrings [ "@compatibilitySource@" ] [ (toString pkgs.folio.source) ] (builtins.readFile ./maintenance.sh);
+  };
+  cleanup = pkgs.writeShellApplication {
+    name = "folio-manager-cleanup";
+    runtimeInputs = [ atomic pkgs.coreutils pkgs.jq pkgs.util-linux ];
+    text = builtins.readFile ./cleanup.sh;
   };
   recovery = operation "folio-manager-recover" (builtins.readFile ./recover.sh);
   plan = operation "folio-manager-plan" (builtins.readFile ./plan.sh);
@@ -73,6 +78,7 @@ pkgs.symlinkJoin {
   passthru.atomic = atomic;
   paths = [
     maintenance
+    cleanup
     worker
     (pkgs.stdenv.mkDerivation {
       pname = "folio-manager-subscriber";

@@ -56,6 +56,7 @@ let
       font ? defaultFont,
       padding ? "2x2",
       colorsFile ? null,
+      opacity ? "1",
     }:
     let
       colors = theme.colors or { };
@@ -94,6 +95,7 @@ let
         bright5=${colorHex lib (palette.purple or null)}
         bright6=${colorHex lib (palette.aqua or null)}
         bright7=${resolve palette "foreground"}
+        alpha=${toString opacity}
       '';
     in
     if !builtins.isString font || font == "" || lib.hasInfix "\n" font || lib.hasInfix "\r" font then

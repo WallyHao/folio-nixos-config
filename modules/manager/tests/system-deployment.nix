@@ -27,13 +27,24 @@ let
         };
     }
   '';
-  fixtureSource = pkgs.runCommand "folio-system-test-source" { } ''
+  currentFixtureSource = pkgs.runCommand "folio-system-test-source" { } ''
     mkdir $out
     cp -R ${source}/. $out/
     chmod -R u+w $out
     cp ${fixtureFlake} $out/flake.nix
     ln -s ../src/common.sh $out/modules/manager/tests/frozen-link
   '';
+  fixtureSource = if recovery then pkgs.runCommand "folio-legacy-schema-test-source" { } ''
+    mkdir $out
+    cp -R ${currentFixtureSource}/. $out/
+    chmod -R u+w $out
+    cp $out/modules/terminal/model/revisions/2026-10-18/folio-terminal.yang $out/modules/terminal/model/folio-terminal.yang
+  '' else currentFixtureSource;
+  fixtureBootstrap = if recovery then
+    (import (fixtureSource + "/modules/manager/src/outputs.nix") {
+      inputs = inputs // { self.outPath = fixtureSource; };
+    }).packages.${pkgs.stdenv.hostPlatform.system}.manager-bootstrap
+  else bootstrap;
   descriptor = pkgs.runCommand "folio-system-test-descriptor" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
   '';
@@ -61,8 +72,8 @@ let
                           then ."folio-system:system"."time-zone"="UTC" else . end)''
           )
         } \
-          ${bootstrap}/${scope}.json > configuration.json
-        folio-prepare-input configuration.json ${bootstrap} ${descriptor} >$out/folio-input.json
+          ${fixtureBootstrap}/${scope}.json > configuration.json
+        folio-prepare-input configuration.json ${fixtureBootstrap} ${descriptor} >$out/folio-input.json
       '';
   userSeed = import (preparedSource "user" + "/modules/manager/src/outputs.nix") {
     inputs = inputs // {
@@ -87,12 +98,25 @@ let
         self.outPath = fixtureSource;
       };
     }).homeConfigurations.folio.activationPackage;
+  migrationSource = pkgs.runCommand "folio-schema-upgrade-source" {
+    nativeBuildInputs = [ prepareInput pkgs.jq ];
+  } ''
+    mkdir $out
+    cp -R ${currentFixtureSource}/. $out/
+    chmod -R u+w $out
+    jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
+    jq '."folio-environment:environment".preferences."font-size"=18' ${bootstrap}/user.json > configuration.json
+    folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
+  '';
+  migrationSeed = import (migrationSource + "/modules/manager/src/outputs.nix") {
+    inputs = inputs // { self.outPath = migrationSource; };
+  };
 in
 pkgs.testers.runNixOSTest {
   name = if recovery then "folio-deployment-recovery" else "folio-system-deployment";
   nodes.machine = { ... }: {
     imports = modules ++ [ ./system-guest.nix ];
-    _module.args.folioBootstrap = bootstrap;
+    _module.args.folioBootstrap = fixtureBootstrap;
     virtualisation.additionalPaths = [
       fixtureSource
       inputs.nixpkgs
@@ -100,7 +124,7 @@ pkgs.testers.runNixOSTest {
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
     ]
-    ++ pkgs.lib.optional recovery defaultUser;
+    ++ pkgs.lib.optionals recovery [ defaultUser migrationSource migrationSeed.homeConfigurations.folio.activationPackage ];
   };
   testScript = ''
     import datetime
@@ -158,7 +182,7 @@ pkgs.testers.runNixOSTest {
         assert descriptor["preferences"]["font-size"] == 20
 
     ${pkgs.lib.optionalString recovery (
-      builtins.replaceStrings [ "@defaultGeneration@" ] [ (toString defaultUser) ] (
+      builtins.replaceStrings [ "@defaultGeneration@" "@migrationSource@" ] [ (toString defaultUser) (toString migrationSource) ] (
         builtins.readFile ./recovery.py
       )
     )}

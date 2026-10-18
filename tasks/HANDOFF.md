@@ -1,6 +1,31 @@
 # Implementation Handoff
 
-## Latest continuation boundary (2026-10-18)
+## Stage 04 completion boundary (2026-10-18)
+
+This section supersedes all historical boundaries below. Stage 04 is complete;
+continue Stage 05 applications. See its completion record for exact commands and
+evidence. Submilestone `54beb78` preceded the final stage commit; obtain the latest
+SHA from Git rather than interpreting the old uncommitted-work table below.
+
+- Implemented terminal revision 18 -> additive percent revision 19 -> unit-fraction
+  revision 20, with model-owned hash-bound transforms and preserved old models.
+- Implemented `folio rollback REVISION_ID [--rebuild]`, offline journal status and
+  `folio cleanup [--apply]`. System offline maintenance requires root. Rebuild
+  preserves old models/adapters/lock and must prove a supported worker protocol
+  and retained identities; mismatch remains unavailable.
+- Root/user paired restoration, real schema migration with activated Foot,
+  unsupported-protocol rejection/rebuild/rollback after a newer failed desired
+  value, real reboot preservation and explicit cleanup passed the scoped VM gate:
+  `/nix/store/jl782y0ysgvbjikq6qzi7jb3krv8kmiw-vm-test-run-folio-deployment-recovery`.
+  Logs `/tmp/folio-stage04-complete-gate2.log` and
+  `/tmp/folio-stage04-complete-expanded.log`. Isolated percent 75 -> fraction 0.75,
+  failure and protected-cleanup evidence is in `tasks/04-recovery.md`.
+- Still no development-host activation, physical acceptance, application or desktop
+  implementation. Preserve private data and the read-only Sylphy reference.
+- The final stage subject is
+  `feat(manager): recover deployments and restore retained revisions`.
+
+## Historical offline maintenance boundary (2026-10-18)
 
 This section supersedes the historical incoming handoff below. Stage 04 remains
 in progress; do not start 05 yet. The incoming uncommitted maintenance work has

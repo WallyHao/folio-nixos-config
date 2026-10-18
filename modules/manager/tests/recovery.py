@@ -53,6 +53,7 @@ with subtest("failed profile restoration stays visible and blocks apply"):
     assert folio("status")["data"]["health"] == "healthy"
     assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() == user_profile
 
+
 with subtest("offline root restore pairs desired data and closure and retains a failed restore barrier"):
     system_state = "/var/lib/folio/deployments"
     current = json.loads(machine.succeed("cat " + system_state + "/current.json"))
@@ -75,6 +76,8 @@ with subtest("offline root restore pairs desired data and closure and retains a 
     machine.fail(command + " restore paired-root")
     machine.succeed("test -f /var/lib/folio/schema-transaction.json")
     machine.fail("systemctl is-active --quiet folio-manager.service")
+    offline = json.loads(machine.succeed("folio --json --system status"))
+    assert offline["data"]["offline"] is True and offline["data"]["maintenance"]["paired-root"]["phase"] == "restoring"
     write_fault(transaction, record, True)
     machine.succeed(command + " restore paired-root > /tmp/paired-restore.json")
     user("timeout 30 bash -c 'until folio --json --system status >/dev/null 2>&1; do sleep 0.2; done'")
@@ -131,3 +134,45 @@ with subtest("root recovery restores only a recorded profile while the guest sta
     assert machine.succeed("cat /proc/sys/kernel/random/boot_id").strip() == boot_id
     assert machine.succeed("readlink -f /etc/localtime").strip().endswith("/zoneinfo/UTC")
     assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() == user_profile
+
+with subtest("module-owned schema migration activates a matching closure and rollback discards failed later desired data"):
+    current = user_record(user_state + "/current.json")
+    retained_id = current["planId"]
+    retained_path = user_state + "/revisions/" + retained_id + ".json"
+    retained = user_record(retained_path)
+    metadata = user_record(current["artifact"] + "/folio-home.json")
+    command = "folio-manager-maintain user " + metadata["bootstrap"]
+    user(command + " upgrade opacity-units @migrationSource@ > /tmp/schema-upgrade.json")
+    assert folio("status")["data"]["health"] == "healthy"
+    upgraded = folio("config show")["data"]["configuration"]
+    terminal = next(item for item in upgraded["folio-environment:environment"]["modules"] if item["name"] == "terminal")
+    foot = terminal["folio-terminal:terminal"]["foot"]
+    assert float(foot["opacity"]) == 1 and "opacity-percent" not in foot
+    assert "alpha=1" in user("cat /home/folio/.config/foot/foot.ini")
+    assert folio("status")["data"]["applied"]["revisionId"] == "maintenance-opacity-units"
+    failed_desired = json.loads(json.dumps(upgraded))
+    failed_desired["folio-environment:environment"]["preferences"]["font-size"] = 24
+    save(failed_desired)
+    unsupported = dict(retained)
+    unsupported["workerProtocol"] = 0
+    write_fault(retained_path, unsupported)
+    rejected = json.loads(user("set +e; folio --json rollback " + retained_id + " >/tmp/unsupported.json; code=$?; test $code = 3 || exit 1; cat /tmp/unsupported.json"))
+    assert rejected["status"] == "unavailable"
+    assert folio("config show")["data"]["configuration"] == failed_desired
+    assert folio("rollback " + retained_id + " --rebuild")["status"] == "success"
+    write_fault(retained_path, retained)
+    restored = folio("config show")["data"]["configuration"]
+    assert restored == retained["configuration"]
+    assert folio("status")["data"]["health"] == "healthy"
+    assert "font=Maple Mono NF CN:size=18" in user("cat /home/folio/.config/foot/foot.ini")
+    user_digest = folio("config show")["data"]["digest"]
+    user_profile = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
+    published = user_record(user_state + "/current.json")
+    revision = user_record(user_state + "/revisions/" + published["revisionId"] + ".json")
+    assert revision["workerProtocol"] == 1 and revision["models"] == retained["models"]
+    orphan = folio("plan --source /home/folio/source")["data"]["planId"]
+    preview = folio("cleanup")["data"]
+    assert orphan in preview["plans"] and retained_id not in preview["plans"]
+    assert folio("cleanup --apply")["status"] == "success"
+    user("test ! -e " + user_state + "/plans/" + orphan + ".json")
+    assert folio("status")["data"]["health"] == "healthy"

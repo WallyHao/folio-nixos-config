@@ -193,6 +193,7 @@ in
             pkgs.writeText "folio-home.json" (
               builtins.toJSON {
                 format = 1;
+                workerProtocol = 1;
                 scope = "user";
                 bootstrap = toString bootstrap;
                 account = (context "user").identity.account;

@@ -1,7 +1,75 @@
 # Stage 04: Fault recovery, migrations and managed rollback
 
-Dependencies: 03. Status: in-progress.
+Dependencies: 03. Status: complete.
 Expected commit: `feat(manager): recover deployments and restore retained revisions`.
+
+## Completion (2026-10-18)
+
+- Completed module-owned revision migration, retained-revision rollback, explicit
+  reference-aware cleanup and offline recovery status. Preceding submilestones
+  are recorded below; `54beb78` is the paired repository recovery baseline.
+- Terminal retains its exact original `2026-10-18` model and an additive
+  `2026-10-19` model; `2026-10-20` changes opacity units from percent to decimal
+  fraction. The registry binds both ends' model hashes and immutable transforms.
+  Foot consumes the migrated alpha. No installed schema was edited in place.
+- `folio rollback REVISION_ID [--rebuild]` checks immutable source/configuration,
+  account, model, tool and closure identities, then restores desired data/models
+  and actual closure together. Unsupported protocols require explicit compatible
+  rebuilding with current manager/repository code and the retained models/adapters/
+  lock. Mismatched identities fail before installation. Failed newer desired data
+  is retained in the before snapshot, never implicitly reapplied after rollback.
+- `folio cleanup [--apply]` previews by default, takes queue before mutation locks,
+  and removes only eligible deployment records/known root links. It preserves
+  current/previous success, active/locked tasks, all backup/recovery/upgrade
+  references, adoption backups and mutable data. Repository backups and historical
+  maintenance revisions are retained conservatively; no automatic/global GC.
+- `status` exposes keyed maintenance phases and can inspect readable scoped
+  journals when the subscriber/repository is unavailable. Pending maintenance
+  blocks configuration commits/apply and degrades observed health. System offline
+  rollback/cleanup require root; they do not introduce a new passwordless root
+  execution surface.
+- Actual isolated commands passed:
+  - `bash modules/terminal/tests/migrations.sh /nix/store/k6y5d2ylrbyhpf14as6dpmmv2cmrw6da-folio-bootstrap /nix/store/q3ynp2sjibls6c9y4w2grijfaw7a52fs-folio-terminal-schema-history /nix/store/lc5zb32lw5kihmaawarm86b3d1mp710s-folio-repository /nix/store/1zcqk4acna252s7ay7rpf12xz95n0ry1-folio-repository-maintain`.
+    Evidence `/tmp/folio-terminal-migrations.Zt4f9d`; log
+    `/tmp/folio-stage04-migrations.log`. Real schema 18 -> 19 adds percent 100;
+    after a real committed value of 75, 19 -> 20 yields `"0.75"` in startup and
+    running. Retained data/models restore back to 18 without a reverse transform.
+  - `bash modules/sysrepo/tests/maintenance.sh /nix/store/k6y5d2ylrbyhpf14as6dpmmv2cmrw6da-folio-bootstrap /nix/store/lc5zb32lw5kihmaawarm86b3d1mp710s-folio-repository /nix/store/1zcqk4acna252s7ay7rpf12xz95n0ry1-folio-repository-maintain /nix/store/6h3nyza152z83p5mddj7r19k8hay1m27-folio-manager-runtime`.
+    Evidence `/tmp/folio-repository-maintenance.ZLsAkq` (see log for exact case);
+    log `/tmp/folio-stage04-maintenance.log`. Reused the compact fault table with
+    current models: failed migration/restoration, revision/hash refusal, stale
+    inputs, active consumers, retries and missing live repository.
+  - `bash modules/manager/tests/cleanup.sh /nix/store/6h3nyza152z83p5mddj7r19k8hay1m27-folio-manager-runtime /nix/store/k6y5d2ylrbyhpf14as6dpmmv2cmrw6da-folio-bootstrap`.
+    Evidence `/tmp/folio-cleanup.69FDCM`; log `/tmp/folio-stage04-cleanup.log`.
+    Verified preview/application, actual indirect roots, a held task lock, current/
+    previous success, active work, backups and unresolved recovery protections.
+- Affected common gate passed:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#manager-runtime path:.#folio path:.#checks.x86_64-linux.foundation path:.#checks.x86_64-linux.configuration`.
+  Log `/tmp/folio-stage04-common-gate.log`; foundation
+  `/nix/store/ailpqj3xb25g3a1kd35bb3pkjrcsk3rb-folio-foundation`, configuration
+  `/nix/store/cpfrrb0m98jny0z2d04sq2xxxn1fl6rf-folio-configuration-integration`.
+  This includes the prepared-only/accepted journal fault boundaries; no full
+  flake or desktop suite was run.
+- Final scoped guest gate passed:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.recovery`.
+  Output `/nix/store/jl782y0ysgvbjikq6qzi7jb3krv8kmiw-vm-test-run-folio-deployment-recovery`;
+  logs `/tmp/folio-stage04-complete-gate2.log` and
+  `/tmp/folio-stage04-complete-expanded.log`. Booted with original terminal schema
+  18, upgraded through the real migration chain to 20 with matching activated
+  Foot closure, rejected unsupported retained protocol without changes, rebuilt
+  and rolled back old source/models/configuration after a later desired value 24,
+  and verified desired/actual 18 after real reboot. Also proved offline root
+  recovery status, failed root restore/retry, healthy paired installation, user
+  restore, profile-only reconciliation, authorization and clean external shutdown.
+- The first guest iteration reached successful rollback but exposed read-only
+  directories in its temporary compatibility source during final cleanup. The
+  copy is now made writable before use; the affected guest gate above passed.
+- Reused Sylphy's Foot renderer and existing Folio guest/adoption/profile fixtures;
+  reference remains `9cba023d90c4485b33a91e2d12724b6920580580`. No reference,
+  development-host activation or physical target was modified.
+- Commit subject: `feat(manager): recover deployments and restore retained revisions`.
+  Next: Stage 05 applications. It must register its own subscribers/migrations,
+  respect configuration-before-application locks and preserve the recovery roots.
 
 ## Objective and deliverables
 

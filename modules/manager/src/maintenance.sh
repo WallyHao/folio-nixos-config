@@ -1,8 +1,9 @@
 # Offline manager entry point. It is intentionally independent of subscriber
 # RPC availability, so a damaged repository never has to be opened to recover.
 umask 0077
-(( $# == 4 || $# == 5 )) || { echo 'Usage: folio-manager-maintain user|system BOOTSTRAP snapshot|upgrade|restore ID [FROZEN_SOURCE]' >&2; exit 2; }
+(( $# >= 4 && $# <= 6 )) || { echo 'Usage: folio-manager-maintain SCOPE BOOTSTRAP snapshot|upgrade|restore|rollback ID [SOURCE_OR_REVISION] [--rebuild]' >&2; exit 2; }
 scope=$1 bootstrap=$2 action=$3 id=$4 source_path=${5:-}
+rebuild=false
 [[ "$id" =~ ^[a-z][a-z0-9-]{0,63}$ ]] || exit 2
 immutable() { [[ "$1" =~ ^/nix/store/[a-z0-9]{32}-[^/]+$ && -d "$1" ]]; }
 immutable "$bootstrap" || exit 2
@@ -20,7 +21,14 @@ case "$scope" in
 esac
 unit_runtime=${XDG_RUNTIME_DIR:-/run}/systemd/user
 [[ "$scope" != system ]] || unit_runtime=/run/systemd/system
-case "$action" in snapshot|restore) [[ $# == 4 ]] || exit 2 ;; upgrade) [[ $# == 5 ]] || exit 2 ;; *) exit 2 ;; esac
+case "$action" in
+  snapshot|restore) [[ $# == 4 ]] || exit 2 ;;
+  upgrade) [[ $# == 5 ]] || exit 2 ;;
+  rollback)
+    [[ $# == 5 || ( $# == 6 && $6 == --rebuild ) ]] || exit 2
+    [[ $# != 6 ]] || rebuild=true ;;
+  *) exit 2 ;;
+esac
 [[ "$state" == /* && "$runtime" == /* && -d "$state" ]] || exit 3
 [[ "$runtime" != *$'\n'* && "$runtime" != *%* ]] || exit 2
 work=$(mktemp -d "$runtime/coordinator.XXXXXX")
@@ -34,14 +42,30 @@ flock -x -w 30 9
 maintain() { folio-repository-maintain "$scope" "$@" >"$work/primitive.json"; }
 digest() { local value; value=$(sha256sum <"$1"); printf '%s\n' "${value%% *}"; }
 snapshot_artifact_matches() {
-  local closure=$1 expected_bootstrap=$2 metadata=$1/folio-home.json
+  local closure=$1 expected_bootstrap=$2 metadata=$1/folio-home.json expected_digest
   immutable "$closure" || return 1
   [[ "$scope" != system ]] || metadata=$closure/folio-system.json
-  jq -e --arg digest "$(digest "$backup/running.json")" \
+  expected_digest=$(jq -r '.beforeAppliedDigest // ""' "$backup/transaction.json")
+  [[ -n "$expected_digest" ]] || expected_digest=$(digest "$backup/running.json")
+  jq -e --arg digest "$expected_digest" \
     --arg bootstrap "$expected_bootstrap" --arg scope "$scope" --arg account "$(id -un)" --arg home "$HOME" \
     '.format==1 and .configurationDigest==$digest and .bootstrap==$bootstrap and
       (if $scope=="system" then .scope=="system" else .scope=="user" and .account==$account and .home==$home end)' \
     "$metadata" >/dev/null
+}
+artifact_effects_match() {
+  local closure=$1 file relative
+  [[ $(readlink -e "$profile") == "$closure" ]] || return 1
+  if [[ "$scope" == system ]]; then
+    [[ $(readlink -e /run/current-system) == "$closure" ]] || return 1
+    [[ $(readlink -e /etc/localtime) == "$(readlink -e "$closure/etc/localtime")" ]] || return 1
+  else
+    [[ -d "$closure/home-files" ]] || return 1
+    while IFS= read -r -d '' file; do
+      relative=${file#"$closure/home-files/"}
+      [[ $(readlink -e "$HOME/$relative") == "$(readlink -e "$file")" ]] || return 1
+    done < <(find -L "$closure/home-files" -type f -print0)
+  fi
 }
 phase() {
   jq --arg phase "$1" '.phase=$phase' "$journal" | folio-atomic-write "$journal"
@@ -98,7 +122,7 @@ finish() {
     if ! "$installed" && [[ ! -e "$state/schema-transaction.json" ]]; then
       flock -u 9
       if restart_consumers; then phase aborted || code=1; else code=1; fi
-    elif [[ "$action" == upgrade ]]; then
+    elif [[ "$action" == upgrade || "$action" == rollback ]]; then
       while IFS= read -r service; do stop_consumer "$service" || code=1; done < <(jq -r '.masked[]' "$journal")
       if maintain restore "$id" &&
           snapshot_artifact_matches "$(jq -er .oldArtifact "$backup/transaction.json")" "$(jq -er .oldBootstrap "$backup/transaction.json")" &&
@@ -139,7 +163,40 @@ done
 if [[ "$action" != restore && -e "$state/schema-transaction.json" ]]; then
   echo 'An incomplete schema transaction requires explicit restore' >&2; exit 4
 fi
-if [[ "$action" == upgrade ]]; then
+if [[ "$action" == rollback ]]; then
+  revision_id=$source_path
+  [[ "$revision_id" =~ ^([a-f0-9]{64}|maintenance-[a-z][a-z0-9-]{0,63})$ ]] || exit 2
+  target_revision=$state/deployments/revisions/$revision_id.json
+  [[ -f "$target_revision" && ! -L "$target_revision" ]] || { echo 'Unknown retained revision' >&2; exit 2; }
+  jq -e --arg scope "$scope" '.format==1 and .scope==$scope' "$target_revision" >/dev/null || exit 3
+  source_path=$(jq -er .source "$target_revision")
+  immutable "$source_path" || { echo 'Retained source is unavailable' >&2; exit 3; }
+  jq -e --slurpfile input "$source_path/folio-input.json" \
+    '.configuration==$input[0].configuration and .configurationDigest==$input[0].configurationDigest and
+      .models==$input[0].models and .tools==$input[0].tools' "$target_revision" >/dev/null || {
+    echo 'Retained revision differs from its immutable input' >&2; exit 4;
+  }
+  source_digest=$(nix hash path --type sha256 "$source_path")
+  source_digest=$(nix hash convert --hash-algo sha256 --to base16 "$source_digest")
+  [[ "$source_digest" == "$(jq -er .inputDigest "$target_revision")" ]] || { echo 'Retained source digest mismatch' >&2; exit 4; }
+  if [[ $(jq -r '.workerProtocol // 0' "$target_revision") != 1 ]] && ! "$rebuild"; then
+    echo 'Unsupported retained worker protocol; use --rebuild to rebuild with the current protocol' >&2; exit 3
+  fi
+  if "$rebuild"; then
+    mkdir "$work/rebuilt-source"
+    cp -R "$source_path/." "$work/rebuilt-source/"
+    chmod -R u+w "$work/rebuilt-source"
+    # Keep old desired data, models, adapters and lock. Replace the manager
+    # implementation and its repository protocol through explicit public source.
+    rm -rf "$work/rebuilt-source/modules/manager/src" "$work/rebuilt-source/modules/sysrepo"
+    cp -R @compatibilitySource@/modules/manager/src "$work/rebuilt-source/modules/manager/src"
+    cp @compatibilitySource@/modules/manager/default.nix "$work/rebuilt-source/modules/manager/default.nix"
+    cp -R @compatibilitySource@/modules/sysrepo "$work/rebuilt-source/modules/sysrepo"
+    chmod -R u+w "$work/rebuilt-source"
+    source_path=$(nix store add-path --name folio-rebuilt-revision "$work/rebuilt-source")
+  fi
+fi
+if [[ "$action" == upgrade || "$action" == rollback ]]; then
   immutable "$source_path" && [[ -f "$source_path/folio-input.json" ]] || exit 2
   nix-store --realise "$source_path" --add-root "$work/source-root" --indirect >/dev/null
   target=homeConfigurations.folio.activationPackage
@@ -166,11 +223,25 @@ if [[ "$action" == upgrade ]]; then
   # shellcheck disable=SC2016
   timeout --kill-after=10 900 bash -c 'nix_build "$1"' _ "path:$source_path#$target" >"$work/build.json"
   artifact=$(jq -er '.[0].outputs.out' "$work/build.json")
+  if [[ "$action" == rollback ]]; then
+    jq -e --arg scope "$scope" --slurpfile identities "$new_bootstrap/identities.json" \
+      '.models==$identities[0].models[$scope] and .tools==$identities[0].tools' "$target_revision" >/dev/null || {
+      echo 'Rebuilt source changed retained model or tool identities; rollback is unavailable' >&2; exit 3;
+    }
+    metadata=$artifact/folio-home.json
+    [[ "$scope" != system ]] || metadata=$artifact/folio-system.json
+    jq -e '.workerProtocol==1' "$metadata" >/dev/null || { echo 'Rebuild did not provide a supported worker protocol' >&2; exit 3; }
+    if ! "$rebuild"; then
+      [[ "$new_bootstrap" == "$(jq -er .bootstrap "$target_revision")" && "$artifact" == "$(jq -er .artifact "$target_revision")" ]] || {
+        echo 'Retained closure identity changed; request an explicit compatible rebuild' >&2; exit 4;
+      }
+    fi
+  fi
 fi
 # Stop and mask registered services before acquiring any repository lock. Never
 # hold initialize/repository locks while asking systemd to stop a consumer.
 services "$bootstrap" >"$work/services"
-if [[ "$action" == upgrade ]]; then services "$new_bootstrap" >>"$work/services"; fi
+if [[ "$action" == upgrade || "$action" == rollback ]]; then services "$new_bootstrap" >>"$work/services"; fi
 if [[ "$action" == restore ]]; then
   [[ -f "$journal" && -f "$backup/transaction.json" ]] || exit 2
   jq -r '.masked[],.active[]' "$journal" >>"$work/services"
@@ -207,9 +278,18 @@ if [[ "$action" != restore ]]; then
   done
   # snapshot creates the backup directory and roots the original pair.
   maintain snapshot "$id" "$bootstrap" "$old_artifact"
+  if [[ "$action" == rollback ]]; then
+    # A failed later desired revision may differ from the actual successful
+    # closure. Retain that desired data as evidence without calling it applied.
+    before_digest=$(jq -er --arg artifact "$old_artifact" 'select(.artifact==$artifact) | .configurationDigest' "$backup/deployment.json")
+    [[ "$before_digest" =~ ^[a-f0-9]{64}$ ]] || exit 4
+    jq --arg digest "$before_digest" '.beforeAppliedDigest=$digest' "$backup/transaction.json" |
+      folio-atomic-write "$backup/transaction.json"
+  fi
   # An offline snapshot must bind the closure to exactly the saved desired data.
   # Older unidentifiable closures require a supported rebuild, never adoption.
   snapshot_artifact_matches "$old_artifact" "$bootstrap"
+  artifact_effects_match "$old_artifact" || { echo 'Selected closure has unverified effects; recover those effects before maintenance' >&2; exit 4; }
   cmp "$backup/startup.json" "$backup/running.json"
   folio-atomic-write "$backup/coordinator.json" <"$journal"
   journal=$backup/coordinator.json
@@ -236,22 +316,13 @@ activate() {
     unset HOME_MANAGER_BACKUP_OVERWRITE DRY_RUN SKIP_SANITY_CHECKS
     HOME_MANAGER_BACKUP_EXT=folio-maintenance-$id timeout --kill-after=10 300 "$closure/activate" --driver-version 1 >&2 || return 1
   else timeout --kill-after=10 300 "$closure/bin/switch-to-configuration" switch >&2 || return 1; fi
-  [[ $(readlink -e "$profile") == "$closure" ]] || return 1
-  if [[ "$scope" == system ]]; then
-    [[ $(readlink -e /run/current-system) == "$closure" ]] || return 1
-    [[ $(readlink -e /etc/localtime) == "$(readlink -e "$closure/etc/localtime")" ]] || return 1
-  else
-    [[ -d "$closure/home-files" ]] || return 1
-    while IFS= read -r -d '' file; do
-      relative=${file#"$closure/home-files/"}
-      [[ $(readlink -e "$HOME/$relative") == "$(readlink -e "$file")" ]] || return 1
-    done < <(find -L "$closure/home-files" -type f -print0)
-  fi
+  artifact_effects_match "$closure"
 }
 case "$action" in
   snapshot) phase complete ;;
-  upgrade)
-    maintain prepare "$id" "$new_bootstrap"
+  upgrade|rollback)
+    if [[ "$action" == upgrade ]]; then maintain prepare "$id" "$new_bootstrap"
+    else maintain prepare-revision "$id" "$new_bootstrap" "$target_revision"; fi
     cmp "$backup/new-running.json" "$work/desired.json"
     maintain bind "$id" "$artifact"
     phase installing
@@ -263,13 +334,17 @@ case "$action" in
     nix-store --realise "$source_path" --add-root "$backup/source-root" --indirect >/dev/null
     mkdir -p "$state/deployments/revisions"
     sync "$state/deployments" "$state/deployments/revisions"
+    input_hash=$(nix hash path --type sha256 "$source_path")
+    input_digest=$(nix hash convert --hash-algo sha256 --to base16 "$input_hash")
+    before_deployment=null
+    [[ ! -f "$backup/deployment.json" ]] || before_deployment=$(jq -c . "$backup/deployment.json")
     jq -cnS --arg scope "$scope" --arg artifact "$artifact" --arg source "$source_path" \
-      --arg bootstrap "$new_bootstrap" --arg id "$id" --arg inputDigest "$(digest "$work/input.json")" \
+      --arg bootstrap "$new_bootstrap" --arg id "$id" --arg inputDigest "$input_digest" --argjson beforeDeployment "$before_deployment" \
       --slurpfile input "$work/input.json" --slurpfile transaction "$backup/transaction.json" \
       '{format:1,workerProtocol:1,scope:$scope,artifact:$artifact,source:$source,bootstrap:$bootstrap,
         revisionId:("maintenance-"+$id),maintenanceId:$id,inputDigest:$inputDigest,
         configurationDigest:$input[0].configurationDigest,configuration:$input[0].configuration,
-        models:$input[0].models,tools:$input[0].tools,beforeProfile:$transaction[0].oldArtifact}' |
+        models:$input[0].models,tools:$input[0].tools,beforeProfile:$transaction[0].oldArtifact,beforeDeployment:$beforeDeployment}' |
       folio-atomic-write "$state/deployments/revisions/maintenance-$id.json"
     jq '{format,artifact,source,inputDigest,configurationDigest,revisionId,maintenanceId}' \
       "$state/deployments/revisions/maintenance-$id.json" | folio-atomic-write "$state/deployments/current.json"

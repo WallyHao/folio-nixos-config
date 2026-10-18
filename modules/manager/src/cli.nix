@@ -2,6 +2,7 @@
   pkgs,
   repository,
   cliCommands,
+  runtime,
 }:
 let
   common = builtins.replaceStrings [ "@normalizeFilter@" ] [ "${./normalize.jq}" ] (
@@ -25,6 +26,12 @@ let
     build = adapters.plan;
     apply = adapters.plan;
     status = adapters.plan;
+    rollback = pkgs.writeShellApplication {
+      name = "folio-maintenance";
+      runtimeInputs = [ runtime pkgs.coreutils pkgs.jq ];
+      text = builtins.readFile ./client-common.sh + "\n" + builtins.readFile ./maintenance-client.sh;
+    };
+    cleanup = adapters.rollback;
   };
   cli = pkgs.writeShellApplication {
     name = "folio";

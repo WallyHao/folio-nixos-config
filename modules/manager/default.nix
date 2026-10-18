@@ -20,7 +20,7 @@ let
     repository = pkgs.folio.repository;
   };
   client = import ./src/cli.nix {
-    inherit pkgs cliCommands;
+    inherit pkgs cliCommands runtime;
     repository = pkgs.folio.repository;
   };
   userService = folioBootstrap: {
@@ -125,7 +125,7 @@ in
             --arg environment ${lib.escapeShellArg context.identity.environment} \
             --arg bootstrap ${lib.escapeShellArg (toString folioBootstrap)} \
             --slurpfile configuration "$out/folio-configuration.json" \
-            '{format:1,scope:"system",environment:$environment,bootstrap:$bootstrap,
+            '{format:1,workerProtocol:1,scope:"system",environment:$environment,bootstrap:$bootstrap,
               configurationDigest:$digest,configuration:$configuration[0]}' > "$out/folio-system.json"
         '';
       systemd.user.services.folio-manager = {

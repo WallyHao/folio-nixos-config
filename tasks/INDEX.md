@@ -25,10 +25,9 @@ choices locally without replacing the specified architecture.
 
 - Agent transition: read [HANDOFF.md](HANDOFF.md) for the latest Stage 04 boundary,
   retained evidence and remaining work.
-- Stage 04 continuation: offline repository primitives and a manager-owned paired
-  snapshot/upgrade/restore coordinator are implemented; see its task record for
-  focused validation. Production schema transforms, general retained-revision
-  rollback and explicit cleanup still precede Stage 05.
+- Stage 04 is complete: real module-owned opacity migrations, scoped paired
+  restore, retained-revision rollback/rebuild and explicit protected cleanup passed
+  their bounded gates. Stage 05 applications is next.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
@@ -51,7 +50,7 @@ to run the full suite or create a commit after each checkbox.
 | 01 | [Foundation](01-foundation.md) | 00 | complete | Pure Flake composition, models, isolated repositories |
 | 02 | [User Foot deployment](02-user-foot.md) | 01 | complete | Actual user config/build/apply vertical slice |
 | 03 | [System and VM](03-system-vm.md) | 02 | complete | Authorized passwordless guest system updates |
-| 04 | [Recovery and rollback](04-recovery.md) | 03 | in-progress | Fault recovery, migrations, managed rollback |
+| 04 | [Recovery and rollback](04-recovery.md) | 03 | complete | Fault recovery, migrations, managed rollback |
 | 05 | [Applications](05-applications.md) | 04 | pending | Owned Zen/OBS lifecycle and regular-file delivery |
 | 06 | [Desktop](06-desktop.md) | 05 | pending | Niri, appearance, input, devices, capture |
 | 07 | [Developer tools](07-tools.md) | 06 | pending | Terminal, Git, Emacs, Codex migration |
