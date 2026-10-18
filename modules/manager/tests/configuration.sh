@@ -33,6 +33,14 @@ expect_code() {
 
 folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
 start_subscriber
+folio-repository user cfg --export --datastore operational --module folio-environment --format json |
+  jq -e '."folio-environment:environment".state.health=="unavailable" and
+    ."folio-environment:environment".configuration.saved==true'
+jq '."folio-environment:environment".preferences."font-size"=17' "$bootstrap/user.json" >maintenance.json
+folio-repository user cfg --import=maintenance.json --module folio-environment --format json
+folio-repository user cfg --export --datastore operational --module folio-environment --format json |
+  jq -e '."folio-environment:environment".configuration.saved==false'
+folio-repository user cfg --copy-from startup --datastore running --module folio-environment
 folio --json config show >before.json
 jq -e '.status=="success" and (.data.digest|length)==64' before.json
 jq '.data.configuration | ."folio-environment:environment".preferences."font-size"=18' before.json >draft.json

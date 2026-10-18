@@ -5,10 +5,10 @@
 }:
 let
   common = builtins.replaceStrings [ "@normalizeFilter@" ] [ "${./normalize.jq}" ] (
-    builtins.readFile ./client-common.sh
+    builtins.readFile ./configuration-client-common.sh
   );
   client =
-    name: source:
+    name: source: shared:
     pkgs.writeShellApplication {
       inherit name;
       runtimeInputs = [
@@ -16,11 +16,15 @@ let
         pkgs.coreutils
         pkgs.jq
       ];
-      text = common + "\n" + builtins.readFile source;
+      text = builtins.readFile ./client-common.sh + "\n" + shared + "\n" + builtins.readFile source;
     };
   adapters = {
-    config = client "folio-config" ./config-client.sh;
-    modules = client "folio-modules" ./modules-client.sh;
+    config = client "folio-config" ./config-client.sh common;
+    modules = client "folio-modules" ./modules-client.sh common;
+    plan = client "folio-deployment" ./deployment-client.sh "";
+    build = adapters.plan;
+    apply = adapters.plan;
+    status = adapters.plan;
   };
   cli = pkgs.writeShellApplication {
     name = "folio";

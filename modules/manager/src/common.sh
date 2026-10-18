@@ -31,6 +31,12 @@ digest_file() {
   value=$(sha256sum <"$1")
   printf '%s\n' "${value%% *}"
 }
+configuration_is_saved() {
+  folio-repository user cfg --export --datastore startup --module folio-environment --format json --defaults report-all \
+    >"$work/startup.json" || return 1
+  folio-normalize "$models" "$work/startup.json" >"$work/startup-normalized.json" || return 1
+  [[ $(digest_file "$work/startup-normalized.json") == "$1" ]]
+}
 recover_configuration() {
   local journal=$state/configuration/transaction.json phase expected
   [[ -e "$journal" ]] || return 0

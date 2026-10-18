@@ -1,6 +1,7 @@
 scope=user
 json=false
 environment=portable
+no_wait=false
 emit_error() {
   local status=$1 message=$2 code=$3
   if "$json"; then
@@ -14,6 +15,7 @@ arguments=()
 while (( $# )); do
   case "$1" in
     --json) json=true; shift ;;
+    --no-wait) no_wait=true; shift ;;
     --system) scope=system; shift ;;
     --environment)
       if (( $# < 2 )); then emit_error invalid 'Missing environment name' 2; fi
@@ -30,14 +32,21 @@ Usage: folio [--json] [--environment portable] [--system] COMMAND
 Commands:
   config show|edit|import FILE|export FILE   Read or durably save desired data
   modules list|enable NAME|disable NAME     Inspect or change desired selection
+  plan [--source DIRECTORY]                Freeze configuration and source
+  build|apply PLAN_ID [--request-id ID]     Build or activate a recorded plan
+  status [TASK_ID]                         Query observed state or a task
 
 User configuration operations require the manager subscriber for writes.
-Deployment and rollback commands are unavailable until implemented.
+Build/apply wait by default; --no-wait returns the durable task ID.
+Rollback is unavailable until its implementation stage.
 HELP
   exit 0
 fi
 [[ "$environment" == portable ]] || emit_error invalid 'Unknown environment' 2
 command=${arguments[0]}
+if "$no_wait" && [[ "$command" != build && "$command" != apply ]]; then
+  emit_error invalid '--no-wait applies to build/apply tasks' 2
+fi
 adapter=$(jq -er --arg command "$command" '.[$command].path' @commands@ 2>/dev/null) || {
   case "$command" in
     plan|build|apply|rollback|status) emit_error unavailable 'This command is not implemented yet' 3 ;;
@@ -46,5 +55,5 @@ adapter=$(jq -er --arg command "$command" '.[$command].path' @commands@ 2>/dev/n
 }
 jq -e --arg command "$command" --arg scope "$scope" '.[$command].scopes | index($scope) != null' @commands@ >/dev/null ||
   emit_error invalid "Command does not support $scope scope" 2
-export FOLIO_SCOPE=$scope FOLIO_JSON=$json FOLIO_ENVIRONMENT=$environment
+export FOLIO_SCOPE=$scope FOLIO_JSON=$json FOLIO_ENVIRONMENT=$environment FOLIO_COMMAND=$command FOLIO_NO_WAIT=$no_wait
 exec "$adapter" "${arguments[@]:1}"

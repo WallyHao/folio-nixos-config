@@ -17,12 +17,35 @@
 static volatile sig_atomic_t stopping;
 static void stop(int signal_number) { (void)signal_number; stopping = 1; }
 
+/* An absent YANG value is omitted, rather than encoded as an untyped JSON null.
+ * Keep the outer CLI envelope's null fields outside the modeled anydata tree. */
+static void omit_absent_values(json_t *value)
+{
+    if (json_is_object(value)) {
+        const char *key;
+        void *next;
+        json_t *child;
+        json_object_foreach_safe(value, next, key, child) {
+            if (json_is_null(child)) json_object_del(value, key);
+            else omit_absent_values(child);
+        }
+    } else if (json_is_array(value)) {
+        size_t index;
+        json_t *child;
+        json_array_foreach(value, index, child) omit_absent_values(child);
+    }
+}
+
 struct operation {
     const char *xpath;
     const char *program;
 };
 static const struct operation operations[] = {
     {"/folio-environment:configuration-commit", CONFIGURATION_OPERATION},
+    {"/folio-deployment:plan", PLAN_OPERATION},
+    {"/folio-deployment:build", BUILD_OPERATION},
+    {"/folio-deployment:apply", APPLY_OPERATION},
+    {"/folio-deployment:status", STATUS_OPERATION},
 };
 
 static int execute(const char *program, const char *input, json_t **result)
@@ -112,6 +135,15 @@ static int callback(sr_session_ctx_t *session, uint32_t sub_id, const char *xpat
     int code = SR_ERR_OK;
     json_object_foreach(result, key, value) {
         if (json_is_null(value)) continue;
+        if (!strcmp(key, "data") && json_is_object(value)) {
+            omit_absent_values(value);
+            char *data = json_dumps(value, JSON_COMPACT);
+            LY_ERR error = data ? lyd_new_any(output, NULL, key, data, LYD_ANYDATA_JSON,
+                LYD_NEW_VAL_OUTPUT, NULL) : LY_EMEM;
+            free(data);
+            if (error != LY_SUCCESS) { code = SR_ERR_CALLBACK_FAILED; break; }
+            continue;
+        }
         if (!json_is_string(value) || lyd_new_term(output, NULL, key,
                 json_string_value(value), LYD_NEW_VAL_OUTPUT, NULL) != LY_SUCCESS) {
             code = SR_ERR_CALLBACK_FAILED;
@@ -119,6 +151,40 @@ static int callback(sr_session_ctx_t *session, uint32_t sub_id, const char *xpat
         }
     }
     json_decref(result);
+    return code;
+}
+
+static int operational(sr_session_ctx_t *session, uint32_t sub_id, const char *module_name,
+        const char *path, const char *request_xpath, uint32_t request_id,
+        struct lyd_node **parent, void *private_data)
+{
+    (void)sub_id; (void)module_name; (void)path; (void)request_xpath; (void)request_id;
+    const char *root = private_data;
+    json_t *result = NULL, *selected = NULL;
+    char *data = NULL;
+    struct lyd_node *tree = NULL;
+    int code = SR_ERR_CALLBACK_FAILED;
+    if (execute(OBSERVED_OPERATION, "{}", &result)) goto cleanup;
+    selected = json_object();
+    if (!selected || json_object_set(selected, root, json_object_get(result, root))) goto cleanup;
+    data = json_dumps(selected, JSON_COMPACT);
+    if (!data) goto cleanup;
+    sr_conn_ctx_t *connection = sr_session_get_connection(session);
+    const struct ly_ctx *ctx = sr_acquire_context(connection);
+    if (!ctx) goto cleanup;
+    LY_ERR error = lyd_parse_data_mem(ctx, data, LYD_JSON, LYD_PARSE_STRICT | LYD_PARSE_ONLY, 0, &tree);
+    if (error == LY_SUCCESS) {
+        if (*parent) error = lyd_merge_siblings(parent, tree, LYD_MERGE_DESTRUCT);
+        else *parent = tree;
+        tree = NULL;
+    }
+    sr_release_context(connection);
+    if (error == LY_SUCCESS) code = SR_ERR_OK;
+cleanup:
+    lyd_free_all(tree);
+    json_decref(selected);
+    json_decref(result);
+    free(data);
     return code;
 }
 
@@ -158,6 +224,10 @@ int main(int argc, char **argv)
     for (size_t i = 0; code == SR_ERR_OK && i < sizeof(operations) / sizeof(operations[0]); ++i) {
         code = sr_rpc_subscribe_tree(session, operations[i].xpath, callback, (void *)&operations[i], 0, 0, &subscription);
     }
+    if (code == SR_ERR_OK) code = sr_oper_get_subscribe(session, "folio-environment", "/folio-environment:environment",
+        operational, "folio-environment:environment", 0, &subscription);
+    if (code == SR_ERR_OK) code = sr_oper_get_subscribe(session, "folio-deployment", "/folio-deployment:deployment",
+        operational, "folio-deployment:deployment", 0, &subscription);
     if (code == SR_ERR_OK) {
         signal(SIGTERM, stop);
         signal(SIGINT, stop);

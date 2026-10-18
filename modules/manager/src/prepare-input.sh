@@ -24,4 +24,10 @@ jq -cnS --arg scope "$scope" \
   '{ format: 1, scope: $scope, configuration: $configuration[0],
      configurationDigest: $configurationDigest, systemDescriptor: $descriptor[0],
      descriptorDigest: $descriptorDigest, models: $identities[0].models[$scope],
-     tools: $identities[0].tools }'
+     tools: $identities[0].tools,
+     resolvedPreferences: (
+       ($configuration[0]."folio-environment:environment".preferences // {}) as $preferences |
+       ($descriptor[0].preferences + $preferences) as $values |
+       {values:$values, origins:($values | with_entries(.key as $key |
+         .value=(if $scope=="system" then "system-configuration"
+           elif $preferences|has($key) then "user-configuration" else "system-default" end)))}) }'

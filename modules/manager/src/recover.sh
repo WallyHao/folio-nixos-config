@@ -1,3 +1,4 @@
 lock_configuration
 recover_configuration
+recover_tasks
 reply success

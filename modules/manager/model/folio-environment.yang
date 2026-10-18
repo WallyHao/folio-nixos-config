@@ -56,10 +56,10 @@ module folio-environment {
     }
     container preferences {
       description "Shared preferences; identity and privileges are not overridable here.";
-      leaf scheme { type enumeration { enum everforest; } default everforest; }
-      leaf appearance { type enumeration { enum dark; enum light; } default dark; }
-      leaf font-family { type string { length '1..128'; pattern '[^\r\n]+'; } default 'Maple Mono NF CN'; }
-      leaf font-size { type uint8 { range '6..72'; } default 16; }
+      leaf scheme { type enumeration { enum everforest; } }
+      leaf appearance { type enumeration { enum dark; enum light; } }
+      leaf font-family { type string { length '1..128'; pattern '[^\r\n]+'; } }
+      leaf font-size { type uint8 { range '6..72'; } }
     }
     list modules {
       key name;

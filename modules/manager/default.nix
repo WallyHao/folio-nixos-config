@@ -5,8 +5,17 @@
 }:
 let
   normalizer = pkgs.callPackage ./src/normalizer.nix { };
+  prepareInput = pkgs.writeShellApplication {
+    name = "folio-prepare-input";
+    runtimeInputs = [
+      normalizer
+      pkgs.jq
+      pkgs.coreutils
+    ];
+    text = builtins.readFile ./src/prepare-input.sh;
+  };
   runtime = import ./src/runtime.nix {
-    inherit pkgs normalizer;
+    inherit pkgs normalizer prepareInput;
     sysrepo = pkgs.folio.sysrepo;
     repository = pkgs.folio.repository;
   };
@@ -29,15 +38,7 @@ in
   packages = {
     inherit normalizer runtime;
     cli = client.cli;
-    input = pkgs.writeShellApplication {
-      name = "folio-prepare-input";
-      runtimeInputs = [
-        normalizer
-        pkgs.jq
-        pkgs.coreutils
-      ];
-      text = builtins.readFile ./src/prepare-input.sh;
-    };
+    input = prepareInput;
   };
   commands = lib.mapAttrs (_: adapter: {
     path = "${adapter}/bin/${adapter.meta.mainProgram}";

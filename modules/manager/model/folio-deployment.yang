@@ -8,6 +8,41 @@ module folio-deployment {
   description "Manager-owned immutable plans and observed durable deployment tasks.";
   revision 2026-10-18 { description "Initial plan and task contract; operations are registered when implemented."; }
 
+  grouping result {
+    leaf status { type fe:result-status; mandatory true; }
+    leaf error { type string; }
+    anydata data { description "Operation-specific observed result, never desired settings."; }
+  }
+  rpc plan {
+    description "Freeze an owned source and accepted user configuration into an immutable plan.";
+    input {
+      leaf source { type string; mandatory true; }
+      leaf timeout-seconds { type uint32 { range '1..86400'; } default 1800; }
+    }
+    output { uses result; leaf plan-id { type fe:digest; } }
+  }
+  rpc build {
+    description "Durably submit a build of a recorded immutable plan.";
+    input {
+      leaf plan-id { type fe:digest; mandatory true; }
+      leaf request-id { type fe:identifier; mandatory true; }
+    }
+    output { uses result; leaf task-id { type fe:identifier; } }
+  }
+  rpc apply {
+    description "Submit activation of a recorded successful build after stale-plan checks.";
+    input {
+      leaf plan-id { type fe:digest; mandatory true; }
+      leaf request-id { type fe:identifier; mandatory true; }
+    }
+    output { uses result; leaf task-id { type fe:identifier; } }
+  }
+  rpc status {
+    description "Read recorded tasks and probed profile/configuration state.";
+    input { leaf task-id { type fe:identifier; } }
+    output { uses result; }
+  }
+
   container deployment {
     config false;
     list plans {

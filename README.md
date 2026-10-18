@@ -4,10 +4,11 @@ Folio is a NixOS configuration framework built around module-owned YANG models
 and sysrepo. One CLI manages system and user configuration; each module executes
 its own operations. Root Nix composition lives in the manager module.
 
-Status: foundation and durable user configuration implemented; deployment operations below remain
-the implementation contract until their stages pass. See the runnable foundation
-workflow below and [STRUCTURE.md](STRUCTURE.md) for directory ownership. No Folio
-system has been installed or activated.
+Status: foundation, durable user configuration and Foot deployment are implemented
+and tested in an isolated NixOS guest. System deployment and later modules below
+remain the implementation contract until their stages pass. No development-host
+activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
+for directory ownership.
 
 ## Foundation workflow
 
@@ -44,14 +45,15 @@ with lexically sorted object keys plus one LF. libyang validates types and emits
 defaults; only the schema's system-ordered module/user/group lists are sorted.
 User-ordered arrays and RFC 7951 scalar encodings are preserved. A source snapshot
 containing `folio-input.json` consumes that data through pure Nix and rejects
-mismatched digests/model/tool identities. Source freezing and durable runtime
-deployment are Stage 02; real descriptor publication is Stage 03.
+mismatched digests/model/tool identities. Resolved public preference values and
+their origins are recorded and checked; absent user overrides inherit the system
+descriptor's defaults. Real system descriptor publication remains Stage 03.
 
 For a separate root-identity/scope check, run
 `bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
 It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
-it does not initialize system state on the development host. User apply and
-rollback are not implemented yet.
+it does not initialize system state on the development host. Rollback and system
+deployment are not implemented yet.
 
 ## User configuration development
 
@@ -59,7 +61,8 @@ The `folio` package provides `config show/edit/import/export` and
 `modules list/enable/disable` in user scope. Writes use sysrepocfg and the real
 manager C subscriber. The Home Manager output installs `folio-manager.service`;
 it initializes the repository before subscribing and reconciles interrupted
-configuration commits first. It has not yet been activated as a Folio user.
+configuration commits first. Guest activation is covered by the user-deployment
+check; initial product system provisioning remains Stage 03.
 
 For isolated development, keep the scratch XDG paths from the foundation example
 and run `folio-manager-subscriber user "$bootstrap"` in the development shell.
@@ -74,10 +77,57 @@ validates journal digests, restores prepared-only data, and rolls accepted data
 forward into running/startup before consumers start. A failed save remains a
 failure. JSON commands return one `{ status, data, error, taskId }` envelope;
 missing write subscribers return exit 3, validation exit 2, conflicts exit 4.
-Unimplemented deployment/status/rollback commands explicitly return exit 3.
+Unimplemented rollback explicitly returns exit 3; unsupported scopes return exit 2.
 
 Run `nix build --no-link .#checks.x86_64-linux.configuration` for the bounded
 real-sysrepo commit/edit/conflict/failure/restart integration scenario.
+
+## User build and deployment
+
+The following workflow requires the provisioned `folio` account with
+`HOME=/home/folio`, a running user manager subscriber and its initialized
+repository. Use the disposable test below until system provisioning is delivered.
+
+```sh
+folio config edit
+plan_id=$(folio --json plan --source /path/to/folio-checkout | jq -r .data.planId)
+folio build "$plan_id"
+folio apply "$plan_id"
+folio --json status
+```
+
+Plans copy the root Flake/lock, module code and optional assets once, exclude
+environment metadata/state/output paths, reject escaping symlinks and evaluate
+only immutable store bytes. Each plan binds desired configuration, descriptor,
+source identity, current profile and a bounded timeout. Build/apply submit durable
+tasks to independent `folio-task-<id>.service` user units. `--no-wait` returns the
+task ID; `--request-id ID` makes repeated identical submissions return that task.
+Client exit or subscriber restart does not cancel the worker. Use
+`folio status TASK_ID` to inspect the recorded outcome.
+
+Build never publishes applied state. Apply rechecks stale inputs, enforces the
+provisioned account/home and one standalone Home Manager profile, preserves first
+adoptions with unique backups and rejects later changes to managed files. It
+records profile effects before activation and verifies the actual selected
+profile and generated files before success. Disabling terminal removes its
+managed contribution while preserving application data. The profile is
+`$XDG_STATE_HOME/nix/profiles/home-manager` (default `~/.local/state/...`). Plans,
+tasks, successful builds and `current.json` live under the scoped `deployments/`;
+explicit Nix GC roots retain source/worker/artifact closures. Cleanup and managed
+rollback remain Stage 04; interrupted activation reports failure or interruption.
+
+Status probes profile/configuration drift and actual startup persistence. The C
+subscriber also publishes configuration/state and deployment plans/tasks through
+the operational datastore, for example
+`folio-repository user cfg --export --datastore operational --module folio-deployment --format json`.
+Configuration health does not establish desktop or hardware health.
+
+Run `nix build --no-link .#checks.x86_64-linux.user-deployment` for real isolated
+user edit/build/apply, changed Foot output, adoption/conflict, disable/data
+preservation and operational-state evidence. The development-shell command
+`bash modules/manager/tests/build.sh . "$bootstrap"` separately checks immutable
+source capture and a real user worker surviving subscriber exit; it builds into
+isolated XDG roots and never activates on the development host.
 
 ## Development handoff
 

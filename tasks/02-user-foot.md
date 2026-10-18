@@ -1,6 +1,6 @@
 # Stage 02: User configuration to Foot deployment
 
-Dependencies: 01. Status: in-progress.
+Dependencies: 01. Status: complete.
 Expected commit: `feat(manager): deploy frozen user foot configuration`.
 
 ## Objective and deliverables
@@ -84,3 +84,63 @@ digests/locks and actual observed Foot evidence. Record unavailable evidence hon
 - Remaining: immutable source capture/plans, durable independent workers/tasks,
   managed profile/adoption/apply, observed Foot state and the full Stage 02 gate.
   Deployment/status/rollback CLI commands explicitly report unavailable.
+
+## Stage completion record (2026-10-18)
+
+- Configuration submilestone: `9add07f`. Completed immutable source capture and
+  plans, independent durable build/apply workers, actual standalone Home Manager
+  activation, profile/file verification and operational data publication.
+- Public commands now include user `plan`, `build`, `apply`, `status`; rollback
+  remains unavailable. Fixed manager-owned RPC handlers do not route app actions.
+  JSON stdout is one envelope, editor/progress output uses stderr, and missing
+  subscribers/invalid scopes/conflicts/backend failures preserve documented exits.
+- Plans copy allowed source roots before validation, exclude environment metadata/
+  state/output paths, reject escaping symlinks, add frozen RFC 7951 input and bind
+  source/configuration/descriptor identities. Public preference values and origins
+  are validated against the descriptor plus explicit user overrides.
+- Tasks are durably queued before acknowledgement. Request-ID-derived stable task
+  IDs and serialized queue records prevent duplicate effects across retries/crashes.
+  `folio-task-<id>.service` transient user units run immutable recorded workers;
+  recorded timeouts bound builds/activation. Active source/worker/artifact closures
+  and successful previous closures remain explicitly rooted for future cleanup.
+- Profile authority is `$XDG_STATE_HOME/nix/profiles/home-manager`; scoped
+  `deployments/{plans,tasks,builds,roots}/` and `current.json` retain actual evidence.
+  Apply serializes configuration mutations, rechecks stale config/descriptor/
+  profile inputs, validates account/home/artifact identity, journals profile
+  effects before activation, uses unique adoption backups, rejects later managed
+  edits and verifies actual linked files. Build alone never publishes applied state.
+- The C subscriber provides real `environment/configuration`, `environment/state`
+  and deployment plans/tasks in operational data. Saved state compares running
+  and startup; out-of-protocol maintenance edits are not reported as persisted.
+- Actual passing commands:
+  - `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.catalogue path:.#checks.x86_64-linux.foundation path:.#checks.x86_64-linux.configuration path:.#checks.x86_64-linux.user-deployment`
+  - Final affected checks: `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.configuration path:.#checks.x86_64-linux.user-deployment`
+  - Development-shell `modules/manager/tests/prepared.sh` and
+    `modules/sysrepo/tests/scopes.sh`; Nixfmt, ShellCheck and `git diff --check`.
+- Final evidence: `/nix/store/3vhilhaxq9fhs8zl9q4ggapnmavr1n6d-folio-configuration-integration`
+  and `/nix/store/sl9h1m1a1mzvhppas5hhjy2vl0kg0c2n-vm-test-run-folio-user-deployment`.
+  Logs are available with `nix log`; `/tmp/folio-stage02-final.log` records the
+  final command. The guest verified actual Foot size 18, first-adoption backup,
+  later conflict without overwriting edits, profile/operational-state evidence,
+  disable removal, application-data preservation and persisted selection restart.
+- Independent build evidence: `/tmp/folio-build-test.UOr7F1/`, source snapshot
+  `/nix/store/igxpfi60481xw3gva0165l1735gwasm6-folio-input`. The real user worker
+  built immutable source after poisoning the editable Foot renderer and stopping
+  the subscriber. Duplicate requests returned the same task, build left applied
+  state empty and stale apply was rejected. Later shared state-provider changes
+  were covered by the final real guest gate; source capture/idempotency code was
+  unchanged apart from narrowing output-name exclusion and returning timeout data.
+- Reuse: Sylphy Foot renderer/selected preferences from Stage 01; inspected
+  home-authority/adoption/publication and VM provisioning tests. Adapted ownership,
+  journal, backup and guest-fixture principles without porting its private Python/
+  Rust manager or its system-owned Home publication behavior.
+- An initial guest dependency seed accidentally included derivation closures;
+  that build was interrupted and corrected to actual output/runtime closures.
+  No broad garbage collection or reference checkout modification was performed.
+- Limits: no system-scope activation, product VM lifecycle, migration executor or
+  managed rollback yet. Interrupted activation is reported for Stage 04 recovery;
+  no automatic destructive retry is claimed. No development-host activation.
+- Commit subject: `feat(manager): deploy frozen user foot configuration`.
+- Next: Stage 03 extends the same scoped repositories, immutable plans/workers and
+  profile authority with authorized root service, unprivileged builder, real system
+  descriptor and disposable UEFI guest. It must preserve the selected user profile.

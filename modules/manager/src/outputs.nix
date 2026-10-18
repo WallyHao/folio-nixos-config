@@ -50,8 +50,26 @@ let
         environment = environment.name;
         platform = environment.platform;
       }
-      // lib.optionalAttrs (scope == "user") { account = environment.account; };
-      globals = environment.preferences;
+      // lib.optionalAttrs (scope == "user") {
+        account = environment.account;
+        home =
+          let
+            users =
+              if prepared != null then
+                prepared.systemDescriptor.users
+              else
+                defaults.system."folio-environment:environment".users;
+            matches = builtins.filter (user: user.name == environment.account) users;
+          in
+          if builtins.length matches != 1 then
+            throw "Folio: account is absent or ambiguous in system descriptor"
+          else
+            (builtins.head matches).home;
+      };
+      globals =
+        defaults.system."folio-environment:environment".preferences
+        // (if scope == "user" && prepared != null then prepared.systemDescriptor.preferences else { })
+        // (environment.preferences or { });
       capabilities =
         if scope == "user" && prepared != null then prepared.systemDescriptor.capabilities else { };
     };
@@ -135,8 +153,20 @@ in
     modules = adapters "user" ++ [
       {
         home.username = (context "user").identity.account;
-        home.homeDirectory = "/home/${(context "user").identity.account}";
+        home.homeDirectory = (context "user").identity.home;
         home.stateVersion = "26.05";
+        home.extraBuilderCommands = ''
+          cp ${
+            pkgs.writeText "folio-home.json" (
+              builtins.toJSON {
+                format = 1;
+                account = (context "user").identity.account;
+                home = (context "user").identity.home;
+                configurationDigest = if prepared == null then null else prepared.configurationDigest;
+              }
+            )
+          } $out/folio-home.json
+        '';
       }
     ];
   };
@@ -161,6 +191,21 @@ in
     ];
   };
   checks.${system} = {
+    user-deployment = import ../tests/user-deployment.nix {
+      inherit pkgs inputs bootstrap;
+      source = lib.fileset.toSource {
+        root = ../../..;
+        fileset = lib.fileset.unions [
+          ../../../flake.nix
+          ../../../flake.lock
+          ../../../modules
+        ];
+      };
+      runtime = collection.packages.manager-runtime;
+      cli = collection.packages.manager-cli;
+      repository = collection.packages.sysrepo-tools;
+      prepareInput = collection.packages.manager-input;
+    };
     configuration = import ../tests/configuration.nix {
       inherit pkgs bootstrap;
       runtime = collection.packages.manager-runtime;
