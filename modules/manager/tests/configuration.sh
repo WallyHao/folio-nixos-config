@@ -64,7 +64,7 @@ jq -e '.status=="conflict"' result.json
 folio --json config show | jq -e '.data.configuration."folio-environment:environment".preferences."font-size"==20'
 expect_code 2 folio --json modules enable unknown
 jq -e '.status=="invalid"' result.json
-expect_code 2 folio --json --system plan
+expect_code 2 folio --json --environment unknown config show
 
 # A genuine durable-write failure must be a failed modeled result, with no save.
 chmod 0500 "$XDG_STATE_HOME/folio/configuration"

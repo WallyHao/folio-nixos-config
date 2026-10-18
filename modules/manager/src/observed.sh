@@ -6,8 +6,7 @@ if [[ -f "$state/deployments/current.json" ]]; then
   artifact=$(jq -er .artifact "$state/deployments/current.json")
   applied_digest=$(jq -er .configurationDigest "$state/deployments/current.json")
   health=degraded
-  if [[ $(readlink -e "$profile" || true) == "$artifact" && "$applied_digest" == "$desired_digest" ]] &&
-      managed_files_match "$artifact"; then health=healthy; fi
+  if [[ "$applied_digest" == "$desired_digest" ]] && applied_artifact_matches "$artifact"; then health=healthy; fi
 fi
 saved=true
 if ! configuration_is_saved "$desired_digest"; then saved=false; fi

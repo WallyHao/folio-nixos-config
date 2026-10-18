@@ -47,22 +47,23 @@ in
     inherit normalizer runtime;
     cli = client.cli;
     input = prepareInput;
+    atomic = runtime.atomic;
+    cli-support = pkgs.writeTextDir "share/folio/client-common.sh" (
+      builtins.readFile ./src/client-common.sh
+    );
   };
-  commands = lib.mapAttrs (name: adapter: {
+  commands = lib.mapAttrs (_: adapter: {
     path = "${adapter}/bin/${adapter.meta.mainProgram}";
     scopes = [
       "user"
-    ]
-    ++ lib.optional (builtins.elem name [
-      "config"
-      "modules"
-      "status"
-    ]) "system";
+      "system"
+    ];
   }) client.adapters;
   nixosModule =
     context:
-    { folioBootstrap, ... }:
+    args@{ folioBootstrap, ... }:
     let
+      folioInput = args.folioInput or null;
       descriptor = pkgs.writeText "folio-system-descriptor.json" (
         builtins.toJSON {
           format = 1;
@@ -70,7 +71,7 @@ in
           platform = context.identity.platform;
           users = context.identity.users;
           preferences = context.globals;
-          capabilities = {
+          capabilities = context.capabilities // {
             system-repository = true;
           };
           origin = "system-generation";
@@ -105,6 +106,24 @@ in
         client.cli
         runtime
       ];
+      system.systemBuilderCommands =
+        let
+          configuration =
+            if folioInput == null then
+              "${folioBootstrap}/system.json"
+            else
+              pkgs.writeText "folio-system-input.json" (builtins.toJSON folioInput.configuration);
+        in
+        ''
+          ${normalizer}/bin/folio-normalize ${folioBootstrap}/models/system ${configuration} > "$out/folio-configuration.json"
+          configuration_digest=$(${pkgs.coreutils}/bin/sha256sum < "$out/folio-configuration.json")
+          ${pkgs.jq}/bin/jq -cnS --arg digest "''${configuration_digest%% *}" \
+            --arg environment ${lib.escapeShellArg context.identity.environment} \
+            --arg bootstrap ${lib.escapeShellArg (toString folioBootstrap)} \
+            --slurpfile configuration "$out/folio-configuration.json" \
+            '{format:1,scope:"system",environment:$environment,bootstrap:$bootstrap,
+              configurationDigest:$digest,configuration:$configuration[0]}' > "$out/folio-system.json"
+        '';
       systemd.user.services.folio-manager = {
         description = "Folio user configuration subscriber";
         wantedBy = [ "default.target" ];

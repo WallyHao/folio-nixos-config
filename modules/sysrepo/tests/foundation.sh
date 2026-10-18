@@ -8,7 +8,7 @@ cmp normalized.json normalized-reordered.json
 folio-prepare-input "$bootstrap/user.json" "$bootstrap" > input.json
 folio-prepare-input reordered.json "$bootstrap" > reordered-input.json
 cmp input.json reordered-input.json
-jq -e '.format == 1 and .scope == "user" and (.models | length == 3)
+jq -e --slurpfile identities "$bootstrap/identities.json" '.format == 1 and .scope == "user" and .models == $identities[0].models.user
   and (.configurationDigest | length == 64) and (.descriptorDigest | length == 64)
   and .tools.libyang == "3.13.6" and .tools.sysrepo == "3.7.11"' input.json
 jq '."folio-environment:environment".preferences."font-size" = 0' "$bootstrap/user.json" > invalid.json

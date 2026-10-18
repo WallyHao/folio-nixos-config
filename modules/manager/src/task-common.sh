@@ -3,6 +3,12 @@ mkdir -p "$state/deployments/plans" "$state/deployments/tasks" \
 profile=${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager
 if [[ "$scope" == system ]]; then profile=/nix/var/nix/profiles/system; fi
 plan=
+manager_option=--user
+[[ "$scope" != system ]] || manager_option=--system
+selected_profile() {
+  if [[ "$scope" == system && ! -L "$profile" ]]; then readlink -e /run/current-system
+  else readlink -e "$profile" || true; fi
+}
 task_reply() {
   jq -cn --arg id "$1" --slurpfile task "$state/deployments/tasks/$1.json" \
     '{status:"success","task-id":$id,data:{"folio-deployment:result":{timeoutSeconds:$task[0].timeoutSeconds}}}'
@@ -12,12 +18,12 @@ start_task() {
   worker=$(jq -er .worker "$record")
   timeout_seconds=$(jq -er .timeoutSeconds "$record")
   [[ "$worker" =~ ^/nix/store/[a-z0-9]{32}-[^/]+/bin/folio-manager-worker$ && -x "$worker" ]] || return 1
-  if systemctl --user is-active --quiet "folio-task-$id.service"; then return 0; fi
-  systemd-run --user --collect --quiet --unit="folio-task-$id" --service-type=exec \
+  if systemctl "$manager_option" is-active --quiet "folio-task-$id.service"; then return 0; fi
+  systemd-run "$manager_option" --collect --quiet --unit="folio-task-$id" --service-type=exec \
     --property="RuntimeMaxSec=$((timeout_seconds + 60))" --property=TimeoutStopSec=10 \
     --setenv="HOME=$HOME" --setenv="USER=$(id -un)" \
     --setenv="XDG_STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}" \
-    --setenv="XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" --setenv="FOLIO_BOOTSTRAP=$FOLIO_BOOTSTRAP" \
+    --setenv="XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run}" --setenv="FOLIO_BOOTSTRAP=$FOLIO_BOOTSTRAP" --setenv="FOLIO_SCOPE=$scope" \
     "$worker" "$id"
 }
 recover_tasks() {
@@ -29,7 +35,7 @@ recover_tasks() {
     case "$phase" in
       queued) start_task "$id" || return 1 ;;
       validating|building|activating|verifying)
-        if ! systemctl --user is-active --quiet "folio-task-$id.service"; then
+        if ! systemctl "$manager_option" is-active --quiet "folio-task-$id.service"; then
           exec 6>"$state/deployments/tasks/$id.lock"
           if flock -n 6; then
             jq '.phase="interrupted" | .resultStatus="unavailable" |
@@ -52,10 +58,19 @@ managed_files_match() {
     fi
   done < <(find -L "$generation/home-files" -type f -print0)
 }
+applied_artifact_matches() {
+  local artifact=$1
+  [[ $(selected_profile) == "$artifact" ]] || return 1
+  if [[ "$scope" == user ]]; then managed_files_match "$artifact"
+  else
+    [[ $(readlink -e /run/current-system) == "$artifact" ]] &&
+      [[ $(readlink -e /etc/localtime) == "$(readlink -e "$artifact/etc/localtime")" ]]
+  fi
+}
 plan_current() {
   current_configuration >"$work/current.json"
   [[ $(digest_file "$work/current.json") == "$(jq -er .configurationDigest "$plan")" ]] || return 1
   jq -cS . "$descriptor_path" >"$work/descriptor.json"
   [[ $(digest_file "$work/descriptor.json") == "$(jq -er .descriptorDigest "$plan")" ]] || return 1
-  [[ $(readlink -e "$profile" || true) == "$(jq -r .beforeProfile "$plan")" ]] || return 1
+  [[ $(selected_profile) == "$(jq -r .beforeProfile "$plan")" ]] || return 1
 }

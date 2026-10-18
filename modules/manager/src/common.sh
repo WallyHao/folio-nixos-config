@@ -53,6 +53,14 @@ configuration_is_saved() {
   folio-normalize "$models" "$work/startup.json" >"$work/startup-normalized.json" || return 1
   [[ $(digest_file "$work/startup-normalized.json") == "$1" ]]
 }
+nix_as_builder() {
+  if [[ "$scope" == system ]]; then
+    runuser -u folio-builder -- env -i HOME=/var/lib/folio-builder USER=folio-builder \
+      LANG=C.UTF-8 NIX_REMOTE=daemon PATH="$PATH" nix "$@"
+  else
+    nix "$@"
+  fi
+}
 recover_configuration() {
   local journal=$state/configuration/transaction.json phase expected
   [[ -e "$journal" ]] || return 0

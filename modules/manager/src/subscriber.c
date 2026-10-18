@@ -129,7 +129,8 @@ static int callback(sr_session_ctx_t *session, uint32_t sub_id, const char *xpat
             execute(operation->program, request, &result)) {
         free(request);
         json_decref(result);
-        if (lyd_new_term(output, NULL, "status", "failure", LYD_NEW_VAL_OUTPUT, NULL) != LY_SUCCESS ||
+        const char *status = !strcmp(operation->xpath, "/folio-deployment:status") ? "unavailable" : "failure";
+        if (lyd_new_term(output, NULL, "status", status, LYD_NEW_VAL_OUTPUT, NULL) != LY_SUCCESS ||
                 lyd_new_term(output, NULL, "error", "Manager operation failed, timed out, or returned invalid output",
                     LYD_NEW_VAL_OUTPUT, NULL) != LY_SUCCESS) return SR_ERR_CALLBACK_FAILED;
         return SR_ERR_OK;
@@ -251,10 +252,6 @@ int main(int argc, char **argv)
     json_decref(recovery);
     if (code == SR_ERR_OK) code = sr_session_start(connection, SR_DS_RUNNING, &session);
     for (size_t i = 0; code == SR_ERR_OK && i < sizeof(operations) / sizeof(operations[0]); ++i) {
-        /* System deployment handlers are not registered until their privileged
-         * worker and target validation are implemented and tested. */
-        if (system_scope && strcmp(operations[i].xpath, "/folio-environment:configuration-commit") &&
-                strcmp(operations[i].xpath, "/folio-deployment:status")) continue;
         code = sr_rpc_subscribe_tree(session, operations[i].xpath, callback, (void *)&operations[i], 0, 0, &subscription);
     }
     if (code == SR_ERR_OK) code = sr_oper_get_subscribe(session, "folio-environment", "/folio-environment:environment",

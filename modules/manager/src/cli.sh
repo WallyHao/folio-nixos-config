@@ -35,6 +35,8 @@ Commands:
   plan [--source DIRECTORY]                Freeze configuration and source
   build|apply PLAN_ID [--request-id ID]     Build or activate a recorded plan
   status [TASK_ID]                         Query observed state or a task
+  vm build|start|stop|status|cleanup ID     Manage a disposable user VM
+  --system system reboot|poweroff          Accept a guest power request
 
 User configuration operations require the manager subscriber for writes.
 Build/apply wait by default; --no-wait returns the durable task ID.
@@ -44,8 +46,8 @@ HELP
 fi
 [[ "$environment" == portable ]] || emit_error invalid 'Unknown environment' 2
 command=${arguments[0]}
-if "$no_wait" && [[ "$command" != build && "$command" != apply ]]; then
-  emit_error invalid '--no-wait applies to build/apply tasks' 2
+if "$no_wait" && [[ "$command" != build && "$command" != apply && "$command" != vm ]]; then
+  emit_error invalid '--no-wait applies to deployment tasks and VM builds' 2
 fi
 adapter=$(jq -er --arg command "$command" '.[$command].path' @commands@ 2>/dev/null) || {
   case "$command" in

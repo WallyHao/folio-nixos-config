@@ -1,6 +1,6 @@
 # Stage 03: System deployment and disposable UEFI guest
 
-Dependencies: 02. Status: in-progress.
+Dependencies: 02. Status: complete.
 Expected commit: `feat(system): enable authorized vm system deployment`.
 
 ## Objective and deliverables
@@ -106,3 +106,61 @@ storage/installation remains pending.
   module-owned VM lifecycle, system-owned accepted power requests with external
   observation, changed actual system setting and preserved selected user generation.
   Stage 03 remains in progress; no system update or UEFI/power gate is claimed.
+
+## Completed deployment and VM gate (2026-10-18)
+
+- Prior provisioning commit: `010dff7`. Implemented system plan/build/apply using
+  the existing immutable plans, durable tasks and per-scope mutation lock.
+  Evaluation/build run as `folio-builder`; only the fixed root worker activates
+  the recorded, metadata-verified closure. Source, worker and before/after closures
+  remain rooted. User selection is independent of system activation.
+- System owns its timezone model and root power subscriber. Delayed power requests
+  persist prepared/accepted records, bind request IDs to actions, reject changed
+  duplicates and report acceptance separately from externally observed completion.
+- VM owns its YANG/RPC, C subscriber, Bash client, asynchronous build worker and
+  direct QEMU/KVM/OVMF lifecycle. Added a standalone bootable qcow2 output and
+  bootstrap launcher, private overlays/EFI variables/QMP sockets, user networking,
+  bounded shutdown, active-job cleanup rejection and archived failure/serial logs.
+  The image provides `/etc/folio/source` and pinned inputs, without host mounts.
+- Reused Sylphy's image/provisioning/profile patterns inspected at revision
+  `9cba023d90c4485b33a91e2d12724b6920580580`; retained Folio's independent
+  repositories, direct QEMU and C/Bash implementation. No reference-tree changes.
+- Passing final guest command:
+  `nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths path:.#checks.x86_64-linux.system-deployment`.
+  Evidence: `/nix/store/56la33g302kc9nfjc9fzhbb7y4axp28r-vm-test-run-folio-system-deployment`;
+  log `/tmp/folio-stage03-release3.log`. Actual UTC activation, non-root builder,
+  operator authorization, rejected arbitrary payloads, both repositories after
+  reboot and unchanged Foot font/user profile passed. The offline fixture imports
+  its seed from the same frozen source, including an internal symlink; no runtime
+  substitutes or hidden development-directory imports are required.
+- Boot IDs: `57c109a4-068f-4898-a662-6b642f2bc3a6` before reboot and
+  `8ff00ce8-443f-4c9f-ac6a-1dfb2b6c55ef` afterward. Selected system:
+  `/nix/store/b6ikdzdm6xsrzfvjr7rbnshq7sqi9wxz-nixos-system-portable-test`;
+  unchanged user generation:
+  `/nix/store/0p4yzm2yh35gh5izq0w3zzjr3vq3jfaa-home-manager-generation`.
+  QMP observed RESET/SHUTDOWN and QEMU exited with status 0.
+- Separate actual VM lifecycle command: `bash modules/vm/tests/lifecycle.sh
+  BOOTSTRAP REPOSITORY CLI VM_SUBSCRIBER VM_TOOLS IMMUTABLE_SOURCE`, using outputs
+  from `manager-bootstrap`, `sysrepo-tools`, `folio`, `vm-subscriber`, `vm-tools`.
+  Passed with source `/nix/store/i7ywynb3967sxjl5qviwdfr2nzk1bbhi-folio-vm-source.v6o0Jo`;
+  retained evidence `/tmp/folio-vm-lifecycle.clhezc`, log
+  `/tmp/folio-vm-lifecycle.log`. Subscriber restart did not cancel the image build;
+  the UEFI guest reached login, cleanup refused a running guest, ACPI shutdown
+  produced `phase=stopped, exitCode=0`, and explicit cleanup archived serial logs.
+- Final image build: `nix build --no-link --no-update-lock-file --max-jobs 2
+  --print-out-paths path:.#vm-image` produced
+  `/nix/store/vi0iha821incrk5df3a19gj5pssdqyh2-folio-uefi-image`;
+  log `/tmp/folio-vm-image-release.log`.
+- Affected configuration/foundation checks passed in the final batch before the
+  fixture-only import correction: `/nix/store/l2f363hpg7an61kb0f7akiwi1dw0bs2a-folio-configuration-integration`
+  and `/nix/store/nldqlcj6jkyarf8fb7c8f3cr1g4wxl4q-folio-foundation`.
+  Changed transport polling was exercised by actual Home Manager service restart;
+  schema identities are compared to bootstrap identities rather than a fixed count.
+  C builds use `-Wall -Wextra -Werror`; packaged Bash and lifecycle-test ShellCheck
+  passed. Prior Stage 02 adoption/disable checks remain relevant and unchanged.
+- Prototype account password remains `kl;'`; storage is exclusively disposable
+  labeled guest disks. No host activation, host power action, push or physical
+  installation. Hardware acceptance and retained-revision recovery remain pending.
+- Commit subject: `feat(system): enable authorized vm system deployment`.
+  Next: Stage 04, using retained plans/current records, old closures/models and
+  the scoped guest fixture for recovery, migration and managed rollback.

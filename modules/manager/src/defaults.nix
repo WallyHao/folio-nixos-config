@@ -26,6 +26,11 @@
           {
             name = "system";
             enabled = true;
+            "folio-system:system".time-zone = "Asia/Shanghai";
+          }
+          {
+            name = "vm";
+            enabled = true;
           }
         ]
       else
@@ -51,7 +56,10 @@
             name = "folio";
             uid = 1000;
             home = "/home/folio";
-            groups = [ "folio-operators" ];
+            groups = [
+              "folio-operators"
+              "kvm"
+            ];
             login-shell = "bash";
           }
         ];

@@ -8,11 +8,13 @@ rpc() {
       cat "$work/error" >&2
       finish unavailable null 'Manager subscriber is unavailable'
     fi
+    if "$tolerate_unavailable"; then return 1; fi
     cat "$work/error" >&2
     finish failure null 'Deployment RPC failed'
   fi
   response=$(jq -ce 'to_entries[0].value' "$work/reply.json") || finish failure null 'Invalid manager reply'
   response_status=$(jq -er .status <<<"$response")
+  if "$tolerate_unavailable" && [[ "$response_status" == unavailable ]]; then return 1; fi
   response_error=$(jq -r '.error // ""' <<<"$response")
   response_data=$(jq -c '.data["folio-deployment:result"] // .data.result // null' <<<"$response")
 }

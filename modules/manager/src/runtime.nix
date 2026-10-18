@@ -27,6 +27,7 @@ let
         repository
         normalizer
         pkgs.coreutils
+        pkgs.bash
         pkgs.jq
         pkgs.util-linux
         pkgs.nix
@@ -53,6 +54,7 @@ let
 in
 pkgs.symlinkJoin {
   name = "folio-manager-runtime";
+  passthru.atomic = atomic;
   paths = [
     worker
     (pkgs.stdenv.mkDerivation {

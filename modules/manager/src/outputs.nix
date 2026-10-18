@@ -11,6 +11,21 @@ let
     folio = {
       sysrepo = sysrepoModule.packages.library;
       repository = sysrepoModule.packages.tools;
+      atomicWrite = catalogue.manager.packages.atomic;
+      cliSupport = catalogue.manager.packages.cli-support;
+      systemConfiguration = portableSystem;
+      source = lib.fileset.toSource {
+        root = ../../..;
+        fileset = lib.fileset.unions [
+          ../../../flake.nix
+          ../../../flake.lock
+          ../../../modules
+        ];
+      };
+      lockedInputs = [
+        inputs.nixpkgs
+        inputs.home-manager
+      ];
     };
   };
   inherit (pkgs) lib;
@@ -23,6 +38,7 @@ let
     sysrepo = sysrepoModule;
     system = import ../../system/default.nix { inherit pkgs lib; };
     terminal = import ../../terminal/default.nix { inherit pkgs lib; };
+    vm = import ../../vm/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   defaults = lib.genAttrs [ "system" "user" ] (scope: import ./defaults.nix { inherit scope; });
@@ -72,7 +88,14 @@ let
         // (if scope == "user" && prepared != null then prepared.systemDescriptor.preferences else { })
         // (environment.preferences or { });
       capabilities =
-        if scope == "user" && prepared != null then prepared.systemDescriptor.capabilities else { };
+        if scope == "user" && prepared != null then
+          prepared.systemDescriptor.capabilities
+        else
+          {
+            kvm-access-configured = lib.any (
+              entry: entry.name == "vm" && (entry.enabled or false)
+            ) (configuration "system")."folio-environment:environment".modules;
+          };
     };
   adapters =
     scope:
@@ -107,6 +130,14 @@ let
       }) collection.models.${scope}
     );
   };
+  portableSystem = inputs.nixpkgs.lib.nixosSystem {
+    inherit system;
+    specialArgs = {
+      folioBootstrap = bootstrap;
+      folioInput = if prepared != null && prepared.scope == "system" then prepared else null;
+    };
+    modules = adapters "system";
+  };
   bootstrap = pkgs.runCommand "folio-bootstrap" { } ''
     mkdir -p $out/models
     ln -s ${models.system} $out/models/system
@@ -132,7 +163,7 @@ let
           platform = system;
           users = defaults.system."folio-environment:environment".users;
           preferences = defaults.system."folio-environment:environment".preferences;
-          capabilities = { };
+          capabilities = (context "system").capabilities;
           origin = "bootstrap";
         }
       )
@@ -144,11 +175,7 @@ in
     manager-bootstrap = bootstrap;
     folio = collection.packages.manager-cli;
   };
-  nixosConfigurations.portable = inputs.nixpkgs.lib.nixosSystem {
-    inherit system;
-    specialArgs.folioBootstrap = bootstrap;
-    modules = adapters "system";
-  };
+  nixosConfigurations.portable = portableSystem;
   homeConfigurations.folio = inputs.home-manager.lib.homeManagerConfiguration {
     inherit pkgs;
     extraSpecialArgs.folioBootstrap = bootstrap;
@@ -164,7 +191,8 @@ in
                 format = 1;
                 account = (context "user").identity.account;
                 home = (context "user").identity.home;
-                configurationDigest = if prepared == null then null else prepared.configurationDigest;
+                configurationDigest =
+                  if prepared != null && prepared.scope == "user" then prepared.configurationDigest else null;
               }
             )
           } $out/folio-home.json
@@ -193,6 +221,19 @@ in
     ];
   };
   checks.${system} = {
+    system-deployment = import ../tests/system-deployment.nix {
+      inherit pkgs inputs bootstrap;
+      source = lib.fileset.toSource {
+        root = ../../..;
+        fileset = lib.fileset.unions [
+          ../../../flake.nix
+          ../../../flake.lock
+          ../../../modules
+        ];
+      };
+      modules = adapters "system";
+      prepareInput = collection.packages.manager-input;
+    };
     system-scope = import ../tests/system-scope.nix {
       inherit pkgs inputs bootstrap;
       source = lib.fileset.toSource {

@@ -14,9 +14,9 @@ health=unavailable
 if [[ -f "$state/deployments/current.json" ]]; then
   applied=$(jq -c . "$state/deployments/current.json")
   health=degraded
-  if [[ $(readlink -e "$profile" || true) == "$(jq -r .artifact <<<"$applied")" &&
+  if [[ $(selected_profile) == "$(jq -r .artifact <<<"$applied")" &&
         "$desired_digest" == "$(jq -r .configurationDigest <<<"$applied")" ]]; then
-    if managed_files_match "$(jq -r .artifact <<<"$applied")"; then health=healthy; fi
+    if applied_artifact_matches "$(jq -r .artifact <<<"$applied")"; then health=healthy; fi
     expected_foot=$(jq -r '.footDigest // ""' <<<"$applied")
     if [[ -n "$expected_foot" ]] && { [[ ! -f "$HOME/.config/foot/foot.ini" ]] ||
         [[ $(digest_file "$HOME/.config/foot/foot.ini") != "$expected_foot" ]]; }; then health=degraded; fi

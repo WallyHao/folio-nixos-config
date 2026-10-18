@@ -4,9 +4,9 @@ Folio is a NixOS configuration framework built around module-owned YANG models
 and sysrepo. One CLI manages system and user configuration; each module executes
 its own operations. Root Nix composition lives in the manager module.
 
-Status: foundation, durable user configuration, Foot deployment and system-scoped
-configuration services are implemented and tested in isolated NixOS guests.
-System deployment and later modules below
+Status: foundation, durable user configuration, Foot deployment, root deployment
+and system-owned power actions have passed isolated UEFI guest tests. A standalone
+UEFI image and module-owned VM lifecycle are implemented. Later modules below
 remain the implementation contract until their stages pass. No development-host
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
@@ -54,8 +54,8 @@ descriptor; standalone bootstrap retains an explicit bootstrap origin.
 For a separate root-identity/scope check, run
 `bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
 It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
-it does not initialize system state on the development host. Rollback and system
-deployment are not implemented yet.
+it does not initialize system state on the development host. Managed rollback
+remains Stage 04.
 
 ## User configuration development
 
@@ -64,7 +64,7 @@ The `folio` package provides `config show/edit/import/export` and
 manager C subscriber. The Home Manager output installs `folio-manager.service`;
 it initializes the repository before subscribing and reconciles interrupted
 configuration commits first. Guest activation is covered by the user-deployment
-check; initial product system provisioning remains Stage 03.
+check; the portable image provisions the initial product system services.
 
 For isolated development, keep the scratch XDG paths from the foundation example
 and run `folio-manager-subscriber user "$bootstrap"` in the development shell.
@@ -88,7 +88,7 @@ real-sysrepo commit/edit/conflict/failure/restart integration scenario.
 
 The following workflow requires the provisioned `folio` account with
 `HOME=/home/folio`, a running user manager subscriber and its initialized
-repository. Use the disposable test below until system provisioning is delivered.
+repository. The portable UEFI image provides this disposable environment.
 
 ```sh
 folio config edit
@@ -131,17 +131,18 @@ preservation and operational-state evidence. The development-shell command
 source capture and a real user worker surviving subscriber exit; it builds into
 isolated XDG roots and never activates on the development host.
 
-## System configuration foundation
+## System deployment and disposable guests
 
 The disposable system adapter provisions `folio`, the dedicated
 `folio-operators` management group, an unprivileged `folio-builder` account and
 separate root/user subscribers. Lingering starts the user subscriber without
-selecting or applying a Home Manager generation. The builder is provisioned;
-system build/activation workers and the runnable UEFI image are still pending.
+selecting or applying a Home Manager generation. Root plans and builds evaluate
+and build through `folio-builder`; only the recorded root worker selects the
+system profile and runs the verified closure's fixed activation entry point.
 
 An authorized operator can use `folio --system config show/edit/import/export`,
-`modules list/enable/disable` and `status`. Saves change desired data only.
-System plan/build/apply and power actions remain unregistered. There is no
+`modules list/enable/disable`, `plan`, `build`, `apply` and `status`. Saves change
+desired data only. There is no
 passwordless sudo rule or additional Nix trusted user.
 
 The root repository and SHM directories use the provisioned operator group and
@@ -160,8 +161,40 @@ singleton lists/leaf-lists intact across the pinned library's RPC transport.
 Run `nix build --no-link .#checks.x86_64-linux.system-scope` to verify real
 operator/non-operator access, isolated desired stores, durable root commits,
 read-only actual descriptors and user plan binding in a disposable guest.
-UEFI boot, actual system updates, unchanged user generations across system apply,
-and externally observed power operations remain the rest of Stage 03.
+Run `nix build --no-link .#checks.x86_64-linux.system-deployment` for actual UEFI
+boot, unprivileged system builds, root activation, changed timezone, unchanged
+user generation, unauthorized/payload rejection and externally observed power.
+
+```sh
+# On a KVM-capable development machine; this launches only a disposable guest.
+image=$(nix build --no-link --print-out-paths .#vm-image)
+"$image/bin/run-folio-vm" portable
+# Inside the guest, as the provisioned folio account:
+folio --system config edit
+plan_id=$(folio --json --system plan --source /etc/folio/source | jq -r .data.planId)
+folio --system build "$plan_id"
+folio --system apply "$plan_id"
+folio --system system reboot
+```
+
+The image includes its immutable source at `/etc/folio/source` and locked inputs
+in the guest store. No live repository is read during evaluation. The prototype
+`folio` password is `kl;'`. Boot uses
+systemd-boot, EFI and labeled disposable disks; physical installation is pending.
+Power commands return durable **acceptance**, never a claim of completed reboot
+or shutdown. Completion requires outside observation.
+
+The VM module owns `folio vm build JOB_ID IMMUTABLE_SOURCE`, `start`, `stop`,
+`status` and `cleanup`. Enable/apply its user contribution before using its RPC
+commands; system provisioning supplies the KVM group, while start probes actual
+device access. Build waits by default; `--no-wait` returns its stable job ID.
+The image's launcher works before a Folio user service has been installed.
+`folio-vm-tool status|stop|cleanup portable` controls that bootstrap job from the
+`vm-tools` package. Each job has a private qcow2 overlay, EFI variables and QMP
+socket under `$XDG_STATE_HOME/folio/vm/jobs/`. Networking uses QEMU user mode.
+Stop requests ACPI shutdown and waits a bounded time; it never kills a guest to
+claim success. Cleanup refuses active jobs and archives metadata/build/serial
+logs under `folio/vm/logs/` before removing its disposable disk and GC roots.
 
 ## Development handoff
 
@@ -411,7 +444,7 @@ folio modules list|enable|disable NAME [--system]
 folio plan|build|apply|rollback [--system]
 folio status [--system]
 folio applications list|install|update|remove|reconcile ...
-folio system reboot|poweroff
+folio --system system reboot|poweroff
 folio vm build|start|stop|status ...
 ```
 
