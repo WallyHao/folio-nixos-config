@@ -1,0 +1,97 @@
+module folio-environment {
+  yang-version 1.1;
+  namespace "urn:folio:environment";
+  prefix fe;
+
+  organization "Folio";
+  description "Scoped desired configuration and separately observed state.";
+  revision 2026-10-18 {
+    description "Initial portable environment and configuration commit contract.";
+  }
+
+  typedef identifier {
+    type string {
+      length "1..64";
+      pattern '[a-z][a-z0-9-]*';
+    }
+    description "Stable public identifier.";
+  }
+  typedef digest {
+    type string { pattern '[0-9a-f]{64}'; }
+    description "Lowercase SHA-256 of the documented normalized representation.";
+  }
+  typedef scope {
+    type enumeration { enum system; enum user; }
+    description "Independent system or user repository scope.";
+  }
+  typedef result-status {
+    type enumeration {
+      enum success;
+      enum failure;
+      enum invalid;
+      enum unavailable;
+      enum conflict;
+    }
+    description "Operation result, independent of RPC transport success.";
+  }
+
+  container environment {
+    description "One scoped desired environment. Identity is provisioned, not a preference.";
+    leaf name { type identifier; mandatory true; }
+    leaf platform { type enumeration { enum x86_64-linux; } mandatory true; }
+    leaf scope { type scope; mandatory true; }
+    leaf account {
+      when "../scope = 'user'";
+      type identifier;
+      mandatory true;
+    }
+    list users {
+      when "../scope = 'system'";
+      key name;
+      leaf name { type identifier; }
+      leaf uid { type uint32; mandatory true; }
+      leaf home { type string { pattern '/[^\r\n]+'; } mandatory true; }
+      leaf-list groups { type identifier; }
+      leaf login-shell { type enumeration { enum bash; enum zsh; } default bash; }
+    }
+    container preferences {
+      description "Shared preferences; identity and privileges are not overridable here.";
+      leaf scheme { type enumeration { enum everforest; } default everforest; }
+      leaf appearance { type enumeration { enum dark; enum light; } default dark; }
+      leaf font-family { type string { length '1..128'; pattern '[^\r\n]+'; } default 'Maple Mono NF CN'; }
+      leaf font-size { type uint8 { range '6..72'; } default 16; }
+    }
+    list modules {
+      key name;
+      description "Selection is separate from model and command availability.";
+      leaf name { type identifier; }
+      leaf enabled { type boolean; default false; }
+    }
+    container configuration {
+      config false;
+      leaf digest { type digest; }
+      leaf saved { type boolean; }
+      leaf recovery-required { type boolean; }
+    }
+    container state {
+      config false;
+      leaf applied-digest { type digest; }
+      leaf health {
+        type enumeration { enum unknown; enum healthy; enum degraded; enum unavailable; }
+      }
+    }
+  }
+
+  rpc configuration-commit {
+    description "Accept a private draft with optimistic concurrency and durable persistence.";
+    input {
+      leaf expected-digest { type digest; mandatory true; }
+      anydata configuration { mandatory true; description "Complete scoped RFC 7951 desired data."; }
+    }
+    output {
+      leaf status { type result-status; mandatory true; }
+      leaf digest { type digest; }
+      leaf error { type string; }
+    }
+  }
+}

@@ -4,9 +4,54 @@ Folio is a NixOS configuration framework built around module-owned YANG models
 and sysrepo. One CLI manages system and user configuration; each module executes
 its own operations. Root Nix composition lives in the manager module.
 
-Status: design baseline, not an implementation. The commands, interfaces, and
-paths below specify the initial implementation. See [STRUCTURE.md](STRUCTURE.md)
-for directory ownership. No system has been installed or activated by this design.
+Status: foundation implemented; deployment and runtime operations below remain
+the implementation contract until their stages pass. See the runnable foundation
+workflow below and [STRUCTURE.md](STRUCTURE.md) for directory ownership. No Folio
+system has been installed or activated.
+
+## Foundation workflow
+
+The root Flake reuses Sylphy's pinned Nixpkgs/Home Manager inputs. Packages include
+`sysrepo-library` (3.7.11), `sysrepo-libyang` (3.13.6), `sysrepo-tools`,
+`manager-normalizer`, `manager-input`, and `manager-bootstrap`. The minimal
+`nixosConfigurations.portable` is a disposable storage fixture, not a physical
+installation target. `homeConfigurations.folio` renders Foot using the adapted
+Sylphy renderer and selected font/padding. Neither output queries live sysrepo.
+
+```sh
+nix develop
+nix build --no-link .#checks.x86_64-linux.catalogue .#checks.x86_64-linux.foundation
+bootstrap=$(nix build --no-link --print-out-paths .#manager-bootstrap)
+# Within the development shell, initialize only a disposable user instance:
+scratch=$(mktemp -d)
+export XDG_STATE_HOME="$scratch/state" XDG_RUNTIME_DIR="$scratch/run"
+mkdir -p "$XDG_RUNTIME_DIR"
+folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
+folio-repository user cfg --export --module folio-environment --format json --defaults report-all
+folio-prepare-input "$bootstrap/user.json" "$bootstrap" > "$scratch/folio-input.json"
+```
+
+`folio-repository` binds the documented persistent/runtime paths and distinct
+system/user SHM prefixes. `init` installs models and initial data atomically through
+sysrepo, preserves existing startup data, and refuses model/library identity
+changes requiring an explicit future upgrade. `ctl`/`cfg` are maintenance wrappers;
+direct edits do not implement the managed durable-commit protocol.
+
+Frozen input format 1 contains scope, normalized RFC 7951 configuration, a
+versioned read-only bootstrap system descriptor, model SHA-256 identities, pinned
+tool versions, and configuration/descriptor digests. Digests cover compact JSON
+with lexically sorted object keys plus one LF. libyang validates types and emits
+defaults; only the schema's system-ordered module/user/group lists are sorted.
+User-ordered arrays and RFC 7951 scalar encodings are preserved. A source snapshot
+containing `folio-input.json` consumes that data through pure Nix and rejects
+mismatched digests/model/tool identities. Source freezing and durable runtime
+deployment are Stage 02; real descriptor publication is Stage 03.
+
+For a separate root-identity/scope check, run
+`bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
+It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
+it does not initialize system state on the development host. No `folio` runtime
+CLI, subscriptions, systemd services, apply, or rollback behavior is delivered yet.
 
 ## Development handoff
 

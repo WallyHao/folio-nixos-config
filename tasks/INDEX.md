@@ -24,7 +24,7 @@ choices locally without replacing the specified architecture.
 ## Current state
 
 - Planning date: 2026-10-18.
-- Product implementation: foundation preparation underway; no installed or activated Folio system.
+- Product implementation: foundation validated; no installed or activated Folio system.
 - Product documents: README.md and STRUCTURE.md.
 - Reference checkout inspected: /home/sylphy/Workspace/sylphy-nixos-config.
 - Normal Git initialization on `main` succeeds. The owner supplied the real Git
@@ -40,7 +40,7 @@ to run the full suite or create a commit after each checkbox.
 | Stage | Task | Dependencies | Status | Deliverable |
 | --- | --- | --- | --- | --- |
 | 00 | [Repository baseline](00-repository-baseline.md) | None | complete | Normal main repository and reviewed baseline |
-| 01 | [Foundation](01-foundation.md) | 00 | in-progress | Pure Flake composition, models, isolated repositories |
+| 01 | [Foundation](01-foundation.md) | 00 | complete | Pure Flake composition, models, isolated repositories |
 | 02 | [User Foot deployment](02-user-foot.md) | 01 | pending | Actual user config/build/apply vertical slice |
 | 03 | [System and VM](03-system-vm.md) | 02 | pending | Authorized passwordless guest system updates |
 | 04 | [Recovery and rollback](04-recovery.md) | 03 | pending | Fault recovery, migrations, managed rollback |
