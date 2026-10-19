@@ -392,12 +392,14 @@ system=$(nix build --no-link --print-out-paths .#nixosConfigurations.laptop-migr
 sudo "$tool/bin/folio-migrate-account" launch "$system"
 ```
 
-The root worker closes the session after 20 seconds, stops UID 1000 writers,
+The root worker closes the session after 20 seconds, discovers and stops the
+existing login services (including tty autologin), stops UID 1000 writers,
 creates a read-only Btrfs home snapshot, pins the old system and legacy store
 references, renames the account while keeping UID/GID/password, atomically moves
 the home, and keeps `/home/sylphy` as an alias to `/home/folio`. It compares broken
 links and preserved application files before selecting the new boot generation.
-An error during cutover attempts to restore the old identity and boot generation.
+An error during cutover attempts to restore only the identity or boot stages that
+started, then restarts the recorded old login services.
 State, account/EFI/network backups and logs stay root-private under
 `/var/lib/folio-migration`; the home snapshot is under
 `/home/.folio-migration-backups`. No private file bytes are part of builds.
@@ -405,10 +407,12 @@ Account backups require passwd/shadow/group; gshadow is optional on NixOS and
 its absence is recorded. Preparation retries retain existing protection roots.
 The migration tool declares its own systemd-service dependencies and checks for
 immediate worker failure after submission. If a worker stopped before quiescing,
-`resume SYSTEM` accepts only a queued journal with the original account/home and
+`resume SYSTEM` accepts only a queued or failed journal with the original account/home and
 running system, complete preparation backups, no snapshot or new proxy state,
 and no running worker. It retains backups and pins the updated tool/system before
-restarting. Other interrupted phases require inspection rather than blind retry.
+restarting. A root-owned `/home/folio` alias pointing to the unchanged source home
+from an earlier rollback is removed only after those checks pass. Other interrupted
+phases require inspection rather than blind retry.
 
 The original native browser profile, encrypted keyring, SSH/GPG, Codex account
 directories and Home Manager generation are kept. The transition does not apply
@@ -432,7 +436,8 @@ restored over newer personal data. Preserve aliases and GC roots until verified.
 
 The bounded `checks.x86_64-linux.account-migration` guest checks real account
 rename/rollback, password hash, UID/GID/mode/inode preservation, absolute/store
-links, opaque application data and legacy descriptor recovery. It does not prove
+links, opaque application data, tty autologin shutdown/recovery, and legacy
+descriptor recovery. It does not prove
 physical boot or actual account/keyring password synchronization on the laptop.
 
 ## Ownership and scope

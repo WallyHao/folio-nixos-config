@@ -3,6 +3,9 @@ umask 077
 state=/var/lib/folio-migration
 old_home=/home/sylphy
 new_home=/home/folio
+session_stopped=false
+identity_started=false
+boot_started=false
 
 die() { echo "Migration stopped: $*" >&2; return 1; }
 root_only() { [[ $(id -u) == 0 ]] || die 'Run this action with sudo from a local terminal'; }
@@ -38,7 +41,10 @@ preflight() {
   root_only
   [[ $(getent passwd sylphy | cut -d: -f3,6) == "1000:$old_home" ]] || die 'Unexpected source account';
   ! getent passwd folio >/dev/null || die 'Destination account already exists';
-  [[ -d "$old_home" && ! -L "$old_home" && ! -e "$new_home" && ! -L "$new_home" ]] || die 'Unexpected home layout';
+  [[ -d "$old_home" && ! -L "$old_home" ]] || die 'Unexpected source home layout';
+  if [[ -e "$new_home" || -L "$new_home" ]]; then
+    [[ ${1:-} == retry && -L "$new_home" && $(readlink "$new_home") == "$old_home" && $(stat -c %u "$new_home") == 0 ]] || die 'Unexpected destination home layout'
+  fi
   [[ $(findmnt -n -o FSTYPE --target /home) == btrfs ]] || die 'Expected Btrfs home filesystem';
   btrfs subvolume show /home >/dev/null
   [[ -s /var/lib/sylphy-mihomo/config.json && -s /var/lib/sylphy-mihomo-private/provider.yaml ]] || die 'Existing proxy policy/provider is unavailable';
@@ -95,15 +101,60 @@ restore_boot() {
   nix-env --profile /nix/var/nix/profiles/system --set "$previous"
   NIXOS_INSTALL_BOOTLOADER=1 "$previous/bin/switch-to-configuration" boot
 }
+stop_login_sessions() {
+  local user=${1:-sylphy} candidate session tty
+  # Stop the old installation's real login entry points, including tty1
+  # autologin. The new Folio system's greeter may not exist on the old host.
+  {
+    printf '%s\n' display-manager.service greetd.service getty@tty1.service
+    for session in $(loginctl show-user "$user" -p Sessions --value); do
+      tty=$(loginctl show-session "$session" -p TTY --value)
+      if [[ $tty =~ ^tty[0-9]+$ ]]; then
+        printf 'getty@%s.service\n' "$tty"
+      elif [[ $tty =~ ^(tty(S|AMA)[0-9]+|hvc[0-9]+|xvc[0-9]+)$ ]]; then
+        printf 'serial-getty@%s.service\n' "$tty"
+      fi
+    done
+  } | while IFS= read -r candidate; do
+    if [[ $(systemctl show "$candidate" -p LoadState --value) == loaded ]] && systemctl is-active --quiet "$candidate"; then
+      systemctl show "$candidate" -p Id --value
+    fi
+  done | LC_ALL=C sort -u >"$state/login-units"
+  session_stopped=true
+  while IFS= read -r candidate; do
+    echo "Stopping legacy login service: $candidate"
+    systemctl stop "$candidate"
+  done <"$state/login-units"
+  loginctl disable-linger "$user"
+  loginctl terminate-user "$user" || true
+  systemctl stop user@1000.service
+  for _attempt in $(seq 1 30); do
+    if ! pgrep -u 1000 >/dev/null; then break; fi
+    sleep 1
+  done
+  ! pgrep -u 1000 >/dev/null || die 'User processes remain; refusing to move live application databases'
+}
+restart_login_services() {
+  local unit
+  if [[ -f "$state/login-units" ]]; then
+    while IFS= read -r unit; do systemctl start "$unit"; done <"$state/login-units"
+  fi
+}
+discard_rollback_alias() {
+  if [[ -L "$new_home" ]]; then
+    [[ $(readlink "$new_home") == "$old_home" && $(stat -c %u "$new_home") == 0 ]] || die 'Unexpected rollback alias'
+    rm "$new_home"
+  fi
+}
 failed() {
   local code=$?
   trap - ERR
   set +e
-  echo 'Cutover failed; restoring account identity and the previous boot generation' >&2
-  restore_identity
-  restore_boot
+  echo 'Cutover failed; recovering only the stages that started' >&2
+  if "$identity_started"; then restore_identity; fi
+  if "$boot_started"; then restore_boot; fi
   printf '%s\n' failed >"$state/phase"
-  systemctl start greetd.service
+  if "$session_stopped"; then restart_login_services; fi
   exit "$code"
 }
 queue_worker() {
@@ -141,8 +192,11 @@ case "$action" in
     ;;
   resume)
     system=$(realpath -e -- "${2:?System closure is required}")
-    preflight
-    [[ $(cat "$state/phase") == queued ]] || die 'Only a queued, unmodified preparation can be resumed'
+    preflight retry
+    case $(cat "$state/phase") in
+      queued|failed) ;;
+      *) die 'Only an unmodified preparation can be resumed' ;;
+    esac
     [[ $(cat "$state/old-system") == $(readlink -f /run/current-system) ]] || die 'Running system changed since preparation'
     [[ ! -e "$state/home-snapshot" && ! -e /home/.folio-migration-backups/sylphy-before-folio ]] || die 'A snapshot already exists; inspect the interrupted migration instead'
     case $(systemctl show folio-account-migration.service -p ActiveState --value) in
@@ -150,9 +204,11 @@ case "$action" in
       *) die 'Migration service is still running' ;;
     esac
     [[ -s "$state/boot-backup.tar" && -d "$state/legacy-etc" && -s "$state/account-backup/shadow" ]] || die 'Preparation backups are incomplete'
+    discard_rollback_alias
     pin "$system" new-system
     pin "$(dirname "$(dirname "$(realpath -e "$0")")")" migration-tool
     printf '%s\n' "$system" >"$state/new-system"
+    printf '%s\n' queued >"$state/phase"
     systemctl reset-failed folio-account-migration.service || true
     queue_worker
     ;;
@@ -165,15 +221,7 @@ case "$action" in
     echo 'Worker preflight passed; waiting 20 seconds before closing the desktop.'
     sleep 20
     # Existing state is snapshotted only after all UID 1000 writers have stopped.
-    systemctl stop greetd.service
-    loginctl disable-linger sylphy
-    loginctl terminate-user sylphy || true
-    systemctl stop user@1000.service
-    for _attempt in $(seq 1 30); do
-      if ! pgrep -u 1000 >/dev/null; then break; fi
-      sleep 1
-    done
-    ! pgrep -u 1000 >/dev/null || die 'User processes remain; refusing to move live application databases'
+    stop_login_sessions sylphy
     install -d -m 0700 /home/.folio-migration-backups
     snapshot=/home/.folio-migration-backups/sylphy-before-folio
     [[ ! -e "$snapshot" ]] || die 'Snapshot destination already exists'
@@ -203,6 +251,7 @@ case "$action" in
     # Let StateDirectory assign the new service identity recursively at boot.
     chown root:root /var/lib/folio-mihomo
     printf '%s\n' backed-up >"$state/phase"
+    identity_started=true
     rename_identity
     [[ $(getent passwd folio | cut -d: -f3,6) == "1000:$new_home" ]]
     ! getent passwd sylphy >/dev/null
@@ -216,6 +265,7 @@ case "$action" in
         diff -qr --no-dereference "$snapshot/sylphy/$entry" "$new_home/$entry" >"$state/preserved-check" 2>&1
       fi
     done
+    boot_started=true
     nix-env --profile /nix/var/nix/profiles/system --set "$system"
     NIXOS_INSTALL_BOOTLOADER=1 "$system/bin/switch-to-configuration" boot
     printf '%s\n' ready-to-boot >"$state/phase"
@@ -233,10 +283,7 @@ case "$action" in
   rollback-worker)
     root_only
     sleep 10
-    systemctl stop greetd.service
-    loginctl terminate-user folio || true
-    systemctl stop user@1000.service
-    ! pgrep -u 1000 >/dev/null || die 'User processes remain'
+    stop_login_sessions folio
     restore_identity
     restore_boot
     printf '%s\n' rolled-back >"$state/phase"
