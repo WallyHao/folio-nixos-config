@@ -226,6 +226,7 @@ in
       maintenance = catalogue.sysrepo.packages.maintenance;
       agentsHistory = catalogue.agents.packages.schema-history;
       terminalHistory = catalogue.terminal.packages.schema-history;
+      systemModules = adapters "system";
     };
     panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
     panel-network = import ../../network/tests/panel.nix {

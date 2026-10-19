@@ -1,5 +1,25 @@
 { pkgs, lib, client, runtime, normalizer }:
-let userService = import ./user-service.nix { inherit pkgs runtime; };
+let
+  userService = import ./user-service.nix { inherit pkgs runtime; };
+  userBootstrapCondition = bootstrap: pkgs.writeShellApplication {
+    name = "folio-user-bootstrap-compatible";
+    runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.folio.sysrepo ];
+    text = ''
+      state="''${XDG_STATE_HOME:-$HOME/.local/state}/folio"
+      [[ -f "$state/model-identity" ]] || exit 0
+      expected=$(mktemp)
+      trap 'rm -f "$expected"' EXIT
+      for model in ${bootstrap}/models/user/*.yang; do
+        printf '%s ' "$(basename "$model")" >>"$expected"
+        sha256sum <"$model" >>"$expected"
+      done
+      sysrepoctl --version >>"$expected"
+      if ! cmp -s "$expected" "$state/model-identity"; then
+        echo 'User repository requires a separate paired upgrade; system fallback subscriber deferred.' >&2
+        exit 1
+      fi
+    '';
+  };
 in
 context:
     { folioBootstrap, folioInput ? null, ... }:
@@ -70,7 +90,11 @@ context:
         description = "Folio user configuration subscriber";
         wantedBy = [ "default.target" ];
         unitConfig.ConditionUser = "folio";
-        serviceConfig = userService folioBootstrap;
+        # A system update must not force the system's newer user schemas onto
+        # an independently managed (or still legacy) Home Manager generation.
+        serviceConfig = userService folioBootstrap // {
+          ExecCondition = "${userBootstrapCondition folioBootstrap}/bin/folio-user-bootstrap-compatible";
+        };
       };
       systemd.services.folio-manager = {
         description = "Folio system configuration subscriber";

@@ -11,6 +11,11 @@ case "$scope" in
     prefix=folio_user_$(id -u) ;;
   system)
     [[ $(id -u) == 0 ]] || { echo 'System repository maintenance requires root' >&2; exit 3; }
+    # JSON datastore imports can recreate files using the process's effective
+    # group. Keep the provisioned operator group through restore as well as init.
+    if [[ $(id -gn) != folio-operators ]]; then
+      exec setpriv --regid=folio-operators --keep-groups "$0" "$scope" "$action" "$transaction_id" "$@"
+    fi
     state=/var/lib/folio runtime=/run/folio prefix=folio_system ;;
   *) exit 2 ;;
 esac

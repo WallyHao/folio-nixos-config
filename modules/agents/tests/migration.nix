@@ -1,4 +1,4 @@
-{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory }:
+{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, systemModules }:
 let
   old = pkgs.runCommand "folio-before-agents-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
     mkdir $out
@@ -25,9 +25,14 @@ let
   '';
 in pkgs.testers.runNixOSTest {
   name = "folio-agents-terminal-migration";
-  nodes.machine = {
-    users.users.folio = { isNormalUser = true; uid = 1000; };
-    nix.settings.substituters = [ ];
+  nodes.machine = { lib, ... }: {
+    imports = systemModules;
+    _module.args.folioBootstrap = bootstrap;
+    users.users.folio.linger = true;
+    services.greetd.enable = lib.mkForce false;
+    services.timesyncd.enable = lib.mkForce false;
+    nix.settings.substituters = lib.mkForce [ ];
+    virtualisation.memorySize = 2048;
     virtualisation.additionalPaths = [ bootstrap old ];
     environment.systemPackages = [ pkgs.jq repository maintenance ];
   };
@@ -36,8 +41,32 @@ in pkgs.testers.runNixOSTest {
     import shlex
     machine.start()
     machine.wait_for_unit("multi-user.target")
-    machine.succeed("install -d -o folio -m 0700 /run/user/1000")
+    machine.wait_for_unit("folio-manager.service", user="folio")
+    # The fresh matching fallback starts normally. Move only disposable state
+    # aside before recreating the legacy user repository for the migration test.
+    machine.succeed("runuser -u folio -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user stop folio-manager")
+    machine.succeed("mv /home/folio/.local/state/folio /home/folio/fresh-folio-state")
+    machine.succeed("mv /run/user/1000/folio /run/user/1000/fresh-folio-runtime")
     command = "bash ${./migration.sh} ${bootstrap} ${old} ${repository} ${maintenance}"
     machine.succeed("runuser -u folio -- env HOME=/home/folio XDG_RUNTIME_DIR=/run/user/1000 bash -c " + shlex.quote(command), timeout=datetime.timedelta(seconds=180))
+    # A newer system fallback must defer an incompatible retained user repository
+    # instead of failing activation or changing its models. Home Manager owns it.
+    user_systemctl = "runuser -u folio -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user "
+    machine.succeed(user_systemctl + "start folio-manager")
+    machine.fail(user_systemctl + "is-active folio-manager")
+    machine.fail(user_systemctl + "is-failed folio-manager")
+    machine.succeed("journalctl _SYSTEMD_USER_UNIT=folio-manager.service _UID=1000 --no-pager | grep 'fallback subscriber deferred'")
+    # Reproduce sudo's root primary group, not the service's operator primary
+    # group: a restore imports datastores and used to recreate root:root files.
+    machine.succeed("test $(id -gn) = root")
+    machine.succeed("systemctl stop folio-network folio-system folio-manager")
+    maintain = "${maintenance}/bin/folio-repository-maintain system "
+    machine.succeed(maintain + "snapshot root-permissions ${bootstrap} $(readlink -f /run/current-system)")
+    machine.succeed(maintain + "restore root-permissions")
+    machine.succeed(maintain + "finalize root-permissions")
+    machine.succeed("systemctl start folio-manager folio-network folio-system")
+    machine.wait_for_unit("folio-manager.service")
+    machine.wait_until_succeeds("folio --json --system status | jq -e '.status == \"success\" and .data.offline != true'")
+    machine.succeed("${repository}/bin/folio-repository system ctl --list | grep 'folio-environment.*root:folio-operators'")
   '';
 }

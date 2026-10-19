@@ -793,3 +793,83 @@ The agents runtime check exercises headless profile startup, native PTY/FFI/imag
 library loading, plugin-manager availability and migration selection/conflict
 cases without credentials. DeepSeek inference and arbitrary third-party plugin
 compatibility require separate runtime evidence and are not claimed by this gate.
+
+## 18. Physical upgrade failure and recovery (2026-10-19)
+
+### Observed incident
+
+The physical system upgrade `system-20261019-220635` failed during user service
+activation. The system fallback user manager used the new user bootstrap against
+an independently retained old user repository. Automatic rollback returned the
+system/profile to the old closure, but a root-primary-group datastore import
+recreated startup access as `root:root 0660`. The system manager then rejected
+`folio-environment` access and restarted repeatedly. Coordinator phase `restored`
+and absence of `schema-transaction.json` did not establish subscriber health.
+The earlier user-only migration and matching-profile lifecycle checks did not
+cover these two combined deployment conditions.
+
+### Changes
+
+- System repository maintenance re-executes with effective group
+  `folio-operators` before performing datastore operations, including restore.
+- The system fallback user unit checks the complete model/library identity before
+  initialization. Incompatible retained user repositories defer that unit without
+  making system activation fail. The independently managed Home Manager unit
+  retains ownership of user upgrades; no automatic user migration is attempted.
+- The real migration guest now boots the system adapters, verifies fresh fallback
+  startup and incompatible fallback deferral, then snapshots/restores the system
+  repository under root's primary group and verifies real subscriber startup.
+
+### Host recovery
+
+Run as root with the currently installed tools; no rebuild is needed:
+
+```sh
+sudo bash <<'SH'
+set -euo pipefail
+systemctl stop folio-network.service folio-system.service folio-manager.service
+for module in folio-environment folio-deployment; do
+  /run/current-system/sw/bin/folio-repository system ctl \
+    --change "$module" --owner root --group folio-operators --permissions 0660
+done
+systemctl reset-failed folio-manager.service
+systemctl start folio-manager.service folio-network.service folio-system.service
+systemctl --no-pager --full status folio-manager.service
+SH
+/run/current-system/sw/bin/folio --system status
+```
+
+The host recovery requires local sudo authentication. Do not infer its success
+from guest checks. Preserve the transaction backup and coordinator evidence.
+The legacy Sylphy Home Manager profile still needs a separately verified user
+migration path; a successful system rebuild does not migrate that profile.
+
+### Verified gate and next steps
+
+The following gate passed; both disposable guests shut down successfully:
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.agents-migration \
+  .#checks.x86_64-linux.configuration
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.tools-deployment \
+  .#nixosConfigurations.folio.config.system.build.toplevel
+git diff --check
+```
+
+- Migration, root-group restore, incompatible fallback deferral and live system
+  status RPC: `/tmp/folio-upgrade-recovery-regression-final.log`, output
+  `/nix/store/c1dflxhzfqyqd91fbjnszfz1wwgk4vxh-vm-test-run-folio-agents-terminal-migration`.
+- Configuration integration:
+  `/nix/store/xcv9xylrdzhmnafqk8l0zn2gw4fyh21a-folio-configuration-integration`.
+- Matching user profile lifecycle: `/tmp/folio-upgrade-recovery-gate.log`, output
+  `/nix/store/h3j2kxiz0hr3c4ccr82i2b30p37sh40v-vm-test-run-folio-tools-deployment`.
+- Physical-target build (not activated):
+  `/nix/store/arcphghbd3qs41p3vc5nr2ihysahri7j-nixos-system-sylphy-portable-26.11.20261011.7fd4004`.
+
+Next: confirm the host recovery command produces an active manager and successful
+live status, then prepare a system upgrade using the fixed source. Do not reuse
+an archived source from before this fix. Independently plan and verify adoption
+of the legacy user profile before enabling the new user schemas or agents.
+No further physical activation was performed as part of these source fixes.

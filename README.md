@@ -870,6 +870,13 @@ Preserve the old repository backup and closure. Failed migrations restore that
 pair before resuming. Do not hot-replace schemas while callbacks or deployments
 are active. Recovery tooling can restore offline without the manager running.
 
+System maintenance runs with the `folio-operators` effective group so datastore
+imports retain `root:folio-operators` ownership. The system-provided fallback user
+subscriber starts only when its bootstrap matches the existing user model/library
+identity. A mismatch defers that fallback without failing system activation;
+upgrade the user repository and its Home Manager closure separately. Deferral
+does not complete a user migration or establish user-service health.
+
 ## Flatpak and application configuration
 
 All Flatpak applications belong to `applications`. Install as the user with
