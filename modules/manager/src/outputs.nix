@@ -14,6 +14,8 @@ let
       atomicWrite = catalogue.manager.packages.atomic;
       cliSupport = catalogue.manager.packages.cli-support;
       configClient = catalogue.manager.packages.config-client;
+      cli = catalogue.manager.packages.cli;
+      inputLanguage = catalogue.input.packages.indicator;
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
       systemConfiguration = portableSystem;
@@ -45,6 +47,8 @@ let
     applications = import ../../applications/default.nix { inherit pkgs lib; };
     desktop = import ../../desktop/default.nix { inherit pkgs lib; };
     devices = import ../../devices/default.nix { inherit pkgs lib; };
+    appearance = import ../../appearance/default.nix { inherit pkgs lib; };
+    input = import ../../input/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib; };
@@ -219,6 +223,14 @@ in
       inherit pkgs inputs bootstrap cache plans;
       source = pkgs.folio.source;
       prepareInput = collection.packages.manager-input;
+      modules = adapters "system";
+    }) { };
+    desktop = lib.makeOverridable ({ legacySource ? null, cache ? null, plans ? null, drm ? true }: import ../../desktop/tests/session.nix {
+      inherit pkgs inputs bootstrap legacySource cache plans drm;
+      source = pkgs.folio.source;
+      prepareInput = collection.packages.manager-input;
+      runtime = collection.packages.manager-runtime;
+      cli = collection.packages.manager-cli;
       modules = adapters "system";
     }) { };
     configuration = import ../tests/configuration.nix {

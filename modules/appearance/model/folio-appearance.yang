@@ -1,0 +1,20 @@
+module folio-appearance {
+  yang-version 1.1;
+  namespace "urn:folio:appearance";
+  prefix fa;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "Shared resources and scoped GTK/cursor preferences; applications render their own configuration.";
+  revision 2026-10-19 { description "Everforest resources and GoogleDot cursor integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'appearance'";
+    container appearance {
+      when "../../fe:scope = 'user'";
+      presence "Appearance settings are supplied.";
+      leaf appearance { type enumeration { enum inherit; enum dark; enum light; } default inherit; }
+      leaf font-family { type string { length '1..128'; pattern '[^\r\n]+'; } }
+      leaf font-size { type uint8 { range '6..72'; } }
+      leaf cursor-size { type uint8 { range '16..96'; } default 28; }
+    }
+  }
+}

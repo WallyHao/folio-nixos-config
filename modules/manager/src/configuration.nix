@@ -18,6 +18,10 @@ let
     scope:
     let
       environment = (configuration scope)."folio-environment:environment";
+      sharedPreferences =
+        defaults.system."folio-environment:environment".preferences
+        // (if scope == "user" && prepared != null then prepared.systemDescriptor.preferences else { })
+        // (environment.preferences or { });
     in
     {
       configurationDigest = if prepared != null && prepared.scope == scope then prepared.configurationDigest else null;
@@ -43,15 +47,22 @@ let
           else
             (builtins.head matches).home;
       };
-      globals =
-        defaults.system."folio-environment:environment".preferences
-        // (if scope == "user" && prepared != null then prepared.systemDescriptor.preferences else { })
-        // (environment.preferences or { });
+      enabledModules = map (entry: entry.name) (builtins.filter (entry: entry.enabled or false) environment.modules);
+      globals = sharedPreferences;
+      preferenceOrigins =
+        if prepared != null && prepared.scope == scope then prepared.resolvedPreferences.origins
+        else lib.mapAttrs (name: _: if scope == "system" then "system-configuration"
+          else if builtins.hasAttr name (environment.preferences or { }) then "user-configuration"
+          else "system-default") sharedPreferences;
       capabilities =
         if scope == "user" && prepared != null then
           prepared.systemDescriptor.capabilities
         else
           {
+            desktop-provisioned = lib.any (entry: entry.name == "desktop" && (entry.enabled or false))
+              (configuration "system")."folio-environment:environment".modules;
+            devices-provisioned = lib.any (entry: entry.name == "devices" && (entry.enabled or false))
+              (configuration "system")."folio-environment:environment".modules;
             flatpak-provisioned = lib.any (entry: entry.name == "applications" && (entry.enabled or false))
               (configuration "system")."folio-environment:environment".modules;
             kvm-access-configured = lib.any (

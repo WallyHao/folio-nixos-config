@@ -30,8 +30,12 @@ choices locally without replacing the specified architecture.
   their bounded gates in commit `7af1c09`. Stage 05 applications has passed its
   bounded guest gate in commit `e3ab28a`.
 - The required layout correction in [LAYOUT.md](LAYOUT.md) passed its affected
-  checks, including real application and deployment-recovery guests. Continue
-  Stage 06 after committing that reviewed correction.
+  checks, including real application and deployment-recovery guests. Correction
+  commit `3270914` is the baseline for the unfinished Stage 06 work.
+- Stage 06 passed its full affected guest gate after correcting first-run Rime
+  deployment readiness, late OBS modal handling and QEMU/Xvfb teardown. Evidence:
+  `/nix/store/mz3i9kanf7r2kd73v3xxw18wxp7kxafd-vm-test-run-folio-desktop-session`.
+  See HANDOFF and the Stage 06 completion record. Stage 07–09 remain unimplemented.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
@@ -56,7 +60,7 @@ to run the full suite or create a commit after each checkbox.
 | 03 | [System and VM](03-system-vm.md) | 02 | complete | Authorized passwordless guest system updates |
 | 04 | [Recovery and rollback](04-recovery.md) | 03 | complete | Fault recovery, migrations, managed rollback |
 | 05 | [Applications](05-applications.md) | 04 | complete | Owned Zen/OBS lifecycle and regular-file delivery |
-| 06 | [Desktop](06-desktop.md) | 05 | pending | Niri, appearance, input, devices, capture |
+| 06 | [Desktop](06-desktop.md) | 05 | complete | Niri, appearance, input, devices, capture |
 | 07 | [Developer tools](07-tools.md) | 06 | pending | Terminal, Git, Emacs, Codex migration |
 | 08 | [Network and system](08-network-system.md) | 07 | pending | Remaining modeled connectivity and system policy |
 | 09 | [Acceptance](09-acceptance.md) | 08 | pending | Integrated guest evidence and separate hardware evidence |

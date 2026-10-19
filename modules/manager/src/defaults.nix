@@ -24,6 +24,7 @@
       if scope == "system" then
         [
           { name = "applications"; enabled = true; }
+          { name = "appearance"; enabled = true; }
           { name = "desktop"; enabled = true; }
           { name = "devices"; enabled = true; }
           {
@@ -38,6 +39,10 @@
         ]
       else
         [
+          { name = "appearance"; enabled = true; }
+          { name = "input"; enabled = true; }
+          { name = "desktop"; enabled = true; }
+          { name = "devices"; enabled = true; }
           {
             name = "applications";
             enabled = true;
@@ -70,6 +75,7 @@
             groups = [
               "folio-operators"
               "kvm"
+              "video"
             ];
             login-shell = "bash";
           }

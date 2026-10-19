@@ -1,0 +1,7 @@
+Usage: folio devices status
+       folio devices volume LEVEL|+DELTA|-DELTA
+       folio devices mute
+       folio devices brightness LEVEL|+DELTA|-DELTA
+       folio devices profile balanced|power-saver|performance
+Levels are 0..100; volume adjustments are limited to 20 points.
+Missing hardware, services or authorization return unavailable.

@@ -1,0 +1,37 @@
+module folio-devices {
+  yang-version 1.1;
+  namespace "urn:folio:devices";
+  prefix fd;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "Device services, bounded session controls and actual backend observations.";
+  revision 2026-10-19 { description "Audio, Bluetooth, backlight and power-profile integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'devices'";
+    container devices {
+      when "../../fe:scope = 'system'";
+      presence "Device settings are supplied.";
+      leaf audio { type boolean; default true; }
+      leaf bluetooth { type boolean; default true; }
+      leaf brightness { type boolean; default true; }
+      leaf power-profiles { type boolean; default true; }
+    }
+  }
+  rpc execute {
+    description "Observe actual devices or change a session control. Missing hardware/backends are unavailable, not healthy.";
+    input {
+      leaf action {
+        type enumeration { enum status; enum set-volume; enum adjust-volume; enum toggle-mute; enum set-brightness; enum adjust-brightness; enum set-power-profile; }
+        mandatory true;
+      }
+      leaf level { when "../action = 'set-volume' or ../action = 'set-brightness'"; type uint8 { range '0..100'; } mandatory true; }
+      leaf amount { when "../action = 'adjust-volume' or ../action = 'adjust-brightness'"; type int8 { range '-20..-1 | 1..20'; } mandatory true; }
+      leaf profile { when "../action = 'set-power-profile'"; type enumeration { enum balanced; enum power-saver; enum performance; } mandatory true; }
+    }
+    output {
+      leaf status { type fe:result-status; mandatory true; }
+      leaf result-json { type string; }
+      leaf error { type string; }
+    }
+  }
+}

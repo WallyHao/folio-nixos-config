@@ -31,6 +31,9 @@ while IFS= read -r -d '' link; do
     *) reply invalid 'Source contains an escaping symlink'; exit 0 ;;
   esac
 done < <(find "$work/source" -type l -print0)
+# Store-backed and read-only source trees retain directory modes in the archive.
+# Only the private copy needs write access for cleanup and the frozen input.
+chmod -R u+w "$work/source"
 folio-prepare-input "$work/configuration.json" "$FOLIO_BOOTSTRAP" "$descriptor_path" >"$work/source/folio-input.json"
 if [[ "$scope" == user ]]; then
   descriptor_home=$(jq -er --arg account "$account" '.systemDescriptor.users[] | select(.name==$account) | .home' \

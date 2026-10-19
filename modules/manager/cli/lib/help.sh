@@ -19,6 +19,8 @@ Commands:
   vm build|start|stop|status|cleanup ID     Manage a disposable user VM
   apps list|init|install|update|remove|reconcile|adopt|rollback|prepare|resume|status
                                           Manage owned user Flatpak applications
+  devices status|volume|mute|brightness|profile
+                                          Observe or control session devices
   --system system reboot|poweroff          Accept a guest power request
 
 User configuration operations require the manager subscriber for writes.

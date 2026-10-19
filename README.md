@@ -9,7 +9,9 @@ and system-owned power actions have passed isolated UEFI guest tests. A standalo
 UEFI image and module-owned VM lifecycle are implemented. Later modules below
 remain the implementation contract until their stages pass. Owned Zen/OBS Flatpak
 lifecycle and regular-file configuration delivery have passed an isolated guest
-gate; GUI appearance and capture evidence remain for the desktop stage. No development-host
+gate. Niri, desktop resources, cold-start Chinese input and actual OBS portal capture
+have passed a disposable virtual DRM guest gate. Exact GUI parity and physical
+hardware acceptance remain unverified. No development-host
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
 
@@ -729,8 +731,34 @@ OBS installation, desktop integration and declared permissions are managed.
 Scenes, recording profiles, accounts and mutable preferences stay app-owned.
 Only supported external theme/configuration interfaces are used; GTK theming
 alone does not establish OBS/Qt theming parity. Report unsupported appearance
-features rather than overwriting OBS state. Screen capture is verified through
-desktop portals and PipeWire. Devices and desktop retain those host capabilities.
+features rather than overwriting OBS state. Screen-capture acceptance requires
+actual frames through desktop portals and PipeWire. Devices and desktop retain those host capabilities.
+
+## Desktop, input and device integration
+
+User modules render Niri, Waybar, Mako, Fuzzel, clipboard
+history and screenshots; system desktop owns the login session and portal
+prerequisites. Appearance provides Everforest palettes, Maple Mono NF CN, a
+recolored GoogleDot cursor and GTK resources. Shared preference and module override
+origins are recorded in `~/.config/folio/appearance.json`. Applying a generation
+does not log out the current desktop; session-dependent changes need a new login.
+
+Fcitx5/Rime Ice starts as a user service. Initial profile and candidate defaults
+are seeded only when absent; existing personal profiles, dictionaries and history
+are preserved. The bar observes the real input-method indicator. Chinese input
+has committed text from a fresh profile in an isolated Wayland guest. First-run
+Rime Ice dictionary deployment must finish before Chinese composition is ready.
+
+`folio devices status` reports actual audio, Bluetooth adapter, backlight, power
+profile and basic hardware observations. `volume`, `mute`, `brightness` and
+`profile` use the module's own subscriber and native services. Media and brightness
+keys call those public commands when the user devices module is selected. Missing
+hardware or authorization returns unavailable; a configured service does not prove
+physical device health. Bluetooth pairing remains available through Blueman.
+Physical GPU, sound, backlight and Bluetooth acceptance remains separate from guest
+checks. The virtual DRM acceptance fixture observed changing OBS frames through
+the real portal and PipeWire. It uses software Mesa in an isolated SDL/Xvfb QEMU
+display; it does not establish physical GPU acceleration or encoder performance.
 
 ## Operations and VM policy
 

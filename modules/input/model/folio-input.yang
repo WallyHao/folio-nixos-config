@@ -1,0 +1,19 @@
+module folio-input {
+  yang-version 1.1;
+  namespace "urn:folio:input";
+  prefix fi;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "Fcitx5 and Rime-Ice integration without owning personal dictionaries or histories.";
+  revision 2026-10-19 { description "Wayland input startup, candidate theme and one-time public defaults."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'input'";
+    container input {
+      presence "Input settings are supplied.";
+      leaf wayland-frontend { type boolean; default true; }
+      leaf prefer-text-icon { type boolean; default false; }
+      leaf seed-defaults { type boolean; default true; }
+      leaf candidate-count { type uint8 { range '1..10'; } default 7; }
+    }
+  }
+}
