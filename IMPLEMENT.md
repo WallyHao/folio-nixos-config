@@ -1,134 +1,143 @@
 # CLI Implementation Proposal
 
-Status: reduced discussion draft, 2026-10-19. This revision incorporates the
-owner's exclusions. Existing means the command is implemented; new means a
-proposal requiring implementation. No CLI behavior is changed by this document.
-README.md remains the product usage documentation.
+Status: discussion draft, revised 2026-10-19. This revision supersedes the
+previous explicit user/system plan/build/apply command proposal. No implementation
+or current CLI behavior has changed. README remains actual product documentation.
 
-## Scope and tools
+## Accepted direction
 
-Focus on manager configuration, module selection, explicit deployment, task
-inspection and recovery. Keep Bash, jq and sysrepocfg for CLI adapters and the
-existing C/libsysrepo/libyang subscribers. Use shared presentation/transport
-helpers while preserving module ownership and the current authorization model.
-No CLI rewrite or new frontend framework is planned.
+- One everyday `apply` entry detects user/system/source changes and performs the
+  necessary scoped work internally. Do not ask users to classify change scope.
+- Every accepted apply workflow is a standard change with a unique change ID,
+  comment and recorded before/after system and user state.
+- Rollback targets a standard change, restoring its successful final state.
+- Keep logs, but provide their locations rather than a log-viewing CLI.
+- Keep plans, task IDs, scoped repositories and privileged workers internally.
+  Unified interaction does not make separate backend effects atomic.
+- Keep Bash/jq/sysrepocfg adapters and C/libsysrepo/libyang backends. No language
+  rewrite, frontend framework or TUI implementation is included in this phase.
 
-Improve human-readable output first. Keep stable JSON envelopes and exit codes
-for scripts. Configuration saves, plans, builds, activation and observed health
-remain distinct. There is no combined update command or automatic reboot.
+## Everyday CLI: complete list
 
-## Common syntax
+`[]` denotes optional arguments. `CHANGE_ID` uniquely identifies a standard
+change. Comments may be Chinese or English and need not be unique.
 
-`[]` denotes optional arguments. Uppercase identifiers are placeholders. User
-scope is the default; `--system` selects system scope. IDs for plans, tasks and
-revisions are distinct. Global options precede the command in examples.
+| Complete command | Function |
+| --- | --- |
+| `folio --help` | Show the short command list and common edit/apply/history/rollback workflows |
+| `folio help COMMAND` | Explain a command, arguments, authorization requirements and examples |
+| `folio --version` | Show CLI version/build identity without contacting subscribers |
+| `folio status` | Summarize configuration health, pending changes, current standard change and partial recovery state |
+| `folio status CHANGE_ID` | Show a change's comment, before/after references, step results, actual effects, rollback availability and log locations |
+| `folio config show` | Read the current desired configuration, clearly separating system/user ownership in the display |
+| `folio config edit` | Open an editor for configuration changes, validate and report exactly what was saved; do not activate |
+| `folio config import FILE` | Validate/import a configuration backup, with explicit system/user ownership; do not activate |
+| `folio config export FILE` | Export a restorable configuration backup with explicit system/user sections, excluding secrets, runtime data and application profiles |
+| `folio modules [NAME]` | List module descriptions, desired/applied state and prerequisites; with NAME, show that module's settings/help |
+| `folio apply [-m COMMENT]` | Detect applicable changes, freeze inputs, build, authorize privileged effects, apply and verify; record one standard change |
+| `folio history` | List standard changes with ID, time, comment, outcome and current/rollback availability indicators |
+| `folio rollback CHANGE_ID [-m COMMENT]` | Restore system/user configuration to the selected change's successful final state, authorizing privileged work as needed; record a new change |
 
-| Syntax | State | Function |
-| --- | --- | --- |
-| `folio --help` | Existing | List commands and common workflows |
-| `folio help COMMAND` | Existing | Explain arguments, scope, prerequisites and examples |
-| `folio --version` | New | Show CLI version/build identity without contacting subscribers |
-| `folio --system COMMAND` | Existing | Operate on system configuration/tasks with required authorization |
-| `folio --json COMMAND` | Existing | Emit one stable result envelope on stdout; progress goes to stderr |
-| `folio --verbose COMMAND` | New | Show additional diagnostic detail, excluding secrets |
-| `folio --no-wait COMMAND` | Existing, limited | Return the task ID after durable build/apply acceptance; do not cancel accepted work when the client exits |
-| `folio --environment NAME COMMAND` | Existing | Select the supported environment identity; this is not hardware selection |
+`folio --json COMMAND` remains the machine interface for supported noninteractive
+commands, including future clients. Preserve one final result envelope and keep
+progress on stderr. JSON mutations must provide their comment and cannot prompt
+on redirected input. Missing authorization fails explicitly without partial work
+being disguised as success. No unrestricted privileged frontend is introduced.
 
-Human output should identify scope, phase, result, recorded effects, IDs and the
-next useful command. Use terminal detection for styling; no color-control flag.
-Preserve exit codes 0 success, 1 failure, 2 invalid, 3 unavailable, 4 conflict.
-Ctrl-C stops waiting, not the backend task. Do not claim no effects or a reboot
-requirement unless the recorded deployment facts establish it.
+## Apply and authorization contract
 
-## State and task inspection
+`apply` compares both scoped desired stores and relevant source with recorded
+applied state. Source edits matter even if database values did not change. Nix
+reuses cached artifacts; a system configuration build does not imply recompiling
+all software. No pending effects means a no-op, without a new successful change
+or unnecessary authorization prompt.
 
-| Complete command | State | Function and effects |
-| --- | --- | --- |
-| `folio overview` | New | Summarize readable system/user health, installed target and active tasks; explicitly mark inaccessible scopes |
-| `folio status` | Existing | Read selected-scope desired/applied consistency, deployment and recovery health |
-| `folio status TASK_ID` | Existing | Read one task's phase, recorded effects, result and error; do not resume it |
-| `folio tasks [--limit N] [--state STATE]` | New | List recent tasks, newest first; proposed default 20; filter active/succeeded/failed/interrupted |
-| `folio logs TASK_ID [--tail N] [--follow]` | New | Read authorized task logs; proposed default last 100 lines; optionally follow until completion/Ctrl-C |
-| `folio history [--limit N]` | New | List applied/retained revisions, configuration/source identity and available rollback information; proposed default 20 |
+A real change requires a nonempty comment. With `-m`, use the supplied comment;
+otherwise prompt on a terminal. Noninteractive use without a comment is invalid.
+Allow Unicode comments; escape control characters in displays and never use
+comments as filenames, shell code or unique identifiers. Preserve the comment on
+failed/partial changes so an operator can understand attempted work.
 
-System task/log/history access needs an authorized backend API where absent.
-Never expose private root journals or use arbitrary sudo commands from the
-frontend. Log following is initially human-output only; a JSON stream protocol
-is outside this scope. Empty results and unavailable information are distinct.
+Resolve source explicitly and show its identity before effects. The default
+source-selection rule still needs agreement; do not guess a different checkout,
+pull Git or refresh a lock automatically. A future explicit source override can
+be considered separately, rather than adding it to this minimal command list.
 
-## Configuration and module selection
+Build/evaluate as an unprivileged account. System effects require a controlled
+privileged entry point and backend-enforced authorization; user-only changes do
+not prompt for sudo. Current operator-group RPC access does not require a password,
+so this needs a real authorization redesign, not a cosmetic frontend `sudo -v`.
+Sudo may reuse valid cached authorization. Do not run arbitrary source evaluation
+as root or expose private journals to make the UI convenient.
 
-All writes in this section commit desired data only; they do not install,
-activate or change live hardware. Add `--system` for system configuration.
+When both scopes change, apply system state before preparing the final user
+snapshot against the resulting system descriptor. Record every step. System
+success followed by user failure is a partial change, not atomic success or
+an implicit full rollback. Report the actual state and recovery information.
+No implicit Flatpak update, hardware-target transition, reboot or destructive
+repair belongs in `apply`.
 
-| Complete command | State | Function and effects |
-| --- | --- | --- |
-| `folio config show` | Existing | Read complete desired configuration and its digest, grouped for human output |
-| `folio config edit` | Existing | Edit a private temporary document, validate and commit with concurrency checks |
-| `folio config import FILE` | Existing | Validate and commit a complete scoped RFC 7951 document; not a partial merge |
-| `folio config export FILE` | Existing | Export repeatable desired-data JSON to a file without repository mutation |
-| `folio config get PATH` | New | Read a setting, its effective value and known origin/default information |
-| `folio config set PATH VALUE [--json-value]` | New | Validate and commit one setting; normal mode parses an unambiguous scalar, JSON mode accepts an explicit typed value |
-| `folio modules list` | Existing | Show desired selection, applied contribution and prerequisite availability |
-| `folio modules info NAME` | New | Describe a module, its scopes, settings, commands and prerequisites |
-| `folio modules enable NAME` | Existing | Save enabled selection; deployment remains a separate step |
-| `folio modules disable NAME` | Existing | Save disabled selection; do not delete personal data |
+## Standard change and rollback contract
 
-Provisional paths: `preferences.font-size` and `modules.NAME.SETTING`. Resolve
-module list keys and namespaces internally; do not require array positions.
-Reject unsupported compound paths or ambiguous value conversions. Example:
-`folio config set preferences.font-size 18`. Path grammar and type conversion
-still require discussion. No reset command is included.
+Retain ID, timestamps, comment, operation kind, before/after desired snapshots,
+source/model identities, system/user closure references, step/task references,
+authorization outcome, logs and final outcome. Retain both scopes' state even
+when only one changed; record an unchanged scope without rebuilding it needlessly.
+Pin the closures/sources required for advertised rollback availability.
 
-## Explicit deployment and recovery
+`rollback CHANGE_ID` means restore the selected successful final state, not undo
+that row's own edits. Reject failed/partial rows as final-state rollback targets
+unless a separately validated recovery operation establishes a usable endpoint.
+Rollback creates a new history entry; do not erase later records. Its default
+comment is generated from the target ID/comment, with `-m` allowing replacement.
 
-These commands support user and system scope. Build/apply wait by default;
-`--no-wait` returns after durable acceptance. No implicit Git pull, lock refresh,
-application update, target change or reboot occurs.
+Restore desired data as well as applicable closures; do not merely switch a boot
+entry. Plan recovery before privileged effects and record partial failures.
+Missing retained inputs mean rollback unavailable, not fabricated restoration.
+Personal documents, application databases, credentials and arbitrary runtime
+controls are outside configuration rollback. Driver/kernel restoration may need
+a later reboot; report known requirements without rebooting automatically.
 
-| Complete command | State | Function and effects |
-| --- | --- | --- |
-| `folio plan [--source DIR] [--timeout-seconds N]` | Existing | Freeze source/configuration and retain a plan; source defaults to current directory; timeout defaults to 1800 seconds, range 1–86400; show scope, target and plan ID |
-| `folio build PLAN_ID [--request-id ID]` | Existing | Build the immutable plan with progress and a final artifact/task summary; do not select a profile |
-| `folio apply PLAN_ID [--request-id ID]` | Existing | Reject stale inputs, activate a built plan and verify actual effects; may change files/services |
-| `folio rollback REVISION_ID [--rebuild]` | Existing | Restore a retained scoped configuration/closure; explicit rebuild permits compatible reconstruction; system maintenance currently requires root |
-| `folio cleanup` | Existing | Preview eligible cleanup and protected objects without removing anything |
-| `folio cleanup --apply` | Existing | Remove only eligible unreferenced managed records/roots; system maintenance currently requires root; not unrestricted Nix GC |
+## Configuration editing details still open
 
-Preserve the request-ID idempotency contract. A failed activation may have partial
-effects; show the recorded recovery state and task ID. Plans should explain known
-changes without promising a complete package/service impact analysis.
+Hide scope selection from the everyday command line while retaining explicit
+system/user ownership in editor/export data. The unified view is not a new
+configuration authority. Define versioned import/export mapping to the existing
+scoped YANG repositories, concurrency checks and authorization before coding.
+Saving multiple stores is not inherently atomic; never silently save half a
+configuration and report full success. Keep a failed edit recoverable.
 
-## Explicit system power
+Decide backup replacement/merge semantics, source selection, retention policy,
+change-ID format and interrupted-workflow recovery before implementation. Do not
+add separate configuration-only history until its relationship to standard
+apply changes is agreed.
 
-| Complete command | State | Function and effects |
-| --- | --- | --- |
-| `folio --system system reboot [--request-id ID]` | Existing | Accept and schedule an authorized reboot of the actual machine |
-| `folio --system system poweroff [--request-id ID]` | Existing | Accept and schedule authorized shutdown of the actual machine |
+## Excluded from the everyday interface
 
-Show the affected machine/scope. Acceptance does not prove completed reboot or
-shutdown. These operations are never implicit in configuration/deployment commands.
+No standalone plan/build commands or user-managed plan/task IDs; no --system or
+--environment selection for daily use. Existing internal/scoped mechanisms can
+remain during migration until the unified workflow is actually implemented.
 
-## Excluded and deferred work
+No logs/tasks/overview/diff/doctor/update/reset/cleanup commands, config get/set,
+module enable/disable shortcuts, status watch, color flag, verbose flag or public
+request-ID options. Advanced cleanup and migration helpers remain maintenance
+operations, with protected recovery generations retained.
 
-Excluded from this CLI proposal: color-control flags, status watching, diff,
-doctor, convenience update and config reset. Do not replace them with aliases.
+Network, device, application and VM CLI design is deferred. System reboot/poweroff
+are not part of this minimal daily interface; use the operating system facilities.
+TUI/GUI work is deferred. This proposal does not remove existing implemented
+commands or disable their backend capabilities.
 
-Network/device CLI design, application CLI work and VM CLI work are deferred.
-Existing implementations are not removed by this planning revision. TUI and GUI
-implementation/toolkit selection are deferred; no TUI entry command is included.
-Migration/keyring helpers remain separate maintenance tools documented in README.
-Hardware-target switching, task cancellation and automatic repairs are outside
-this initial command set.
+## Delivery order and verification
 
-## Delivery order and validation
+1. Agree on the minimal command list and remaining data/source/auth decisions.
+2. Implement standard change records and authorized history/status reads.
+3. Implement unified configuration views/import/export with scoped validation.
+4. Implement intelligent apply, partial recovery and backend-enforced authorization.
+5. Implement unified rollback and concise human output; preserve JSON contracts.
 
-1. Agree on this command list and the remaining configuration path/value syntax.
-2. Improve existing manager human output/help while retaining JSON/exit behavior.
-3. Add authorized tasks/logs/history APIs and read-only overview.
-4. Add module information and schema-aware configuration get/set.
-
-Use ShellCheck, Bash syntax checks, affected Nix outputs and focused real-sysrepo
-or disposable guest fixtures. Verify pipes, missing subscribers, permissions,
-conflicts, task waiting and partial failures. Do not rerun hardware/GUI matrices
-for presentation-only changes. Update README when behavior actually exists.
+Use focused real-sysrepo and disposable guest tests. Cover user-only/system-only/
+combined/no-op/source-only changes, comments, denied authorization, stale inputs,
+partial application, interrupted recovery and rollback. Keep logs outside source.
+Verify retained rollback roots and no unintended personal-data restoration.
+Do not claim this draft's command forms already work in the current CLI.
