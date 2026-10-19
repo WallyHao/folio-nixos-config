@@ -3,9 +3,41 @@
 ## Current state (2026-10-19)
 
 The owner explicitly resumed implementation after the earlier handoff. Stages
-00–08 have passed their gates; Stage 06 is committed as `6cec01f` and Stage 07 as
-`d09467b`. Stage 08's commit subject is recorded below; Stage 09 is pending. Physical acceptance remains
-separate and no development-host activation is authorized.
+00–08 have passed their gates. Implementation HEAD is `0ce2277` on `main`;
+Stage 09 is pending. The worktree was clean before this documentation-only
+transition. No Stage 09 implementation or integrated-release pass is claimed.
+Physical acceptance is separate and no development-host activation is authorized.
+
+## Immediate assignment for the receiving agent
+
+1. Read the rules below, then tasks/09-acceptance.md and its receiving-agent
+   execution plan. Preserve existing AGENTS.md. Check current HEAD and worktree;
+   this handoff may be followed by a separate documentation commit.
+2. Audit the current composition and root README against delivered behavior.
+   Extend existing module-owned fixtures for one integrated disposable lifecycle;
+   there is currently no named integrated-release check. Do not invent a passing
+   command or substitute separate historical gates for end-to-end evidence.
+3. Complete and commit the Stage 09 VM milestone. Keep physical acceptance pending
+   until an actual target, recovery plan and target-specific authorization exist.
+   Ordinary implementation decisions require no repeated consultation.
+
+### Delivered milestones
+
+| Stage | Commit | Delivered boundary |
+| --- | --- | --- |
+| 00–03 | See owning task records | Foundation, scoped user/root deployment, VM lifecycle and observed guest power |
+| 04 | `7af1c09` | Durable recovery, model migration, retained rollback and protected cleanup |
+| 05 | `e3ab28a` | Owned Zen/OBS lifecycle and regular-file configuration |
+| Layout | `3270914` | Agreed module source/client/runtime/model/test ownership |
+| 06 | `6cec01f` | Desktop/resources, Chinese input, device controls and real portal capture |
+| 07 | `d09467b` | Terminal/Git/Emacs/Codex, migration and selective removal preserving personal data |
+| 08 | `0ce2277` | Network-owned actions, DNS/proxy/firewall/SSH and explicit system/storage policy |
+
+Stages 06–08 have individual passing guest gates; no single final-revision
+lifecycle spanning all stages has yet passed. Evidence below states its tested
+scope and limitations. Stage 08 changes are concentrated in `modules/network/`,
+`modules/system/` and manager composition/public module exposure. Stage 07 also
+extended the manager's readiness-probe timeout within its existing retry budget.
 
 Read README.md, STRUCTURE.md, tasks/WORKFLOW.md, tasks/SYLPHY-REUSE.md,
 tasks/INDEX.md and the assigned stage before changes. Preserve Nix in `src/`,
@@ -21,8 +53,9 @@ Branch: `main`. Prior committed baseline: `3270914`.
 - `7af1c09`: Stage 04 recovery, migrations, rollback and protected cleanup.
 - `e3ab28a`: Stage 05 owned Zen/OBS Flatpak lifecycle and regular-file delivery.
 - `3270914`: required directory correction, with application/recovery guest gates.
-- Stage 06 subject: `feat(desktop): integrate sylphy desktop preferences and devices`.
-  Record its actual resulting SHA after commit; do not amend for a self-reference.
+- `6cec01f`: Stage 06 desktop preferences, input and devices.
+- `d09467b`: Stage 07 terminal and developer environment.
+- `0ce2277`: Stage 08 modeled connectivity and system policy.
 
 Stage 06 integrates module-owned appearance, input, desktop and devices:
 Everforest/GTK, Maple Mono NF CN, GoogleDot-Folio cursor, preference origins;
@@ -106,7 +139,7 @@ backlight and Wi-Fi remain unverified and belong to Stage 09 hardware evidence.
 
 ## Next steps and boundaries
 
-1. Stage 08 passed its complete gate and is delivered by the commit subject below.
+1. Stage 08 passed its complete gate and is committed as `0ce2277`.
    AGENTS.md is unchanged. Read its task record and retained evidence before
    changing network/system policy or claiming physical health.
 2. Continue with Stage 09 VM acceptance. Read its ordered
@@ -123,8 +156,7 @@ telemetry. No authentication/session files belong in source or build snapshots.
 
 ## Passing Stage 08 evidence and interfaces
 
-Commit subject: `feat(network): complete modeled connectivity and system policy`.
-Report the resulting SHA after commit; do not amend to insert a self-reference.
+Commit: `0ce2277 feat(network): complete modeled connectivity and system policy`.
 
 - Scope: network-owned system YANG/C/Bash controls; NetworkManager/DNS/firewall,
   key-only SSH and optional local Mihomo; system storage/account/locale/time/

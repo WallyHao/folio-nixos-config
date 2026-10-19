@@ -31,14 +31,16 @@ choices locally without replacing the specified architecture.
   bounded guest gate in commit `e3ab28a`.
 - The required layout correction in [LAYOUT.md](LAYOUT.md) passed its affected
   checks, including real application and deployment-recovery guests. Correction
-  commit `3270914` is the baseline for the unfinished Stage 06 work.
+  commit `3270914` was the baseline for the subsequently completed Stage 06 work.
 - Stage 06 passed its full affected guest gate after correcting first-run Rime
   deployment readiness, late OBS modal handling and QEMU/Xvfb teardown. Evidence:
   `/nix/store/mz3i9kanf7r2kd73v3xxw18wxp7kxafd-vm-test-run-folio-desktop-session`.
   Stage 06 commit: `6cec01f`. Stage 07 passed its tools and real profile gates,
   including upgrade, selective removal/preservation and snapshot resumption.
   Stage 07 commit: `d09467b`. Stage 08 passed the network/system guest gate and
-  catalogue/foundation checks; Stage 09 remains pending. See HANDOFF and task records.
+  catalogue/foundation checks in `0ce2277`. Stage 09 remains pending; its task
+  contains the receiving-agent execution plan. VM and hardware are separate
+  milestones. See HANDOFF for retained evidence, commands and known fixture traps.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
