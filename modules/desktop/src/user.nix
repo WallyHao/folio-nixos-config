@@ -19,6 +19,13 @@ in {
     ++ lib.optionals (settings.launcher or true) [ pkgs.fuzzel ]
     ++ lib.optionals (settings.clipboard or true) [ packages.clipboard ];
   home.sessionVariables = { MOZ_ENABLE_WAYLAND = "1"; NIXOS_OZONE_WL = "1"; };
+  # Keep the session unit present across legacy Home Manager adoption. Removing
+  # its user-level file makes sd-switch stop the running compositor even though
+  # the same service remains available from NixOS.
+  xdg.configFile."systemd/user/niri.service".source = pkgs.runCommand "folio-niri-session-unit" { } ''
+    cat ${pkgs.niri}/lib/systemd/user/niri.service >$out
+    printf '\n[Unit]\nX-SwitchMethod=keep-old\n' >>$out
+  '';
   xdg.configFile."niri/config.kdl".text = renderer.renderConfig {
     colors = renderer.themeColors theme;
     foot = "${pkgs.foot}/bin/foot";

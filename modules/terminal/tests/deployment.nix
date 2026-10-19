@@ -66,6 +66,7 @@ in pkgs.testers.runNixOSTest {
         identity = result["data"]["planId"]
         assert folio("build " + identity)["status"]=="success"
         assert folio("apply " + identity)["status"]=="success"
+        user("systemctl --user is-active folio-manager folio-applications folio-devices")
 
     def configure(path):
         assert folio("config import " + path)["status"]=="success"

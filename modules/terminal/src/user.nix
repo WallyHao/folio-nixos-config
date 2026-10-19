@@ -58,6 +58,7 @@ in { config, ... }: {
     };
     zsh = lib.mkIf (shell.enabled or true) {
       enable = true;
+      dotDir = "${config.xdg.configHome}/zsh";
       # The reused renderer owns secure history/cache setup and completion order.
       enableCompletion = false;
       history = { path = "${config.xdg.stateHome}/folio/zsh/history"; size = shell.history-size or 10000; save = shell.history-size or 10000; };

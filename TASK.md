@@ -873,3 +873,133 @@ live status, then prepare a system upgrade using the fixed source. Do not reuse
 an archived source from before this fix. Independently plan and verify adoption
 of the legacy user profile before enabling the new user schemas or agents.
 No further physical activation was performed as part of these source fixes.
+
+## 19. First Sylphy user-profile adoption (2026-10-19)
+
+The system transaction `system-20261019-222947` completed and reports healthy.
+The remaining user repository still contains the old Codex/Git models; its
+selected Home Manager generation is a Sylphy protocol/schema version 1 profile
+rebased to account `folio` and `/home/folio`. All legacy managed files matched
+that retained generation before migration; no Folio applied record exists.
+
+A dedicated offline `adopt` action now handles this first transition. It requires
+matching legacy account/home metadata, rejects already managed profiles, retains
+the original repository and independently identified legacy closure, and follows
+the existing isolated prepare/bind/install/activation protocol. It does not forge
+Folio metadata for the legacy profile. Newly enabled subscribers start only after
+maintenance conditions are removed. Explicit restore supports the retained legacy
+pair. Ordinary subsequent upgrades retain their strict Folio identity checks.
+
+The real agents migration guest passed with a genuine minimal Home Manager
+legacy fixture, incompatible-account rejection without profile/repository
+changes, real adoption and healthy user RPC, explicit restoration of the old
+profile/models, and a second successful adoption. Application private-state
+fixtures survive. The earlier root restore and fallback compatibility regression
+checks remain in the same guest. Evidence:
+`/tmp/folio-legacy-adoption-gate3.log`, output
+`/nix/store/k8h2fjynx9vmsy85m4pk6j4609l4zdvv-vm-test-run-folio-agents-terminal-migration`.
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.agents-migration
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.configuration .#checks.x86_64-linux.tools-deployment
+git diff --check
+```
+
+Host migration uses the old model-matching bootstrap, current installed system
+descriptor, unchanged desired settings transformed through the published agents
+and terminal migrations, and a frozen `folio` target source. The coordinator
+rechecks the migrated desired data against that frozen input before installation.
+Codex/DeepSeek/GitHub authentication, application profiles and personal files are
+outside the migration's managed configuration. Host outcome is recorded below
+only after actual activation and status verification.
+
+### Host outcome and desktop regression
+
+The actual host adoption `user-adopt-20261019-224535` completed. The selected user
+closure is `/nix/store/iwkj7kgbl4aqmh5wjgnmzlg80fzzgvdp-home-manager-generation`,
+source `/nix/store/8bhahy3v9bnqk678ivsp6lgpdgyn26xn-folio-user-adoption-source`.
+User status reports healthy; agents/terminal replace Codex/Git model selections,
+and manager/applications/devices subscribers are active. Old repository/profile
+roots remain under the transaction backup. Codex and GitHub credential hashes
+matched the private pre-activation fingerprints; no credential bytes were logged.
+
+However, Home Manager stopped the removed legacy user `niri.service` during
+activation, terminating the real desktop session. The headless fixture had not
+covered that unit. The resulting session retained the legacy exported
+`ZDOTDIR=~/.config/zsh`, while Folio generated startup files in the home root;
+new shells therefore missed the configuration. Earlier matching-profile
+regression execution was interrupted by the session termination and is not a
+passed gate. Reported manager health did not establish desktop/shell usability.
+
+Temporary links from the empty legacy zsh directory to the selected generation's
+startup files restored interactive completion, aliases and Powerlevel10k. The
+permanent terminal setting now explicitly uses the XDG zsh directory. The desktop
+module retains the upstream Niri user unit with `X-SwitchMethod=keep-old`, rather
+than removing the unit while its system-provided counterpart remains installed.
+The adoption fixture now includes an active legacy compositor sentinel and XDG
+zsh startup files, checks inherited `ZDOTDIR`, and requires the compositor PID to
+survive adoption, restore and retry. Live repair must also verify the actual Niri
+PID remains unchanged before declaring the desktop transition complete.
+
+### Completed repair and acceptance
+
+The first repair attempt stopped before activation because temporary compatibility
+links were not recognized as Home Manager links. Its selected profile was returned
+to the unchanged before generation, and manager recovery verified the before
+files and cleared the recovery requirement. The retained failed task is evidence;
+it was not deleted or relabeled as a successful activation. Temporary shell links
+were corrected to immutable Home Manager file paths before retrying.
+
+The final live apply succeeded as task `t-1533fe058f142cab4f559b49222b8f29`, plan
+`0fbbe18718cd6c69bd70198ccba964f289f2a00bd6f514a12852b3df76aaf08d`:
+
+- Selected home: `/nix/store/09j7s7g5vchys8z45ch87jm38kwcl1h1-home-manager-generation`.
+- Frozen source: `/nix/store/vxf56cajphfr46zf3ivdzynwlvb74mh8-folio-input`.
+- Desired and applied digest: `6caa92ce069859b8eda6b64be7715a6c8ab593f8b9aecd37753afd402cade681`.
+- User and system status are healthy. Manager/applications/devices, input method,
+  Waybar and clipboard services are active; no failed user/system units remain.
+- Niri PID stayed `22602` across both successful repair activations. Main evidence:
+  `/tmp/folio-user-repair-live-final.log` and
+  `/tmp/folio-user-migration-live-complete.log`.
+- A fresh login zsh without inherited `ZDOTDIR` and an interactive PTY shell with
+  inherited `ZDOTDIR` load completion, terminal functions and Powerlevel10k.
+  The final XDG startup/session unit links point to the selected managed files,
+  rather than the temporary compatibility links.
+- Git author name and email now both render and resolve as the user's requested
+  identity. Fixed a shallow Nix attribute merge that had discarded the name when
+  an email was supplied. Legacy GitHub credential helpers still resolve, and
+  retained private credential fingerprints remain unchanged.
+
+The pinned sd-switch 0.6.4 patch preserves an active `keep-old` unit even if the
+previous Home Manager generation did not own it. Its upstream 47 library and
+3 binary tests passed. Before live repair, the patched dry run retained Niri;
+the unpatched preview would have stopped it. The real adoption fixture verifies
+both legacy-unit migration and the missing-old-unit preview. A detached shell
+probe avoids disturbing the guest console while testing interactive zsh.
+
+User apply now resumes enabled registered subscribers after activation: restarting
+the manager stops its dependent subscribers even when sd-switch considers their
+unit files unchanged. The profile lifecycle test asserts their active state after
+each apply. DeepSeek Harness remains disabled in the migrated selection, per the
+migration preservation contract; no new inference request or authentication was
+performed. Codex remains enabled. Further user changes can use ordinary Folio
+configuration/plan/build/apply; the legacy adoption step must not be repeated.
+
+Final acceptance passed on the final implementation:
+
+- Adoption/migration/legacy restore, session sentinel preservation, inherited zsh
+  environment and rendered Git identity:
+  `/tmp/folio-user-adoption-acceptance.log`, output
+  `/nix/store/zg6acbqbcbh6ihd0hn4s1lmq2bv8fkwi-vm-test-run-folio-agents-terminal-migration`.
+- Real profile lifecycle and dependent subscriber resumption:
+  `/tmp/folio-user-deployment-acceptance.log`, output
+  `/nix/store/f1nnh06473vz9qlxijdzy0vsrdz8p3i6-vm-test-run-folio-tools-deployment`.
+- Configuration integration, same log, output
+  `/nix/store/6y3aihq2nakj2nmhp250m7m8awls09xr-folio-configuration-integration`.
+- `git diff --check` passed. Both final guests shut down after their checks.
+- Final live user/system RPC checks are healthy, user recovery is absent, and
+  Niri remains PID `22602`. No further login or system rebuild is required for
+  the already applied user repair. Existing shell processes can run `exec zsh`
+  or open a new terminal to load the corrected startup files.

@@ -1,7 +1,7 @@
 # Offline manager entry point. It is intentionally independent of subscriber
 # RPC availability, so a damaged repository never has to be opened to recover.
 umask 0077
-(( $# >= 4 && $# <= 6 )) || { echo 'Usage: folio-manager-maintain SCOPE BOOTSTRAP snapshot|upgrade|restore|rollback ID [SOURCE_OR_REVISION] [--rebuild]' >&2; exit 2; }
+(( $# >= 4 && $# <= 6 )) || { echo 'Usage: folio-manager-maintain SCOPE BOOTSTRAP snapshot|upgrade|adopt|restore|rollback ID [SOURCE_OR_REVISION] [--rebuild]' >&2; exit 2; }
 scope=$1 bootstrap=$2 action=$3 id=$4 source_path=${5:-}
 rebuild=false
 [[ "$id" =~ ^[a-z][a-z0-9-]{0,63}$ ]] || exit 2
@@ -23,7 +23,7 @@ unit_runtime=${XDG_RUNTIME_DIR:-/run}/systemd/user
 [[ "$scope" != system ]] || unit_runtime=/run/systemd/system
 case "$action" in
   snapshot|restore) [[ $# == 4 ]] || exit 2 ;;
-  upgrade) [[ $# == 5 ]] || exit 2 ;;
+  upgrade|adopt) [[ $# == 5 ]] || exit 2 ;;
   rollback)
     [[ $# == 5 || ( $# == 6 && $6 == --rebuild ) ]] || exit 2
     [[ $# != 6 ]] || rebuild=true ;;
@@ -41,9 +41,20 @@ exec 9>"$state/mutation.lock"
 flock -x -w 30 9
 maintain() { folio-repository-maintain "$scope" "$@" >"$work/primitive.json"; }
 digest() { local value; value=$(sha256sum <"$1"); printf '%s\n' "${value%% *}"; }
+legacy_artifact_matches() {
+  local closure=$1
+  [[ "$scope" == user && -x "$closure/activate" && ! -e "$closure/folio-home.json" ]] || return 1
+  jq -e --arg account "$(id -un)" --arg home "$HOME" \
+    '.protocolVersion==1 and .schemaVersion==1 and .user==$account and .home==$home' \
+    "$closure/sylphy-home.json" >/dev/null
+}
 snapshot_artifact_matches() {
   local closure=$1 expected_bootstrap=$2 metadata=$1/folio-home.json expected_digest
   immutable "$closure" || return 1
+  if jq -e '.legacyAdoption==true' "$backup/transaction.json" >/dev/null; then
+    legacy_artifact_matches "$closure"
+    return
+  fi
   [[ "$scope" != system ]] || metadata=$closure/folio-system.json
   expected_digest=$(jq -r '.beforeAppliedDigest // ""' "$backup/transaction.json")
   [[ -n "$expected_digest" ]] || expected_digest=$(digest "$backup/running.json")
@@ -98,10 +109,21 @@ restart_consumers() {
   done < <(jq -r '.masked[]' "$journal")
   rm -f "$blocker" || return 1
   systemctl "$manager_option" daemon-reload >&2 || return 1
+  jq -r '.active[]' "$journal" >"$work/restart-services"
+  if [[ "$action" == adopt && $(readlink -e "$profile") == "${artifact:-}" ]]; then
+    # A legacy profile may have no active Folio subscriber. Start newly enabled
+    # user units after removing the maintenance condition, not during activation.
+    while IFS= read -r service; do
+      if systemctl "$manager_option" is-enabled --quiet "$service"; then
+        printf '%s\n' "$service" >>"$work/restart-services"
+      fi
+    done < <(services "$new_bootstrap")
+  fi
+  sort -u "$work/restart-services" -o "$work/restart-services"
   while IFS= read -r service; do
     systemctl "$manager_option" start "$service" >&2 || return 1
-  done < <(jq -r '.active[]' "$journal")
-  if jq -e '.active | index("folio-manager.service") != null' "$journal" >/dev/null; then
+  done <"$work/restart-services"
+  if rg -qx 'folio-manager.service' "$work/restart-services"; then
     printf '{"folio-deployment:status":{}}\n' >"$work/readiness.json"
     deadline=$((SECONDS + 30))
     while (( SECONDS < deadline )); do
@@ -124,7 +146,7 @@ finish() {
     if ! "$installed" && [[ ! -e "$state/schema-transaction.json" ]]; then
       flock -u 9
       if restart_consumers; then phase aborted || code=1; else code=1; fi
-    elif [[ "$action" == upgrade || "$action" == rollback ]]; then
+    elif [[ "$action" == upgrade || "$action" == adopt || "$action" == rollback ]]; then
       while IFS= read -r service; do stop_consumer "$service" || code=1; done < <(jq -r '.masked[]' "$journal")
       if maintain restore "$id" &&
           snapshot_artifact_matches "$(jq -er .oldArtifact "$backup/transaction.json")" "$(jq -er .oldBootstrap "$backup/transaction.json")" &&
@@ -215,7 +237,15 @@ if [[ "$action" == rollback ]]; then
     source_path=$(nix store add-path --name folio-rebuilt-revision "$work/rebuilt-source")
   fi
 fi
-if [[ "$action" == upgrade || "$action" == rollback ]]; then
+if [[ "$action" == adopt ]]; then
+  [[ "$scope" == user && ! -e "$state/deployments/current.json" ]] || {
+    echo 'Adoption requires an unmanaged legacy user profile' >&2; exit 4;
+  }
+  legacy_artifact_matches "$(readlink -e "$profile")" || {
+    echo 'Legacy profile account/home metadata is incompatible' >&2; exit 4;
+  }
+fi
+if [[ "$action" == upgrade || "$action" == adopt || "$action" == rollback ]]; then
   immutable "$source_path" && [[ -f "$source_path/folio-input.json" ]] || exit 2
   nix-store --realise "$source_path" --add-root "$work/source-root" --indirect >/dev/null
   target=homeConfigurations.folio.activationPackage
@@ -260,7 +290,7 @@ fi
 # Stop and mask registered services before acquiring any repository lock. Never
 # hold initialize/repository locks while asking systemd to stop a consumer.
 services "$bootstrap" >"$work/services"
-if [[ "$action" == upgrade || "$action" == rollback ]]; then services "$new_bootstrap" >>"$work/services"; fi
+if [[ "$action" == upgrade || "$action" == adopt || "$action" == rollback ]]; then services "$new_bootstrap" >>"$work/services"; fi
 if [[ "$action" == restore ]]; then
   [[ -f "$journal" && -f "$backup/transaction.json" ]] || exit 2
   jq -r '.masked[],.active[]' "$journal" >>"$work/services"
@@ -297,6 +327,10 @@ if [[ "$action" != restore ]]; then
   done
   # snapshot creates the backup directory and roots the original pair.
   maintain snapshot "$id" "$bootstrap" "$old_artifact"
+  if [[ "$action" == adopt ]]; then
+    legacy_artifact_matches "$old_artifact"
+    jq '.legacyAdoption=true' "$backup/transaction.json" | folio-atomic-write "$backup/transaction.json"
+  fi
   if [[ "$action" == rollback ]]; then
     # A failed later desired revision may differ from the actual successful
     # closure. Retain that desired data as evidence without calling it applied.
@@ -306,7 +340,8 @@ if [[ "$action" != restore ]]; then
       folio-atomic-write "$backup/transaction.json"
   fi
   # An offline snapshot must bind the closure to exactly the saved desired data.
-  # Older unidentifiable closures require a supported rebuild, never adoption.
+  # Legacy adoption records the old repository and independently identified
+  # Sylphy closure without inventing Folio configuration metadata for it.
   snapshot_artifact_matches "$old_artifact" "$bootstrap"
   artifact_effects_match "$old_artifact" || { echo 'Selected closure has unverified effects; recover those effects before maintenance' >&2; exit 4; }
   cmp "$backup/startup.json" "$backup/running.json"
@@ -339,8 +374,8 @@ activate() {
 }
 case "$action" in
   snapshot) phase complete ;;
-  upgrade|rollback)
-    if [[ "$action" == upgrade ]]; then maintain prepare "$id" "$new_bootstrap"
+  upgrade|adopt|rollback)
+    if [[ "$action" != rollback ]]; then maintain prepare "$id" "$new_bootstrap"
     else maintain prepare-revision "$id" "$new_bootstrap" "$target_revision"; fi
     cmp "$backup/new-running.json" "$work/desired.json"
     maintain bind "$id" "$artifact"

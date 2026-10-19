@@ -877,6 +877,23 @@ identity. A mismatch defers that fallback without failing system activation;
 upgrade the user repository and its Home Manager closure separately. Deferral
 does not complete a user migration or establish user-service health.
 
+For the first transition from a Sylphy Home Manager profile, use the explicit
+`folio-manager-maintain user OLD_BOOTSTRAP adopt ID FROZEN_SOURCE` entry point.
+It requires Sylphy protocol/schema version 1 metadata matching the current
+account and home, no existing Folio applied record, and unchanged managed files.
+The frozen input must match the migrated desired configuration. Adoption retains
+the old repository and legacy closure independently, backs up first file
+collisions, and starts newly enabled subscribers after activation. It does not
+invent a Folio identity for the old profile. Explicit `restore ID` restores both
+retained components; subsequent migrations use ordinary `upgrade`.
+
+Terminal startup files live in `~/.config/zsh`, including when a legacy session
+already exports `ZDOTDIR`. Desktop profiles retain the upstream Niri session unit
+with `keep-old`; compositor updates take effect at the next login. The pinned
+Home Manager switcher is patched to honor this setting for an already active
+unit that was previously provided only by the system. User apply also resumes
+enabled Folio subscribers that were stopped by their manager dependency.
+
 ## Flatpak and application configuration
 
 All Flatpak applications belong to `applications`. Install as the user with

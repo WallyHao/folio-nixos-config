@@ -1,5 +1,46 @@
-{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, systemModules }:
+{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, systemModules,
+  homeManager, runtime, prepareInput, source, inputs, switcher }:
 let
+  adoptionSource = pkgs.runCommand "folio-legacy-adoption-source" {
+    nativeBuildInputs = [ pkgs.jq pkgs.folio.normalizer prepareInput ];
+  } ''
+    mkdir $out
+    cp -R ${source}/. $out/
+    chmod -R u+w $out
+    folio-normalize ${old}/models/user ${old}/user.json >configuration.json
+    for module in folio-codex folio-git; do
+      transform=$(jq -er --arg module "$module" '.[] | select(.module==$module) | .transform' ${bootstrap}/migrations.json)
+      "$transform" <configuration.json >next.json
+      mv next.json configuration.json
+    done
+    folio-prepare-input configuration.json ${bootstrap} >$out/folio-input.json
+  '';
+  adoptedHome = (import ../../manager/src/outputs.nix {
+    inputs = inputs // { self.outPath = adoptionSource; };
+  }).homeConfigurations.folio.activationPackage;
+  legacyHome = (homeManager.homeManagerConfiguration {
+    inherit pkgs;
+    modules = [{
+      home.username = "folio";
+      home.homeDirectory = "/home/folio";
+      home.stateVersion = "26.05";
+      programs.zsh = { enable = true; dotDir = "/home/folio/.config/zsh"; };
+      systemd.user.services.niri = {
+        Unit = {
+          Description = "Legacy session sentinel";
+          X-SwitchMethod = "keep-old";
+          BindsTo = [ "graphical-session.target" ];
+          Before = [ "graphical-session.target" ];
+        };
+        Service.ExecStart = "${pkgs.coreutils}/bin/sleep infinity";
+        Install.WantedBy = [ "default.target" ];
+      };
+      home.file.".config/folio-legacy-fixture".text = "retained legacy fixture\n";
+      home.extraBuilderCommands = ''
+        printf '%s\n' '{"protocolVersion":1,"schemaVersion":1,"user":"folio","home":"/home/folio"}' >$out/sylphy-home.json
+      '';
+    }];
+  }).activationPackage;
   old = pkgs.runCommand "folio-before-agents-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
     mkdir $out
     cp -RL ${bootstrap}/. $out/
@@ -32,9 +73,12 @@ in pkgs.testers.runNixOSTest {
     services.greetd.enable = lib.mkForce false;
     services.timesyncd.enable = lib.mkForce false;
     nix.settings.substituters = lib.mkForce [ ];
-    virtualisation.memorySize = 2048;
-    virtualisation.additionalPaths = [ bootstrap old ];
-    environment.systemPackages = [ pkgs.jq repository maintenance ];
+    virtualisation.memorySize = 4096;
+    virtualisation.diskSize = 12288;
+    virtualisation.writableStoreUseTmpfs = false;
+    virtualisation.additionalPaths = [ bootstrap old legacyHome adoptionSource adoptedHome
+      inputs.nixpkgs inputs.home-manager pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ];
+    environment.systemPackages = [ pkgs.jq repository maintenance runtime prepareInput ];
   };
   testScript = ''
     import datetime
@@ -68,5 +112,7 @@ in pkgs.testers.runNixOSTest {
     machine.wait_for_unit("folio-manager.service")
     machine.wait_until_succeeds("folio --json --system status | jq -e '.status == \"success\" and .data.offline != true'")
     machine.succeed("${repository}/bin/folio-repository system ctl --list | grep 'folio-environment.*root:folio-operators'")
+    command = "bash ${./adopt.sh} ${bootstrap} ${old} ${legacyHome} ${adoptionSource} ${switcher}"
+    machine.succeed("runuser -u folio -- env -i HOME=/home/folio USER=folio PATH=/run/current-system/sw/bin XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c " + shlex.quote(command), timeout=datetime.timedelta(seconds=600))
   '';
 }

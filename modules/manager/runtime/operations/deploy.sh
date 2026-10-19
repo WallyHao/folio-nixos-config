@@ -109,6 +109,13 @@ case "$operation_kind" in
       export HOME_MANAGER_BACKUP_EXT=folio-backup-$task_id
       unset HOME_MANAGER_BACKUP_OVERWRITE DRY_RUN SKIP_SANITY_CHECKS
       timeout --kill-after=10 "$timeout_seconds" "$artifact/activate" --driver-version 1
+      # Restarting the manager also stops subscribers that Require it, even
+      # when their unchanged unit files made sd-switch schedule no action.
+      while IFS= read -r service; do
+        if systemctl --user is-enabled --quiet "$service"; then
+          systemctl --user start "$service"
+        fi
+      done < <(jq -er '.user[] | select(test("^folio-[a-z0-9-]+\\.service$"))' "$FOLIO_BOOTSTRAP/subscribers.json")
     else
       [[ -x "$artifact/bin/switch-to-configuration" ]]
       jq -e --slurpfile input "$snapshot/folio-input.json" '.scope=="system" and

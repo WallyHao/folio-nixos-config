@@ -1,0 +1,15 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -311,7 +311,10 @@ fn build_switch_plan(
+                 {
+                     upb.push_decision(UnitDecision::ActiveRefuseManualStop)
+                         .action(UnitAction::KeepOld);
+-                } else if new_unit_file.switch_method() == unit_file::UnitSwitchMethod::StopOnly {
++                } else if matches!(
++                    new_unit_file.switch_method(),
++                    unit_file::UnitSwitchMethod::StopOnly | unit_file::UnitSwitchMethod::KeepOld
++                ) {
+                     upb.push_decision(UnitDecision::SwitchMethod(new_unit_file.switch_method()))
+                         .action(UnitAction::KeepOld);
+                 } else {

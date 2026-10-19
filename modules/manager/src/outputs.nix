@@ -152,8 +152,16 @@ let
       )
     } $out/system-descriptor.json
   '';
+  userPackages = basePkgs.extend (_final: previous: {
+    inherit (pkgs) folio;
+    # Honor keep-old for an already active system-provided user service when
+    # Home Manager takes ownership of its unit for the first time.
+    sd-switch = previous.sd-switch.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [ ./sd-switch-keep-active.patch ];
+    });
+  });
   userHome = inputs.home-manager.lib.homeManagerConfiguration {
-    inherit pkgs;
+    pkgs = userPackages;
     extraSpecialArgs.folioBootstrap = bootstrap;
     modules = adapters "user" ++ [
       {
@@ -227,6 +235,12 @@ in
       agentsHistory = catalogue.agents.packages.schema-history;
       terminalHistory = catalogue.terminal.packages.schema-history;
       systemModules = adapters "system";
+      homeManager = inputs.home-manager.lib;
+      runtime = collection.packages.manager-runtime;
+      prepareInput = collection.packages.manager-input;
+      source = pkgs.folio.source;
+      inherit inputs;
+      switcher = userPackages.sd-switch;
     };
     panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
     panel-network = import ../../network/tests/panel.nix {
