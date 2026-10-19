@@ -29,4 +29,8 @@ in rec {
   };
   laptop-migration = migrated laptop;
   desktop-migration = migrated desktop;
+  mobile = migrated {
+    settings.system = catalogue.system.targetSettings.mobile;
+    modules = [ catalogue.system.targetModules.mobile catalogue.devices.targetModules.mobile ];
+  };
 }

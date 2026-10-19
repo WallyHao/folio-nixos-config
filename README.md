@@ -22,7 +22,7 @@ UEFI guest gate, including real DNS/proxy traffic, firewall and key-only SSH.
 Integrated release acceptance has passed one disposable UEFI lifecycle, including
 both scopes, interrupted recovery, retained rollback, cached apps, actual Chinese
 input/OBS capture, denied effects and externally observed reboot/poweroff. The
-selectable laptop hardware configuration builds successfully; physical acceptance
+selectable laptop, desktop and mobile hardware configurations build successfully; physical acceptance
 remains deferred.
 
 Implemented modules keep Nix implementation in `src/`, client entry points and
@@ -347,6 +347,7 @@ nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.laptop.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.desktop.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.desktop-migration.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.mobile.config.system.build.toplevel
 nix eval --json .#lib.folio.targets
 ```
 
@@ -405,6 +406,60 @@ preserved migration password policy and unchanged laptop PRIME policy. Build log
 `/tmp/folio-desktop-build.log`; evaluated policy: `/tmp/folio-desktop-policy-eval.json`.
 The built bootstraps identify `desktop` and `desktop-migration` respectively.
 No system activation or disk changes were performed during preparation.
+
+### One USB system across the laptop and desktop
+
+`mobile` is the long-term target for this existing migrated USB installation.
+It shares the same account, password/keyring policy, runtime proxy compatibility,
+software and Btrfs mounts across both machines. It is not a generic fresh-install
+image: the existing Folio account and migration runtime state must already exist.
+The CPU/GPU combination is in `modules/devices/src/mobile.nix`; storage and boot
+policy are in `modules/system/src/mobile.nix`.
+
+The driver closure contains Intel and AMD microcode, i915 and amdgpu kernel
+modules, Mesa and the same stable NVIDIA driver for the RTX 4060 and RTX 3090.
+Kernel PCI matching chooses applicable drivers; Niri selects display/render
+devices without a global GPU override. No fixed PRIME bus IDs, DRM card numbers,
+Intel-only display topology or hardware-dependent Nix evaluation is used.
+This provides driver support, not a guarantee of integrated-GPU rendering or
+automatic discrete-GPU power saving. CUDA applications still require their own
+appropriate application environment; no CUDA SDK is added to the base desktop.
+
+The USB root/EFI UUIDs remain fixed and no internal disks are configured. The
+mobile boot menu keeps up to ten generations with a five-second selection window;
+EFI variable writes stay disabled. Firmware must support x86_64 UEFI USB boot.
+The current ESP's removable fallback loader must be checked during deployment;
+its contents were not readable without privilege during preparation. No EFI files
+were changed. Secure Boot enrollment/signing is not provided by this target.
+
+Build with the `mobile` command above. The installed hardware target remains
+unchanged until an explicit deployment transition; a normal Folio plan inherits
+that installed target. After deploying `mobile` once, future plans retain
+`mobile` on either machine. Shut down normally before moving the disk; no rebuild
+or target selection is required merely because the attached computer changes.
+Keep a known-working boot generation while testing each machine. Existing
+machine-specific targets remain available for fixed installations and diagnosis.
+
+Preparation validation (2026-10-19) passed:
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#nixosConfigurations.mobile.config.system.build.toplevel
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#nixosConfigurations.laptop.config.system.build.toplevel \
+  .#nixosConfigurations.desktop.config.system.build.toplevel \
+  .#checks.x86_64-linux.catalogue
+```
+
+Logs: `/tmp/folio-mobile-build.log`, `/tmp/folio-mobile-regression-build.log`.
+Focused policy evaluation and a frozen-source evaluation through the manager's
+stable `portable` entry passed; reports are `/tmp/folio-mobile-policy-eval.json`
+and `/tmp/folio-mobile-frozen-eval.json`. The built bootstrap records `mobile`;
+actual kernel-module files for i915, amdgpu, NVIDIA, iwlwifi and r8169 were checked
+in `/tmp/folio-mobile-driver-files.txt`. Source policy shares the NVIDIA driver
+definition across physical targets, retaining the laptop-only PRIME setup in its
+own profile. No live activation, reboot or physical cross-machine acceptance was
+performed. Existing user data and live desired configuration were not changed.
 
 ### Migrating the existing Sylphy laptop account
 

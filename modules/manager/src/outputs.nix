@@ -189,12 +189,15 @@ in
     else (import ./outputs.nix { inherit inputs; targetName = "desktop"; }).nixosConfigurations.portable;
   nixosConfigurations.desktop-migration = if selectedTarget == "desktop-migration" then portableSystem
     else (import ./outputs.nix { inherit inputs; targetName = "desktop-migration"; }).nixosConfigurations.portable;
+  nixosConfigurations.mobile = if selectedTarget == "mobile" then portableSystem
+    else (import ./outputs.nix { inherit inputs; targetName = "mobile"; }).nixosConfigurations.portable;
   lib.folio.targets = {
     portable = "Disposable UEFI guest";
     laptop = "Lenovo Legion Y7000 IRX9, current USB storage";
     laptop-migration = "Existing Sylphy account migration; requires offline rename and private runtime policy";
     desktop = "MSI B650M, Ryzen 7 9700X, RTX 3090 and AMD graphics, current USB storage";
     desktop-migration = "Desktop hardware with the existing migrated account and private runtime policy";
+    mobile = "Existing migrated USB system shared by the Intel/NVIDIA laptop and AMD/NVIDIA desktop";
   };
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
