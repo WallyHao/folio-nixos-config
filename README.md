@@ -345,6 +345,8 @@ owns CPU/GPU/firmware. There are no separate host/home trees or copied desktops.
 ```sh
 nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
 nix build --no-link .#nixosConfigurations.laptop.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.desktop.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.desktop-migration.config.system.build.toplevel
 nix eval --json .#lib.folio.targets
 ```
 
@@ -356,7 +358,7 @@ module; see the [NixOS NVIDIA documentation](https://wiki.nixos.org/wiki/NVIDIA)
 Wi-Fi/Ethernet use the kernel's iwlwifi/r8169 drivers. Physical driver operation,
 external displays, suspend and battery behavior still need hardware acceptance.
 
-The laptop storage export describes **the current USB installation**, using
+The laptop and desktop storage exports describe **the current USB installation**, using
 inspected root/EFI UUIDs and Btrfs `root`, `home`, `nix` subvolumes. It does not
 select or repartition the internal NVMe. Replace the system-owned storage export
 when installing elsewhere; changing storage must not require copying the GPU or
@@ -372,8 +374,37 @@ stable build entry for that selected target. The environment/account remain the
 shared `portable`/`folio` identity; hardware selection is separate from that name.
 Hardware profiles are source-versioned policy, while modeled desired settings
 and deployment records remain in sysrepo. No hardware is autodetected during a
-Nix build. A desktop target will be registered after its hardware and storage are
-inspected; no guessed desktop deployment is exposed.
+Nix build.
+
+`desktop` targets the inspected MSI MAG B650M MORTAR WIFI with Ryzen 7 9700X,
+GeForce RTX 3090 (PCI ID `10de:2204`) and AMD integrated graphics (`1002:13c0`).
+It enables AMD microcode, AMD graphics firmware/Mesa and the pinned stable NVIDIA
+driver with open kernel modules and DRM modesetting. NVIDIA supports open modules
+on this Ampere GPU; see the [NVIDIA module documentation](https://github.com/NVIDIA/open-gpu-kernel-modules).
+Both adapters remain available without the laptop's Intel driver or PRIME offload
+PCI topology. Shared USB mounts live in `modules/system/src/usb-storage.nix`;
+GPU/CPU policy lives in `modules/devices/src/desktop.nix`. Internal NVMe partitions
+are not mounted or modified by these targets.
+
+For the existing migrated USB installation moved to the desktop, use
+`desktop-migration`: it adds the same migrated account/password, keyring and
+private runtime proxy compatibility as `laptop-migration`. The regular `desktop`
+target instead starts with the physical profile's locked account policy. These
+targets do not repeat the account rename. Changing machines does not automatically
+change the installed target: an existing `laptop-migration` bootstrap still freezes
+that target in plans. Building `desktop-migration` prepares a replacement closure;
+it does not activate it, change sysrepo data or bypass target-conflict checks.
+Switching the installed target requires an explicit reviewed system transition.
+Fresh driver operation, display outputs and suspend remain physical acceptance
+work after activation; a successful build alone does not establish those results.
+
+Preparation validation (2026-10-19): both desktop system builds above and
+`nix build --no-link .#checks.x86_64-linux.catalogue` passed. Focused evaluation
+confirmed AMD microcode, both graphics adapters, disabled desktop PRIME offload,
+preserved migration password policy and unchanged laptop PRIME policy. Build log:
+`/tmp/folio-desktop-build.log`; evaluated policy: `/tmp/folio-desktop-policy-eval.json`.
+The built bootstraps identify `desktop` and `desktop-migration` respectively.
+No system activation or disk changes were performed during preparation.
 
 ### Migrating the existing Sylphy laptop account
 

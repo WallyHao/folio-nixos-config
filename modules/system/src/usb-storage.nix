@@ -1,4 +1,4 @@
-# Observed current USB installation on the Legion, not its internal NVMe.
+# Observed USB installation shared by the laptop and desktop targets.
 # Hardware and disk policy are separate: replace this binding for a new disk.
 { config, lib, ... }:
 let root = config.fileSystems."/".device;
@@ -10,6 +10,6 @@ in {
   boot.initrd.availableKernelModules = [ "uas" "sd_mod" "usbhid" ];
   assertions = [{
     assertion = config.fileSystems."/".fsType == "btrfs";
-    message = "The laptop current-storage profile requires Btrfs; select a different storage profile for a new disk";
+    message = "The current USB storage profile requires Btrfs; select a different storage profile for a new disk";
   }];
 }
