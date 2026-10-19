@@ -183,8 +183,14 @@ in
   nixosConfigurations.portable = portableSystem;
   nixosConfigurations.laptop = if selectedTarget == "laptop" then portableSystem
     else (import ./outputs.nix { inherit inputs; targetName = "laptop"; }).nixosConfigurations.portable;
+  nixosConfigurations.laptop-migration = if selectedTarget == "laptop-migration" then portableSystem
+    else (import ./outputs.nix { inherit inputs; targetName = "laptop-migration"; }).nixosConfigurations.portable;
   # Desktop hardware is deliberately unavailable until its inventory is supplied.
-  lib.folio.targets = { portable = "Disposable UEFI guest"; laptop = "Lenovo Legion Y7000 IRX9, current USB storage"; };
+  lib.folio.targets = {
+    portable = "Disposable UEFI guest";
+    laptop = "Lenovo Legion Y7000 IRX9, current USB storage";
+    laptop-migration = "Existing Sylphy account migration; requires offline rename and private runtime policy";
+  };
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
     packages = [
@@ -207,6 +213,10 @@ in
     ];
   };
   checks.${system} = {
+    account-migration = import ../../system/tests/account-migration.nix {
+      inherit pkgs;
+      migration = catalogue.system.packages.migration;
+    };
     integrated-release = lib.makeOverridable ({ cache ? null, plans ? null }:
       import ../tests/system-deployment.nix {
         inherit pkgs inputs bootstrap cache plans;

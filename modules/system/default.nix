@@ -21,9 +21,11 @@ in
     };
   };
   targetModules.laptop = import ./src/laptop.nix;
+  migrationModule = import ./src/migration.nix { migration = power.migration; };
   subscribers.system = [ "folio-system.service" ];
   packages = {
     runtime = power.runtime;
+    migration = power.migration;
   };
   commands.system = {
     help = "${./cli/commands/system/help.txt}";

@@ -1,5 +1,11 @@
 { pkgs }:
 let
+  migration = pkgs.writeShellApplication {
+    name = "folio-migrate-account";
+    runtimeInputs = with pkgs; [ coreutils findutils gnugrep gnused gawk diffutils
+      jq util-linux shadow btrfs-progs nix systemd gnutar procps glibc.bin ];
+    text = builtins.readFile ../runtime/migrate-account.sh;
+  };
   runtime = pkgs.stdenv.mkDerivation {
     pname = "folio-system-subscriber";
     version = "0.1.0";
@@ -35,5 +41,5 @@ let
   };
 in
 {
-  inherit runtime client;
+  inherit runtime client migration;
 }

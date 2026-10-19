@@ -375,6 +375,58 @@ and deployment records remain in sysrepo. No hardware is autodetected during a
 Nix build. A desktop target will be registered after its hardware and storage are
 inspected; no guessed desktop deployment is exposed.
 
+### Migrating the existing Sylphy laptop account
+
+`nixosConfigurations.laptop-migration` is a guarded transition target for the
+inspected existing installation. It keeps the laptop hardware/storage, adds
+administrator access and login/passwd GNOME Keyring integration, and retains the
+existing private proxy policy at runtime. It is not a fresh-install target:
+activation refuses to create a duplicate UID 1000 or run before the offline rename.
+
+Build `system-migration` and the target system, then run the immutable migration
+tool with local sudo authentication:
+
+```sh
+tool=$(nix build --no-link --print-out-paths .#system-migration)
+system=$(nix build --no-link --print-out-paths .#nixosConfigurations.laptop-migration.config.system.build.toplevel)
+sudo "$tool/bin/folio-migrate-account" launch "$system"
+```
+
+The root worker closes the session after 20 seconds, stops UID 1000 writers,
+creates a read-only Btrfs home snapshot, pins the old system and legacy store
+references, renames the account while keeping UID/GID/password, atomically moves
+the home, and keeps `/home/sylphy` as an alias to `/home/folio`. It compares broken
+links and preserved application files before selecting the new boot generation.
+An error during cutover attempts to restore the old identity and boot generation.
+State, account/EFI/network backups and logs stay root-private under
+`/var/lib/folio-migration`; the home snapshot is under
+`/home/.folio-migration-backups`. No private file bytes are part of builds.
+
+The original native browser profile, encrypted keyring, SSH/GPG, Codex account
+directories and Home Manager generation are kept. The transition does not apply
+a new user generation or replace the native browser with a clean Flatpak profile.
+Legacy `/etc/sylphy` descriptors are restored as regular files after `/etc/static`
+changes. Verify existing sessions before separately adopting new user/app profiles.
+
+First login is `folio` with the existing password. Run
+`folio-migrate-account finish` from an interactive Folio terminal to change the
+password; PAM attempts to update the existing login keyring as well. If it remains
+locked with its earlier password, use Seahorse to change that keyring's password;
+never delete/reinitialize it to bypass the prompt. A successful password change
+does not by itself establish keyring or remote application-session health.
+
+`sudo folio-migrate-account rollback` closes the session, reverses the identity/home
+rename and selects the retained old system for reboot. It keeps current file
+contents and the current password. Simply booting an old generation does not
+reverse a persistent account rename. A complete recovery also has the private
+account/boot backups and pre-migration home snapshot; they are not automatically
+restored over newer personal data. Preserve aliases and GC roots until verified.
+
+The bounded `checks.x86_64-linux.account-migration` guest checks real account
+rename/rollback, password hash, UID/GID/mode/inode preservation, absolute/store
+links, opaque application data and legacy descriptor recovery. It does not prove
+physical boot or actual account/keyring password synchronization on the laptop.
+
 ## Ownership and scope
 
 The manager owns environment/user identity, module selection, shared preferences,

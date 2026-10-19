@@ -2,7 +2,8 @@
 let
   defaults = lib.genAttrs [ "system" "user" ] (scope:
     let shared = import ./defaults.nix { inherit scope; };
-    in shared // { "folio-environment:environment" = shared."folio-environment:environment" // {
+    in shared // { "folio-environment:environment" = shared."folio-environment:environment"
+      // (target.environment.${scope} or { }) // {
       modules = map (entry: entry // (target.settings.${entry.name} or { })) shared."folio-environment:environment".modules;
     }; });
   # Prepared inputs are immutable source files; no datastore is queried here.
