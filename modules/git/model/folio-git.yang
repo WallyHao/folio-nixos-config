@@ -1,0 +1,21 @@
+module folio-git {
+  yang-version 1.1;
+  namespace "urn:folio:git";
+  prefix fg;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned git preferences, independent of activation.";
+  revision 2026-10-19 { description "Initial developer environment integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'git'";
+    container git {
+      when "../../fe:scope = 'user'";
+      presence "Git settings are supplied.";
+      leaf user-name { type string { length '1..256'; pattern '[^\r\n]+'; } }
+      leaf user-email { type string { length '3..256'; pattern '[^\r\n]+'; } }
+      leaf github-cli { type boolean; default true; }
+      leaf default-branch { type string { pattern '[a-zA-Z][a-zA-Z0-9_/-]*'; } default main; }
+      leaf pull-rebase { type boolean; default true; }
+    }
+  }
+}

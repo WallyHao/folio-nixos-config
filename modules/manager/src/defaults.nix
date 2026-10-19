@@ -23,6 +23,7 @@
     ++ (
       if scope == "system" then
         [
+          { name = "terminal"; enabled = true; }
           { name = "applications"; enabled = true; }
           { name = "appearance"; enabled = true; }
           { name = "desktop"; enabled = true; }
@@ -41,6 +42,9 @@
         [
           { name = "appearance"; enabled = true; }
           { name = "input"; enabled = true; }
+          { name = "git"; enabled = true; }
+          { name = "emacs"; enabled = true; }
+          { name = "codex"; enabled = true; }
           { name = "desktop"; enabled = true; }
           { name = "devices"; enabled = true; }
           {

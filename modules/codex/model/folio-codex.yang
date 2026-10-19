@@ -1,0 +1,18 @@
+module folio-codex {
+  yang-version 1.1;
+  namespace "urn:folio:codex";
+  prefix fc;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned codex preferences, independent of activation.";
+  revision 2026-10-19 { description "Initial developer environment integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'codex'";
+    container codex {
+      when "../../fe:scope = 'user'";
+      presence "Codex settings are supplied.";
+      leaf theme { type boolean; default true; }
+      leaf shell-completion { type boolean; default true; }
+    }
+  }
+}

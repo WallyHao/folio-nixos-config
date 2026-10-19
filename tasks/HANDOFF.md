@@ -3,8 +3,8 @@
 ## Current state (2026-10-19)
 
 The owner explicitly resumed implementation after the earlier handoff. Stages
-00–06 have passed their gates; Stage 06 is ready for its implementation commit.
-Stage 07 is next; Stages 07–09 are not implemented. Physical acceptance remains
+00–07 have passed their gates; Stage 06 is committed as `6cec01f` and Stage 07 is
+ready for its implementation commit. Stages 08–09 are not implemented. Physical acceptance remains
 separate and no development-host activation is authorized.
 
 Read README.md, STRUCTURE.md, tasks/WORKFLOW.md, tasks/SYLPHY-REUSE.md,
@@ -106,9 +106,10 @@ backlight and Wi-Fi remain unverified and belong to Stage 09 hardware evidence.
 
 ## Next steps and boundaries
 
-1. Review and commit the passing Stage 06 diff with explicit paths; report SHA and
-   worktree state. AGENTS.md already exists and has not been changed.
-2. Implement Stage 07, then 08, then Stage 09 VM acceptance. Read their ordered
+1. Review and commit the passing Stage 07 diff with explicit paths and subject
+   `feat(tools): migrate terminal and developer environment`. Report its actual
+   SHA and worktree state; do not amend for a self-reference. AGENTS.md is unchanged.
+2. Continue Stage 08, then Stage 09 VM acceptance. Read their ordered
    requirements and reuse sources. Do not mark hardware acceptance complete from VM
    evidence. Target activation or physical writes require actual authorization.
 3. Maintain this handoff, the assigned stage record and INDEX as work progresses.
@@ -119,3 +120,47 @@ The resumed environment uses `/home/sylphy/.codex`; do not switch accounts, read
 credentials or use another session's telemetry as current evidence. The earlier
 owner policy was to sleep below 5% allowance and resume only on fresh recovery
 telemetry. No authentication/session files belong in source or build snapshots.
+
+## Passing Stage 07 evidence and interfaces
+
+Terminal utilities/shell, Git, Emacs and Codex are implemented with user models;
+terminal also registers Zsh system-wide. Only the system account record can select
+the login shell; focused evaluation selected Zsh and rejected missing registration.
+Default account remains Bash. Only `unrar` is allowed by the unfree predicate.
+The 2026-10-20 terminal model is archived; its additive hash-bound migration targets
+2026-10-21. Existing opacity migrations still bind their original exact models.
+
+- Package/config check: `/tmp/folio-stage07-tools-final.log`, output
+  `/nix/store/a83hlv2y7z47vf4l4k0fizq4pidcjr7j-folio-developer-tools`.
+- Full real profile gate: `/tmp/folio-stage07-profile-gate5.log`, output
+  `/nix/store/vmkfw14nisx8shrl06hjdqn7w8r06d99-vm-test-run-folio-tools-deployment`.
+  Script 86.16 seconds; cleanup 0.12 seconds. Retained `tools-status.json` reports
+  healthy configuration after selective removal and snapshot/resumption.
+- Actual legacy `6cec01f` paired upgrade, build/apply, configured shell, Git/Codex
+  delivery, seven Emacs ERT tests, notes/indexing, disabling fzf/Git/Emacs/Codex,
+  preserved repository/notes/index/private-state sentinels and offline snapshot
+  all passed. No real GitHub/Codex login or physical acceptance claim.
+- Full-profile status measured 1.64 seconds against the old one-second readiness
+  timeout. The probe now permits a five-second RPC/six-second process cap within
+  its existing overall retry deadline. Both upgrade and snapshot prove the fix.
+- Interactive shell checks use `setsid --wait` and null stdin to avoid sharing
+  the driver's controlling terminal. Configuration-free Zsh had the same conflict;
+  isolated configured startup took 0.51 seconds. No prompt feature was disabled.
+  Diagnostic logs: `/tmp/folio-stage07-profile-interactive.log`,
+  `/tmp/folio-stage07-profile2-interactive.log`; shell trace in
+  `/tmp/folio-stage07-profile2-output/zsh-session.log`. A diagnostic guest reset
+  restored its test backdoor; it is not system power acceptance evidence.
+- All interactive guests are closed. Reuse unchanged earlier fault/GUI checks;
+  do not rerun them merely for tools. Exact GUI/TUI parity remains unverified.
+
+Current Stage 07 reproduction command (marker is archived real `6cec01f`):
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L --impure --expr '
+let
+  f = builtins.getFlake (toString ./.);
+  old = builtins.storePath
+    (builtins.replaceStrings ["\n"] [""] (builtins.readFile /tmp/folio-stage07-legacy-store));
+in f.checks.x86_64-linux.tools-deployment.override { legacySource = old; }
+'
+```

@@ -1,0 +1,35 @@
+--- a/src/framework/source.c
++++ b/src/framework/source.c
+@@ -121,8 +121,14 @@
+ parse_and_say_curl_result (char *curl_buf)
+ {
+   /* 分隔两部分数据 */
++  if (!curl_buf) return -1;
+   char *split = strchr (curl_buf, ' ');
+-  if (split) *split = '\0';
++  if (!split)
++    {
++      chsrc_warn ("Unable to parse curl speed output");
++      return -1;
++    }
++  *split = '\0';
+-
++
+   // say(curl_buf); say(split+1);
+   int  http_code = xy_str2int (curl_buf);
+@@ -134,7 +140,7 @@
+   if (0==http_code)
+     {
+       char *msg = ENGLISH ? "ERROR curl output: " : "错误 curl 输出: ";
+-      println (red (xy_strcat (3, msg, curl_buf)));
++      println (red (xy_2strcat (msg, curl_buf)));
+     }
+   else if (200!=http_code)
+     {
+@@ -147,7 +153,7 @@
+     {
+       println (speedstr);
+     }
+-  return speed;
++  return http_code == 200 ? speed : -1;
+ }

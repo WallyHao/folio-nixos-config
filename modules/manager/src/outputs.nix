@@ -1,7 +1,10 @@
 { inputs }:
 let
   system = "x86_64-linux";
-  basePkgs = import inputs.nixpkgs { inherit system; };
+  basePkgs = import inputs.nixpkgs {
+    inherit system;
+    config.allowUnfreePredicate = package: (basePkgs.lib.getName package) == "unrar";
+  };
   sysrepoModule = import ../../sysrepo/default.nix {
     inherit pkgs;
     lib = basePkgs.lib;
@@ -49,6 +52,9 @@ let
     devices = import ../../devices/default.nix { inherit pkgs lib; };
     appearance = import ../../appearance/default.nix { inherit pkgs lib; };
     input = import ../../input/default.nix { inherit pkgs lib; };
+    git = import ../../git/default.nix { inherit pkgs lib; };
+    emacs = import ../../emacs/default.nix { inherit pkgs lib; };
+    codex = import ../../codex/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib; };
@@ -117,14 +123,7 @@ let
       )
     } $out/system-descriptor.json
   '';
-in
-{
-  packages.${system} = collection.packages // {
-    manager-bootstrap = bootstrap;
-    folio = collection.packages.manager-cli;
-  };
-  nixosConfigurations.portable = portableSystem;
-  homeConfigurations.folio = inputs.home-manager.lib.homeManagerConfiguration {
+  userHome = inputs.home-manager.lib.homeManagerConfiguration {
     inherit pkgs;
     extraSpecialArgs.folioBootstrap = bootstrap;
     modules = adapters "user" ++ [
@@ -151,6 +150,15 @@ in
       }
     ];
   };
+
+in
+{
+  packages.${system} = collection.packages // {
+    manager-bootstrap = bootstrap;
+    folio = collection.packages.manager-cli;
+  };
+  nixosConfigurations.portable = portableSystem;
+  homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
     packages = [
       pkgs.cmake
@@ -238,6 +246,21 @@ in
       runtime = collection.packages.manager-runtime;
       cli = collection.packages.manager-cli;
       repository = collection.packages.sysrepo-tools;
+    };
+    tools-deployment = lib.makeOverridable ({ legacySource ? null }: import ../../terminal/tests/deployment.nix {
+      inherit pkgs inputs bootstrap legacySource;
+      source = pkgs.folio.source;
+      prepareInput = collection.packages.manager-input;
+      runtime = collection.packages.manager-runtime;
+      cli = collection.packages.manager-cli;
+      editor = catalogue.emacs.packages.editor;
+      modules = adapters "system";
+    }) { };
+    tools = import ../../terminal/tests/tools.nix {
+      inherit pkgs inputs bootstrap;
+      generation = userHome.activationPackage;
+      editor = catalogue.emacs.packages.editor;
+      codex = catalogue.codex.packages.application;
     };
     catalogue = import ../tests/catalogue.nix { inherit pkgs catalogueLib; };
     foundation = import ../../sysrepo/tests/foundation.nix {

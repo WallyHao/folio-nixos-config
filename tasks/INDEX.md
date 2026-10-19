@@ -35,7 +35,9 @@ choices locally without replacing the specified architecture.
 - Stage 06 passed its full affected guest gate after correcting first-run Rime
   deployment readiness, late OBS modal handling and QEMU/Xvfb teardown. Evidence:
   `/nix/store/mz3i9kanf7r2kd73v3xxw18wxp7kxafd-vm-test-run-folio-desktop-session`.
-  See HANDOFF and the Stage 06 completion record. Stage 07–09 remain unimplemented.
+  Stage 06 commit: `6cec01f`. Stage 07 passed its tools and real profile gates,
+  including upgrade, selective removal/preservation and snapshot resumption.
+  Stages 08–09 remain unimplemented. See HANDOFF and the owning stage records.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
@@ -61,7 +63,7 @@ to run the full suite or create a commit after each checkbox.
 | 04 | [Recovery and rollback](04-recovery.md) | 03 | complete | Fault recovery, migrations, managed rollback |
 | 05 | [Applications](05-applications.md) | 04 | complete | Owned Zen/OBS lifecycle and regular-file delivery |
 | 06 | [Desktop](06-desktop.md) | 05 | complete | Niri, appearance, input, devices, capture |
-| 07 | [Developer tools](07-tools.md) | 06 | pending | Terminal, Git, Emacs, Codex migration |
+| 07 | [Developer tools](07-tools.md) | 06 | complete | Terminal, Git, Emacs, Codex migration |
 | 08 | [Network and system](08-network-system.md) | 07 | pending | Remaining modeled connectivity and system policy |
 | 09 | [Acceptance](09-acceptance.md) | 08 | pending | Integrated guest evidence and separate hardware evidence |
 

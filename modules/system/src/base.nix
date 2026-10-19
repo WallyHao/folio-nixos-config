@@ -45,7 +45,8 @@ in
           if (user.login-shell or "bash") == "bash" then
             pkgs.bashInteractive
           else
-            throw "Folio: Zsh login-shell capability is not implemented yet";
+            if builtins.elem "terminal" context.enabledModules then pkgs.zsh
+            else throw "Folio: Zsh login-shell requires the system terminal module";
         initialPassword = "kl;'";
       }
     ) context.identity.users

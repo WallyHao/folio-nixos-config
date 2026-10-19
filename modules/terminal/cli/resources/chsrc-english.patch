@@ -1,0 +1,5 @@
+--- a/src/framework/source.c
++++ b/src/framework/source.c
+@@ -140 +140 @@
+-      char *http_code_str = yellow (xy_2strcat ("HTTP码 ", curl_buf));
++      char *http_code_str = yellow (xy_2strcat (ENGLISH ? "HTTP code " : "HTTP码 ", curl_buf));

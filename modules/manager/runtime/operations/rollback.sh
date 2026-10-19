@@ -105,8 +105,10 @@ restart_consumers() {
     printf '{"folio-deployment:status":{}}\n' >"$work/readiness.json"
     deadline=$((SECONDS + 30))
     while (( SECONDS < deadline )); do
-      if timeout --kill-after=1 2 folio-repository "$scope" cfg --rpc="$work/readiness.json" \
-          --format json --timeout 1 >"$work/readiness-result.json" 2>"$work/readiness-error"; then return 0; fi
+      # Status verifies every managed file; a normal desktop/tool profile can
+      # exceed one second. Let each bounded probe finish instead of queuing retries.
+      if timeout --kill-after=1 6 folio-repository "$scope" cfg --rpc="$work/readiness.json" \
+          --format json --timeout 5 >"$work/readiness-result.json" 2>"$work/readiness-error"; then return 0; fi
       sleep 0.2
     done
     cat "$work/readiness-error" >&2

@@ -15,6 +15,10 @@ hardware acceptance remain unverified. No development-host
 activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
 for directory ownership.
 
+Terminal/developer tools, the paired model upgrade and selective removal with
+personal-data preservation have also passed a disposable user-profile guest gate.
+Remaining network/system completion and integrated acceptance are planned below.
+
 Implemented modules keep Nix implementation in `src/`, client entry points and
 command resources in `cli/`, subscribers and operations in `runtime/`, models in
 `model/`, and behavioral checks in the outer `tests/`. Module `default.nix` files
@@ -733,6 +737,40 @@ Only supported external theme/configuration interfaces are used; GTK theming
 alone does not establish OBS/Qt theming parity. Report unsupported appearance
 features rather than overwriting OBS state. Screen-capture acceptance requires
 actual frames through desktop portals and PipeWire. Devices and desktop retain those host capabilities.
+
+## Terminal and developer tools
+
+The user `terminal` selection now renders Foot and Zsh with the reused Pure
+Powerlevel10k prompt, completion, history, suggestions and highlighting. Its
+`folio-terminal:terminal.shell` settings control those features; `.tools` contains
+independent boolean switches for bat, btop, eza, fd, fzf, jq, ripgrep, zoxide, unzip,
+unrar, chsrc, just and Typst. Typst remains a terminal component. Only the named
+unrar package is allowed by the unfree predicate. Zsh history/cache are writable
+per-user state. The system terminal contribution registers Zsh; changing a user's
+login shell still requires an explicit system account `login-shell` selection.
+
+`git` installs Git and optional GitHub CLI, defaults new repositories to `main`,
+and enables rebasing pulls. Set `folio-git:git.user-name` and `.user-email` in the
+user configuration; no personal identity, signing key or token is supplied.
+
+`emacs` provides Org/Org-roam, backlinks, search/completion, the dashboard and
+Everforest preferences. `C-c n f` finds notes, `C-c n b` shows backlinks and
+`C-c n h` opens the start page. Notes default to `~/Documents/Notes`; set
+`folio-emacs:emacs.notes-directory` to reuse an existing directory. The rebuildable
+index and editor history stay in `$XDG_STATE_HOME/folio/emacs`. Optional personal
+additions live in `~/.config/folio/emacs/local.el`, which Folio does not manage.
+
+`codex` installs the pinned CLI, Zsh completion and a selectable Folio `.tmTheme`.
+Choose it with `/theme`; theme loading follows the
+[official Codex customization interface](https://learn.chatgpt.com/docs/cli-customization).
+Mutable Codex configuration, authentication and session state remain application
+owned. GitHub/Codex authentication requires the target user's own setup. Disabling
+a module removes its managed files while preserving repositories, notes, indexes
+and personal application data.
+
+Use `folio config export desired.json`, edit the owning module settings, then
+`folio config import desired.json` and the plan/build/apply workflow above. A
+configuration commit alone does not install software or change the login shell.
 
 ## Desktop, input and device integration
 

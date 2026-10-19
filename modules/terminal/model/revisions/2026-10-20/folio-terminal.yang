@@ -1,0 +1,32 @@
+module folio-terminal {
+  yang-version 1.1;
+  namespace "urn:folio:terminal";
+  prefix ft;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+
+  organization "Folio";
+  description "Terminal-owned settings, initially the user Foot contribution.";
+  revision 2026-10-20 { description "Express background opacity as a unit fraction instead of a percentage."; }
+  revision 2026-10-19 { description "Add configurable background opacity in percent."; }
+  revision 2026-10-18 { description "Foot settings independent of activation."; }
+
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'terminal'";
+    container terminal {
+      presence "Terminal settings are supplied.";
+      container foot {
+        leaf enabled { type boolean; default true; }
+        leaf font {
+          type string { length '1..256'; pattern '[^\r\n]+'; }
+          description "Optional module override of resolved public font preferences.";
+        }
+        leaf padding { type string { pattern '[0-9]+x[0-9]+'; } default '15x15'; }
+        leaf opacity {
+          type decimal64 { fraction-digits 2; range '0..1'; }
+          default '1';
+          description "Background opacity as a unit fraction; 0.75 means 75 percent.";
+        }
+      }
+    }
+  }
+}
