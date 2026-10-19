@@ -445,6 +445,27 @@ reverse a persistent account rename. A complete recovery also has the private
 account/boot backups and pre-migration home snapshot; they are not automatically
 restored over newer personal data. Preserve aliases and GC roots until verified.
 
+Retiring `/home/sylphy` requires a Home Manager generation built for `folio` at
+`/home/folio`, while retaining existing application profiles. Build
+`system-retirement` and a `laptop-migration` system without the old tmpfiles rule,
+then run `sudo TOOL/bin/folio-retire-home launch SYSTEM HOME_GENERATION` locally.
+It waits 20 seconds, stops the login session, snapshots the home filesystem,
+updates live text/link references, SQLite TEXT fields and Mozilla compressed
+sessions, merges duplicate Codex project records, and activates the corrected
+Home Manager generation. It selects the new boot system, unlinks only the checked
+compatibility symlink, and reboots. Passwords, keyrings and historical transcripts
+are retained. Failure restores the compatibility link and old boot selection;
+the snapshot is retained rather than overwriting newer files automatically.
+The separate root-private journal is `/var/lib/folio-home-retirement`; inspect it
+before retrying an interrupted operation. Old Home Manager generations require
+the old alias when deliberately selected again.
+
+The path migration fixture is `modules/system/tests/home-retirement.py`, invoked
+with the packaged Python environment and `modules/system/runtime/retire-home-paths.py`.
+It checks immutable source preservation, absolute links, SQLite data, compressed
+sessions and duplicate project merging. These fixtures and system builds do not
+establish that physical retirement has completed.
+
 The bounded `checks.x86_64-linux.account-migration` guest checks real account
 rename/rollback, password hash, UID/GID/mode/inode preservation, absolute/store
 links, opaque application data, tty autologin shutdown/recovery, and legacy

@@ -94,6 +94,12 @@ restore_context() {
   # /etc/static changes with the system generation. Legacy module clients still
   # need these public descriptors; restore bytes rather than obsolete links.
   cp -a --remove-destination "$state/legacy-etc/." /etc/sylphy/
+  if [[ -f /etc/sylphy/users.json ]] && getent passwd folio >/dev/null; then
+    jq 'if .username == "sylphy" then .username = "folio" | .homeDirectory = "/home/folio" else . end' \
+      /etc/sylphy/users.json >/etc/sylphy/users.json.new
+    chmod 644 /etc/sylphy/users.json.new
+    mv /etc/sylphy/users.json.new /etc/sylphy/users.json
+  fi
 }
 restore_boot() {
   local previous

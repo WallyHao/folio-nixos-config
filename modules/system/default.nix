@@ -27,6 +27,7 @@ in
     runtime = power.runtime;
     migration = power.migration;
     keyring = power.keyring;
+    retirement = power.retirement;
   };
   commands.system = {
     help = "${./cli/commands/system/help.txt}";

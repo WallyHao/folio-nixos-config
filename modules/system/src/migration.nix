@@ -11,7 +11,6 @@
     hashedPassword = lib.mkForce null;
   };
   environment.systemPackages = [ migration pkgs.seahorse ];
-  systemd.tmpfiles.rules = [ "L /home/sylphy - - - - /home/folio" ];
   system.activationScripts.folioLegacyContext = {
     deps = [ "etc" ];
     text = "${migration}/bin/folio-migrate-account restore-context";

@@ -1,5 +1,15 @@
 { pkgs }:
 let
+  retirementPython = pkgs.python3.withPackages (python: [ python.lz4 python.tomlkit ]);
+  retirement = pkgs.writeShellApplication {
+    name = "folio-retire-home";
+    runtimeInputs = with pkgs; [ coreutils getent jq nix systemd util-linux
+      btrfs-progs gnugrep gnused procps shadow ];
+    text = builtins.replaceStrings
+      [ "@migration@" "@python@" "@pathsHelper@" ]
+      [ "${migration}" "${retirementPython}/bin/python3" "${../runtime/retire-home-paths.py}" ]
+      (builtins.readFile ../runtime/retire-home.sh);
+  };
   keyringHelper = pkgs.stdenv.mkDerivation {
     pname = "folio-keyring-password";
     version = "0.1.0";
@@ -58,5 +68,5 @@ let
   };
 in
 {
-  inherit runtime client migration keyring;
+  inherit runtime client migration keyring retirement;
 }
