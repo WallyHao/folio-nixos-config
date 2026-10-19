@@ -26,6 +26,7 @@ let
             mkdir -p $out
             cp -R ${source}/. $out/
             chmod -R u+w $out
+            cp ${bootstrap}/target.json $out/folio-target.json
             jq '."folio-environment:environment".preferences."font-size"=18 |
               ."folio-environment:environment".modules |= map(
                 if .name=="terminal" then .enabled=${if disabled then "false" else "true"} else . end)' \
@@ -47,6 +48,8 @@ in
 pkgs.testers.runNixOSTest {
   name = "folio-user-deployment";
   nodes.machine = { ... }: {
+    # The current shared appearance activation writes real dconf settings.
+    programs.dconf.enable = true;
     users.users.folio = {
       isNormalUser = true;
       uid = 1000;
@@ -118,6 +121,12 @@ pkgs.testers.runNixOSTest {
 
     with subtest("real CLI, subscriber, plan, build and standalone activation"):
         plan = folio("plan --source /home/folio/source")["data"]["planId"]
+        record = json.loads(user("cat /home/folio/.local/state/folio/deployments/plans/" + plan + ".json"))
+        assert json.loads(user("cat " + record["source"] + "/folio-target.json")) == {"name": "portable"}
+        user("printf '%s' '{\"name\":\"laptop\"}' >/home/folio/source/folio-target.json")
+        conflict = json.loads(user("folio --json plan --source /home/folio/source; test $? -ne 0"))
+        assert conflict["status"] == "invalid", conflict
+        user("rm /home/folio/source/folio-target.json")
         assert folio("build " + plan)["status"] == "success"
         assert folio("status")["data"].get("applied") is None
         applied = folio("apply " + plan)

@@ -1,6 +1,10 @@
-{ inputs, pkgs, lib, identities, collection, catalogueLib }:
+{ inputs, pkgs, lib, identities, collection, catalogueLib, target ? { settings = { }; } }:
 let
-  defaults = lib.genAttrs [ "system" "user" ] (scope: import ./defaults.nix { inherit scope; });
+  defaults = lib.genAttrs [ "system" "user" ] (scope:
+    let shared = import ./defaults.nix { inherit scope; };
+    in shared // { "folio-environment:environment" = shared."folio-environment:environment" // {
+      modules = map (entry: entry // (target.settings.${entry.name} or { })) shared."folio-environment:environment".modules;
+    }; });
   # Prepared inputs are immutable source files; no datastore is queried here.
   preparedPath = inputs.self.outPath + "/folio-input.json";
   prepared =

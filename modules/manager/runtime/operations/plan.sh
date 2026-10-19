@@ -34,6 +34,15 @@ done < <(find "$work/source" -type l -print0)
 # Store-backed and read-only source trees retain directory modes in the archive.
 # Only the private copy needs write access for cleanup and the frozen input.
 chmod -R u+w "$work/source"
+# Hardware selection belongs to the installed immutable bootstrap. Retain it
+# even when a user supplies an ordinary checkout without a target manifest.
+if [[ -f "$FOLIO_BOOTSTRAP/target.json" ]]; then
+  if [[ -f "$source_path/folio-target.json" ]] && ! jq -e --slurpfile installed "$FOLIO_BOOTSTRAP/target.json" \
+      '. == $installed[0]' "$source_path/folio-target.json" >/dev/null; then
+    reply invalid 'Source hardware target differs from the installed target'; exit 0
+  fi
+  cp "$FOLIO_BOOTSTRAP/target.json" "$work/source/folio-target.json"
+fi
 folio-prepare-input "$work/configuration.json" "$FOLIO_BOOTSTRAP" "$descriptor_path" >"$work/source/folio-input.json"
 if [[ "$scope" == user ]]; then
   descriptor_home=$(jq -er --arg account "$account" '.systemDescriptor.users[] | select(.name==$account) | .home' \

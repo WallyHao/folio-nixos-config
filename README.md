@@ -19,7 +19,11 @@ Terminal/developer tools, the paired model upgrade and selective removal with
 personal-data preservation have also passed a disposable user-profile guest gate.
 System policy and network-owned connection/proxy actions have passed an isolated
 UEFI guest gate, including real DNS/proxy traffic, firewall and key-only SSH.
-Integrated release acceptance remains planned below.
+Integrated release acceptance has passed one disposable UEFI lifecycle, including
+both scopes, interrupted recovery, retained rollback, cached apps, actual Chinese
+input/OBS capture, denied effects and externally observed reboot/poweroff. The
+selectable laptop hardware configuration builds successfully; physical acceptance
+remains deferred.
 
 Implemented modules keep Nix implementation in `src/`, client entry points and
 command resources in `cli/`, subscribers and operations in `runtime/`, models in
@@ -52,7 +56,7 @@ folio-prepare-input "$bootstrap/user.json" "$bootstrap" > "$scratch/folio-input.
 `folio-repository` binds the documented persistent/runtime paths and distinct
 system/user SHM prefixes. `init` installs models and initial data atomically through
 sysrepo, preserves existing startup data, and refuses model/library identity
-changes requiring an explicit future upgrade. `ctl`/`cfg` are maintenance wrappers;
+changes requiring an explicit paired upgrade. `ctl`/`cfg` are maintenance wrappers;
 direct edits do not implement the managed durable-commit protocol.
 
 Frozen input format 1 contains scope, normalized RFC 7951 configuration, a
@@ -321,6 +325,55 @@ deferred until their scope is confirmed.
   or private network data into source or build inputs.
 - Hardware/storage definitions must name the actual deployment target. VM disks
   are disposable fixtures, never assumed to describe a physical installation.
+
+`portable` is an environment/output name, not a binding to the development
+laptop or a guarantee of compatibility with every machine. The default system
+is an x86_64 UEFI disposable guest with root/EFI labels `nixos`/`ESP`. No specific
+GPU PCI IDs or development-host disk UUIDs are selected. Physical deployments
+must select the `physical` storage profile, supply inspected stable root/EFI
+paths and disable the prototype password. That model support is not an installer
+or proof of physical driver/boot compatibility. Keep existing data and recovery
+access; a physical target needs its own reviewed configuration and acceptance.
+
+### Selectable hardware targets
+
+One root Flake and `modules/manager/src/defaults.nix` supply shared software,
+preferences and user identity. `modules/manager/src/targets.nix` composes target
+differences through public module exports: system owns storage/boot and devices
+owns CPU/GPU/firmware. There are no separate host/home trees or copied desktops.
+
+```sh
+nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.laptop.config.system.build.toplevel
+nix eval --json .#lib.folio.targets
+```
+
+The checkout defaults to the disposable `portable` guest. `laptop` prepares the
+inspected Lenovo Legion Y7000 IRX9 (i7-13650HX, Intel UHD + RTX 4060 Mobile),
+Intel microcode, redistributable firmware, open NVIDIA kernel modules and PRIME
+offload (`nvidia-offload PROGRAM`). These settings follow the pinned NixOS NVIDIA
+module; see the [NixOS NVIDIA documentation](https://wiki.nixos.org/wiki/NVIDIA).
+Wi-Fi/Ethernet use the kernel's iwlwifi/r8169 drivers. Physical driver operation,
+external displays, suspend and battery behavior still need hardware acceptance.
+
+The laptop storage export describes **the current USB installation**, using
+inspected root/EFI UUIDs and Btrfs `root`, `home`, `nix` subvolumes. It does not
+select or repartition the internal NVMe. Replace the system-owned storage export
+when installing elsewhere; changing storage must not require copying the GPU or
+software configuration. Its public prototype password is disabled and the Folio
+account is locked; working credentials/recovery access must be provisioned before
+any installation. These build commands do not activate the target.
+
+The selected target is carried in the bootstrap's `target.json` and the immutable
+source's `folio-target.json`. Plans retain the installed selection even when
+`--source` points to an ordinary checkout; a conflicting source target is rejected.
+Within a frozen target source, `nixosConfigurations.portable` is the manager's
+stable build entry for that selected target. The environment/account remain the
+shared `portable`/`folio` identity; hardware selection is separate from that name.
+Hardware profiles are source-versioned policy, while modeled desired settings
+and deployment records remain in sysrepo. No hardware is autodetected during a
+Nix build. A desktop target will be registered after its hardware and storage are
+inspected; no guessed desktop deployment is exposed.
 
 ## Ownership and scope
 
@@ -855,9 +908,9 @@ IDs, logs and explicit cleanup. VM access is granted at initial system provision
 ## Verification
 
 Four levels: static checks, module tests, integration tests, and complete-system
-tests. All tests live under the owning module's outer `tests/`; those directories
-remain empty until implementation. This specifies acceptance boundaries, not
-test files or a mandated test framework.
+tests. Behavioral checks live under the owning module's outer `tests/`.
+The final release scenario reuses the manager and desktop fixtures rather than
+introducing another test framework.
 
 - Static: Nix/Shell syntax, shell lint, YANG import/type/constraint validation.
 - Module: request translation, configuration rendering, scope checks, modeled
@@ -866,6 +919,20 @@ test files or a mandated test framework.
   missing subscribers, conflicts, migrations and controlled backend failures.
 - System: disposable VM boot, both scopes, passwordless updates, persistence,
   interrupted deployment, rollback, desktop/Flatpak integration and power actions.
+
+`checks.x86_64-linux.integrated-release` requires an isolated public Flatpak cache
+and matching retained application plans as explicit overrides. It fails before
+boot when either is missing; it never substitutes host application data. With
+their existing store paths in `FOLIO_TEST_CACHE` and `FOLIO_TEST_PLANS`, run:
+
+```sh
+nix build --no-link --impure --expr '
+  let f = builtins.getFlake (toString ./.);
+  in f.checks.x86_64-linux.integrated-release.override {
+    cache = builtins.storePath (builtins.getEnv "FOLIO_TEST_CACHE");
+    plans = builtins.storePath (builtins.getEnv "FOLIO_TEST_PLANS");
+  }'
+```
 
 Nix build success does not prove activation or health. Reboot tests observe a
 changed boot ID and restored services; shutdown tests observe clean guest exit
@@ -880,7 +947,8 @@ need separate hardware acceptance, not claims based on VM success.
 3. System repository, root deployment service and passwordless VM system updates.
 4. Persistence recovery, schema migration and managed rollback.
 5. Flatpak Zen/OBS installation, managed regular-file delivery and observed state.
-6. Remaining module migration and actual hardware acceptance.
+6. Desktop, input, developer tooling and network/system policy (implemented).
+7. Integrated VM acceptance and separately authorized physical hardware validation.
 
 ## Upstream references
 

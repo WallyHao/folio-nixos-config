@@ -1,5 +1,9 @@
-{ inputs }:
+{ inputs, targetName ? null }:
 let
+  targetPath = inputs.self.outPath + "/folio-target.json";
+  selectedTarget = if targetName != null then targetName
+    else if builtins.pathExists targetPath then (builtins.fromJSON (builtins.readFile targetPath)).name
+    else "portable";
   system = "x86_64-linux";
   basePkgs = import inputs.nixpkgs {
     inherit system;
@@ -22,7 +26,13 @@ let
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
       systemConfiguration = portableSystem;
-      source = lib.fileset.toSource {
+      source = pkgs.runCommand "folio-${selectedTarget}-source" { } ''
+        mkdir $out
+        cp -R ${sourceTree}/. $out/
+        chmod -R u+w $out
+        cp ${pkgs.writeText "folio-target.json" (builtins.toJSON { name = selectedTarget; })} $out/folio-target.json
+      '';
+      sourceTree = lib.fileset.toSource {
         root = ../../..;
         fileset = lib.fileset.unions [
           ../../../flake.nix
@@ -37,6 +47,7 @@ let
     };
   };
   inherit (pkgs) lib;
+  sourceTree = pkgs.folio.sourceTree;
   catalogueLib = import ./catalogue.nix { inherit lib; };
   catalogue = {
     manager = import ../default.nix {
@@ -58,7 +69,9 @@ let
     network = import ../../network/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
-  composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib; };
+  targets = import ./targets.nix { inherit catalogue; };
+  target = targets.${selectedTarget} or (throw "Folio: unknown hardware target '${selectedTarget}'; configure its module-owned hardware and storage before use");
+  composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib target; };
   inherit (composition) defaults prepared configuration context adapters;
   models = lib.genAttrs [ "system" "user" ] (
     scope:
@@ -84,7 +97,7 @@ let
     );
   };
   systemModule = {
-    imports = adapters "system";
+    imports = adapters "system" ++ target.modules;
     _module.args = {
       folioBootstrap = bootstrap;
       folioInput = if prepared != null && prepared.scope == "system" then prepared else null;
@@ -100,6 +113,7 @@ let
   };
   bootstrap = pkgs.runCommand "folio-bootstrap" { } ''
     mkdir -p $out/models
+    cp ${pkgs.writeText "target.json" (builtins.toJSON { name = selectedTarget; })} $out/target.json
     ln -s ${models.system} $out/models/system
     ln -s ${models.user} $out/models/user
     cp ${pkgs.writeText "system.json" (builtins.toJSON defaults.system)} $out/system.json
@@ -167,6 +181,10 @@ in
   };
   nixosModules.portable = systemModule;
   nixosConfigurations.portable = portableSystem;
+  nixosConfigurations.laptop = if selectedTarget == "laptop" then portableSystem
+    else (import ./outputs.nix { inherit inputs; targetName = "laptop"; }).nixosConfigurations.portable;
+  # Desktop hardware is deliberately unavailable until its inventory is supplied.
+  lib.folio.targets = { portable = "Disposable UEFI guest"; laptop = "Lenovo Legion Y7000 IRX9, current USB storage"; };
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
     packages = [
@@ -189,6 +207,14 @@ in
     ];
   };
   checks.${system} = {
+    integrated-release = lib.makeOverridable ({ cache ? null, plans ? null }:
+      import ../tests/system-deployment.nix {
+        inherit pkgs inputs bootstrap cache plans;
+        integrated = true;
+        source = pkgs.folio.source;
+        modules = adapters "system";
+        prepareInput = collection.packages.manager-input;
+      }) { };
     recovery = import ../tests/system-deployment.nix {
       inherit pkgs inputs bootstrap;
       recovery = true;

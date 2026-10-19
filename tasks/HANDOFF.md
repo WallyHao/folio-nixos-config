@@ -1,6 +1,91 @@
 # Implementation Handoff
 
-## Current state (2026-10-19)
+## Current delivery (2026-10-19)
+
+Stages 00–08 and the Stage 09 **VM milestone** have passed. The owner explicitly
+requested selectable hardware targets and prioritized the current laptop after
+allowing physical acceptance to be deferred. That configuration preparation is
+also implemented and build-validated. Physical installation/activation remains
+pending by owner choice; no development-host activation, partitioning, bootloader
+writes or power actions were performed. No push is authorized.
+
+Delivery commit subject: `feat(manager): add laptop hardware targets and integrated acceptance`.
+See tasks/09-acceptance.md for exact commands, failures corrected and evidence.
+
+### Implemented interfaces
+
+- One root Flake/lock; shared defaults remain in manager/src/defaults.nix.
+  manager/src/targets.nix composes only public module exports. The checkout's
+  portable target remains a disposable UEFI guest; nixosConfigurations.laptop
+  prepares the current Lenovo Legion. No separate host/home trees were created.
+- System owns current USB UUID/Btrfs storage, devices owns Intel/NVIDIA hardware.
+  Hardware and storage are distinct module exports. Desktop remains unregistered
+  until actual CPU/GPU/firmware and intended storage are inspected.
+- Bootstrap target.json and frozen-source folio-target.json retain installed
+  target selection across plans from ordinary checkouts. Conflicting source
+  targets fail explicitly. The frozen source's portable output is the manager's
+  stable build entry for the selected target. Environment/account remain shared
+  portable/folio. Hardware policy is immutable source, not live autodetection.
+- Laptop physical prototype password is disabled; Folio login remains locked.
+  Provision reviewed credentials/recovery access before any future installation.
+
+### Laptop inventory and boundary
+
+Read-only discovery: Lenovo Legion Y7000 IRX9, i7-13650HX, Intel 00:02.0
+(8086:a78b), NVIDIA 01:00.0 (10de:28e0, RTX 4060 Mobile), iwlwifi, r8169,
+UEFI. Current root is USB sda2, Btrfs UUID
+4e59b522-0ecc-4bc7-b6d0-edc4531e4a00, root/home/nix subvolumes; EFI UUID
+767D-8E97. Internal NVMe has existing partitions and was not changed. Select a
+new system storage export for a different disk; do not silently reuse this USB
+binding for an internal installation. No driver, suspend, external-display or
+physical boot acceptance is claimed from the successful build.
+
+### Passed evidence
+
+- Integrated gate 5: /tmp/folio-stage09-integrated5.log, exit 0, 173.59 seconds
+  guest scenario, cleanup 0.00 seconds, no surviving test guests. Output:
+  /nix/store/fdankxaxdz0y1acq1wkag5dsfvdmf6mm-vm-test-run-folio-integrated-release.
+  Contains desktop/OBS screenshots, actual Chinese input, post-reboot healthy
+  status and differing boot IDs. Includes actual user/root builds/apply, retained
+  rollback, interrupted publication recovery, cached Zen/OBS, tools/network,
+  actual portal/PipeWire frames, denied effects and observed reboot/poweroff.
+- Hardware retention/conflict plus real user deployment: target-checks2.log in
+  /tmp, exit 0. Older fixture needed dconf enabled for current appearance.
+- Final selected static checks and full laptop build: /tmp/folio-target-final-build.log,
+  exit 0. Laptop closure: /nix/store/d7hddg5y197y92vc5ma14mn4mqf7acs4-nixos-system-portable-26.11.20261011.7fd4004.
+  Prepared frozen laptop evaluation retained PCI IDs, microcode and USB mounts:
+  /tmp/folio-laptop-frozen-eval.json.
+- CLI closure audit: 184 paths, no compiler/toolchain name matches, recorded in
+  /tmp/folio-stage09-cli-closure-final.txt. Runtime source policy is unchanged
+  by the subsequent test-only helper correction.
+
+Desktop fixtures are shared through tests/guest.nix and session-script.nix. The
+OBS helper is now explicitly in /etc/folio-test in every guest/root closure.
+The release-only UEFI fixture schedules stock root growfs after growpart; merely
+setting root autoResize did not start growfs with the legacy initrd. Shared SSH
+is deliberately disabled: Stage 09 observes that policy, while Stage 08 retains
+its enabled/key-auth/firewall evidence. Missing app cache/plans fails before boot.
+Prior full recovery/migration, tools migration/removal and real DNS/proxy/SSH
+focused gates are reused rather than repeated as a broad matrix.
+
+### Next work and quota
+
+No further implementation is needed for the authorized VM + laptop preparation
+milestone. Physical acceptance stays deferred. Future desktop configuration needs
+its actual inventory and storage choice. Any physical deployment first needs
+reviewed access/recovery and target-specific authorization; current code is not
+an installer and must not be switched onto the development host automatically.
+
+This execution used codex2: CODEX_HOME=/home/sylphy/.codex-account2. The temporary
+/tmp/folio-codex2-quota/check.sh is tied to this root session, not another agent.
+Latest checked remaining quota was 59%, reset 19:02:05 Asia/Shanghai. Future agents
+must identify their own session/account telemetry; follow the owner's below-5%
+sleep policy without switching accounts. Public app cache/plan paths below were
+reused; never use private host profiles as replacements.
+
+The earlier records below preserve the incoming baseline and focused evidence.
+
+## Historical baseline before Stage 09
 
 The owner explicitly resumed implementation after the earlier handoff. Stages
 00–08 have passed their gates. Implementation HEAD is `0ce2277` on `main`;
@@ -8,7 +93,7 @@ Stage 09 is pending. The worktree was clean before this documentation-only
 transition. No Stage 09 implementation or integrated-release pass is claimed.
 Physical acceptance is separate and no development-host activation is authorized.
 
-## Immediate assignment for the receiving agent
+## Original Stage 09 assignment (completed for VM scope)
 
 1. Read the rules below, then tasks/09-acceptance.md and its receiving-agent
    execution plan. Preserve existing AGENTS.md. Check current HEAD and worktree;

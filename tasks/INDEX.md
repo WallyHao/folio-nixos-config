@@ -38,7 +38,9 @@ choices locally without replacing the specified architecture.
   Stage 06 commit: `6cec01f`. Stage 07 passed its tools and real profile gates,
   including upgrade, selective removal/preservation and snapshot resumption.
   Stage 07 commit: `d09467b`. Stage 08 passed the network/system guest gate and
-  catalogue/foundation checks in `0ce2277`. Stage 09 remains pending; its task
+  catalogue/foundation checks in `0ce2277`. Stage 09's integrated VM milestone
+  and selectable laptop configuration/build have passed; physical acceptance
+  remains deferred by owner. Its task
   contains the receiving-agent execution plan. VM and hardware are separate
   milestones. See HANDOFF for retained evidence, commands and known fixture traps.
 - Planning date: 2026-10-18.
@@ -68,7 +70,7 @@ to run the full suite or create a commit after each checkbox.
 | 06 | [Desktop](06-desktop.md) | 05 | complete | Niri, appearance, input, devices, capture |
 | 07 | [Developer tools](07-tools.md) | 06 | complete | Terminal, Git, Emacs, Codex migration |
 | 08 | [Network and system](08-network-system.md) | 07 | complete | Modeled connectivity and system policy; isolated network/SSH/firewall gate |
-| 09 | [Acceptance](09-acceptance.md) | 08 | pending | Integrated guest evidence and separate hardware evidence |
+| 09 | [Acceptance](09-acceptance.md) | 08 | in-progress | VM passed; laptop configuration built; physical acceptance deferred |
 
 Main path: 00 -> 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09.
 Stage 03 introduces only network/device/system prerequisites needed for its VM.

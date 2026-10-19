@@ -10,6 +10,17 @@ let
   };
 in
 {
+  targetSettings.laptop = {
+    "folio-system:system" = {
+      time-zone = "Asia/Shanghai";
+      storage-profile = "physical";
+      prototype-password = false;
+      root-filesystem = "btrfs";
+      root-device = "/dev/disk/by-uuid/4e59b522-0ecc-4bc7-b6d0-edc4531e4a00";
+      boot-device = "/dev/disk/by-uuid/767D-8E97";
+    };
+  };
+  targetModules.laptop = import ./src/laptop.nix;
   subscribers.system = [ "folio-system.service" ];
   packages = {
     runtime = power.runtime;

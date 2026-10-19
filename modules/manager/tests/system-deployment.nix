@@ -6,8 +6,16 @@
   prepareInput,
   modules,
   recovery ? false,
+  integrated ? false,
+  cache ? null,
+  plans ? null,
 }:
 let
+  guest = if integrated then import ./release-guest.nix { inherit pkgs; } else ./system-guest.nix;
+  guestImport = if integrated then ''(import ./modules/manager/tests/release-guest.nix {
+    pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
+  })'' else "./modules/manager/tests/system-guest.nix";
+  testPython = pkgs.python3.withPackages (p: [ p.websocket-client p.pillow ]);
   fixtureFlake = pkgs.writeText "folio-system-test-flake.nix" ''
     {
       inputs = {
@@ -21,7 +29,7 @@ let
             modules = [
               (inputs.nixpkgs + "/nixos/modules/virtualisation/qemu-vm.nix")
               (inputs.nixpkgs + "/nixos/lib/testing/nixos-test-base.nix")
-              ./modules/manager/tests/system-guest.nix
+              ${guestImport}
             ];
           };
         };
@@ -89,9 +97,20 @@ let
     modules = [
       (inputs.nixpkgs + "/nixos/modules/virtualisation/qemu-vm.nix")
       (inputs.nixpkgs + "/nixos/lib/testing/nixos-test-base.nix")
-      ./system-guest.nix
+      guest
     ];
   };
+  laterSource = pkgs.runCommand "folio-release-later-user" { nativeBuildInputs = [ prepareInput pkgs.jq ]; } ''
+    mkdir $out
+    cp -R ${fixtureSource}/. $out/
+    chmod -R u+w $out
+    jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
+    jq '."folio-environment:environment".preferences."font-size"=24' ${bootstrap}/user.json > configuration.json
+    folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
+  '';
+  laterUser = (import (laterSource + "/modules/manager/src/outputs.nix") {
+    inputs = inputs // { self.outPath = laterSource; };
+  }).homeConfigurations.folio.activationPackage;
   defaultUser =
     (import (fixtureSource + "/modules/manager/src/outputs.nix") {
       inputs = inputs // {
@@ -113,9 +132,9 @@ let
   };
 in
 pkgs.testers.runNixOSTest {
-  name = if recovery then "folio-deployment-recovery" else "folio-system-deployment";
+  name = if integrated then "folio-integrated-release" else if recovery then "folio-deployment-recovery" else "folio-system-deployment";
   nodes.machine = { ... }: {
-    imports = modules ++ [ ./system-guest.nix ];
+    imports = modules ++ [ guest ];
     _module.args.folioBootstrap = fixtureBootstrap;
     virtualisation.additionalPaths = [
       fixtureSource
@@ -124,6 +143,9 @@ pkgs.testers.runNixOSTest {
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
     ]
+    ++ pkgs.lib.optionals integrated [ laterUser testPython pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ]
+    ++ pkgs.lib.optional (cache != null) cache
+    ++ pkgs.lib.optional (plans != null) plans
     ++ pkgs.lib.optionals recovery [
       defaultUser migrationSource migrationSeed.homeConfigurations.folio.activationPackage
       # Rebuilding retained source may produce a new wrapper derivation even
@@ -138,9 +160,17 @@ pkgs.testers.runNixOSTest {
     import datetime
     import json
     import shlex
+    import time
+    from typing import Any, cast
+
+    session_env = {}
 
     def user(command, timeout=240):
-        return machine.succeed("runuser -u folio -- env HOME=/home/folio USER=folio XDG_STATE_HOME=/home/folio/.local/state XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c " + shlex.quote(command), timeout=datetime.timedelta(seconds=timeout))
+        environment = {"HOME":"/home/folio", "USER":"folio", "XDG_STATE_HOME":"/home/folio/.local/state",
+            "XDG_RUNTIME_DIR":"/run/user/1000", "DBUS_SESSION_BUS_ADDRESS":"unix:path=/run/user/1000/bus"}
+        environment.update(session_env)
+        prefix = "runuser -u folio -- env " + " ".join(shlex.quote(key+"="+value) for key,value in environment.items())
+        return machine.succeed(prefix + " bash -c " + shlex.quote("set -euo pipefail; " + command), timeout=datetime.timedelta(seconds=timeout))
 
     def folio(arguments):
         return json.loads(user("folio --json " + arguments))
@@ -149,6 +179,7 @@ pkgs.testers.runNixOSTest {
         user("printf %s " + shlex.quote(json.dumps(configuration)) + " >/home/folio/draft.json")
         assert folio(("--system " if system else "") + "config import /home/folio/draft.json")["status"] == "success"
 
+    assert ${if integrated && (cache == null || plans == null) then "False" else "True"}, "Integrated acceptance requires isolated Flatpak cache/plans overrides; see README"
     machine.start(allow_reboot=True)
     machine.wait_for_unit("multi-user.target")
     machine.succeed("test -d /sys/firmware/efi")
@@ -195,6 +226,18 @@ pkgs.testers.runNixOSTest {
       )
     )}
 
+    ${pkgs.lib.optionalString (integrated && cache != null && plans != null) ''
+    with subtest("module-owned cached Zen and OBS reconciliation"):
+        user("mkdir -p /home/folio/.local/share/flatpak /home/folio/.local/state/folio/applications/prepared; cp -R ${cache}/. /home/folio/.local/share/flatpak/; chmod -R u+w /home/folio/.local/share/flatpak; cp ${plans}/*.json /home/folio/.local/state/folio/applications/prepared/")
+        assert folio("apps install all --offline")["status"]=="success"
+    ''}
+
+    ${pkgs.lib.optionalString integrated (builtins.readFile ./release.py)}
+
+    ${pkgs.lib.optionalString integrated (import ../../desktop/tests/session-script.nix {
+      inherit pkgs cache plans testPython;
+    })}
+
     with subtest("unauthorized and arbitrary activation requests have no effects"):
         profile = machine.succeed("readlink -f /run/current-system").strip()
         denied = json.loads(machine.succeed("if runuser -u visitor -- folio --json --system system reboot --request-id denied; then exit 1; fi"))
@@ -212,6 +255,7 @@ pkgs.testers.runNixOSTest {
         assert folio("--system system reboot --request-id observed-reboot")["data"] == accepted["data"]
         machine.wait_for_qmp_event(lambda event: event["event"]=="RESET", timeout=datetime.timedelta(seconds=60))
         machine.connected = False
+        session_env.clear()
         machine.wait_for_unit("multi-user.target", timeout=datetime.timedelta(seconds=90))
         after_boot = machine.succeed("cat /proc/sys/kernel/random/boot_id").strip()
         assert before_boot != after_boot
@@ -222,6 +266,13 @@ pkgs.testers.runNixOSTest {
         assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() == user_profile
         assert folio("config show")["data"]["digest"] == user_digest
         machine.succeed("test -d /sys/firmware/efi")
+        if ${if integrated then "True" else "False"}:
+            assert folio("status")["data"]["health"] == "healthy"
+            assert folio("--system status")["data"]["health"] == "healthy"
+            user("folio --json status >/home/folio/release-status.json")
+            machine.copy_from_machine("/home/folio/release-status.json")
+            user("printf %s " + shlex.quote(json.dumps({"beforeBootId":before_boot,"afterBootId":after_boot,"userProfile":user_profile,"systemProfile":status["applied"]["artifact"]})) + " >/home/folio/release-boot.json")
+            machine.copy_from_machine("/home/folio/release-boot.json")
         accepted = folio("--system system poweroff --request-id observed-poweroff")
         assert accepted["data"]["phase"] == "accepted"
         machine.wait_for_qmp_event(lambda event: event["event"]=="SHUTDOWN", timeout=datetime.timedelta(seconds=60))
