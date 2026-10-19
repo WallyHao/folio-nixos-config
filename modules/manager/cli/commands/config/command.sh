@@ -12,14 +12,14 @@ case "$action" in
     finish success "$(jq -cn --slurpfile configuration "$work/normalized.json" --arg digest "$configuration_digest" \
       '{configuration:$configuration[0],digest:$digest}')" ;;
   export)
-    if ! cat "$work/normalized.json" >"$1"; then finish failure null 'Export could not be written'; fi
+    if ! jq --indent 2 . "$work/normalized.json" >"$1"; then finish failure null 'Export could not be written'; fi
     finish success "$(jq -cn --arg path "$1" '{path:$path}')" ;;
   import)
     if ! jq -e 'select(type == "object")' "$1" >"$work/draft.json"; then
       finish invalid null 'Import must contain a JSON configuration object'
     fi ;;
   edit)
-    cp "$work/normalized.json" "$work/draft.json"
+    jq --indent 2 . "$work/normalized.json" >"$work/draft.json"
     read -r -a editor <<<"${VISUAL:-${EDITOR:-emacs}}"
     if ! "${editor[@]}" "$work/draft.json" >&2; then finish failure null 'Editor failed'; fi
     if ! jq -e 'type == "object"' "$work/draft.json" >/dev/null; then

@@ -1,8 +1,9 @@
 # CLI Implementation Proposal
 
 Status: discussion draft, revised 2026-10-19. This revision supersedes the
-previous explicit user/system plan/build/apply command proposal. No implementation
-or current CLI behavior has changed. README remains actual product documentation.
+previous explicit user/system plan/build/apply command proposal. Unified command
+forms below are not implemented yet. The existing editor/export JSON readability
+fix is implemented separately. README remains actual product documentation.
 
 ## Accepted direction
 
@@ -16,6 +17,9 @@ or current CLI behavior has changed. README remains actual product documentation
   Unified interaction does not make separate backend effects atomic.
 - Keep Bash/jq/sysrepocfg adapters and C/libsysrepo/libyang backends. No language
   rewrite, frontend framework or TUI implementation is included in this phase.
+- Editor drafts and exported configuration use two-space indented JSON with a
+  trailing newline. Canonical compact JSON remains internal to digests/transport;
+  whitespace-only editing must not change configuration meaning.
 
 ## Everyday CLI: complete list
 

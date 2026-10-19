@@ -93,6 +93,9 @@ In another shell with the same XDG paths, use `folio --json config show`,
 desired RFC 7951 data, suitable for reviewing or importing; `show` returns the
 configuration with its digest. Stop the development subscriber when finished.
 
+Editor drafts and exported configuration files use two-space indented JSON.
+Compact canonical JSON is reserved for internal digest and transport processing.
+
 Edits use private temporary documents and optimistic digest checks. Commits
 serialize writers and durably record prepared/accepted/saved phases. Recovery
 validates journal digests, restores prepared-only data, and rolls accepted data
