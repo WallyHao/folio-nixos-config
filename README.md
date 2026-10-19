@@ -427,6 +427,17 @@ locked with its earlier password, use Seahorse to change that keyring's password
 never delete/reinitialize it to bypass the prompt. A successful password change
 does not by itself establish keyring or remote application-session health.
 
+If the login keyring still uses its previous password, run
+`nix run .#system-keyring` from the repository in an interactive Folio desktop
+terminal, without sudo. It saves a private copy of the encrypted keyrings, reads
+the previous password and new password twice with terminal echo disabled, and
+changes the existing login keyring through GNOME Keyring's platform-specific
+D-Bus interface. No GUI is required. Use the current login password as the new
+keyring password; this command does not change the system password. Empty or
+mismatched new passwords are rejected. The helper reports success only after the
+daemon accepts the change, and does not delete credentials. Log out and in again
+and check existing application sessions afterward.
+
 `sudo folio-migrate-account rollback` closes the session, reverses the identity/home
 rename and selects the retained old system for reboot. It keeps current file
 contents and the current password. Simply booting an old generation does not

@@ -1,5 +1,22 @@
 { pkgs }:
 let
+  keyringHelper = pkgs.stdenv.mkDerivation {
+    pname = "folio-keyring-password";
+    version = "0.1.0";
+    dontUnpack = true;
+    nativeBuildInputs = [ pkgs.pkg-config ];
+    buildInputs = [ pkgs.glib ];
+    buildPhase = ''
+      $CC -std=c11 -Wall -Wextra -Werror -O2 \
+        ${../runtime/keyring-password.c} $(pkg-config --cflags --libs gio-2.0) -o folio-keyring-password
+    '';
+    installPhase = "mkdir -p $out/bin; cp folio-keyring-password $out/bin/";
+  };
+  keyring = pkgs.writeShellApplication {
+    name = "folio-migrate-keyring";
+    runtimeInputs = [ pkgs.coreutils pkgs.getent keyringHelper ];
+    text = builtins.readFile ../runtime/migrate-keyring.sh;
+  };
   migration = pkgs.writeShellApplication {
     name = "folio-migrate-account";
     runtimeInputs = with pkgs; [ coreutils findutils gnugrep gnused gawk diffutils
@@ -41,5 +58,5 @@ let
   };
 in
 {
-  inherit runtime client migration;
+  inherit runtime client migration keyring;
 }
