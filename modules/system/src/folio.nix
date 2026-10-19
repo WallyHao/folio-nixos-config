@@ -1,4 +1,4 @@
-# The same existing USB installation boots on both supported UEFI machines.
+# The Folio USB installation boots on both supported UEFI machines.
 { ... }: {
   imports = [ ./usb-storage.nix ];
   boot.initrd.availableKernelModules = [ "ehci_pci" "uhci_hcd" ];

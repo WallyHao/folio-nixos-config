@@ -1,4 +1,4 @@
-# One driver closure for the Intel/RTX 4060 laptop and AMD/RTX 3090 desktop.
+# Folio driver closure for the Intel/RTX 4060 laptop and AMD/RTX 3090 desktop.
 # Kernel PCI matching selects drivers; display/render selection stays with Niri.
 { ... }: {
   imports = [ ./nvidia.nix ];
