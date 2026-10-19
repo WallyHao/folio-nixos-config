@@ -9,7 +9,30 @@ root_only() { [[ $(id -u) == 0 ]] || die 'Run this action with sudo from a local
 pin() {
   local path=$1 name=$2
   [[ -e "$path" ]] || return 0
+  # A preparation failure can leave valid roots before a journal is queued.
+  # Retain those roots and use a distinct name for an updated tool/system.
+  if [[ -L "$state/roots/$name" ]]; then
+    [[ $(readlink -f "$state/roots/$name") != $(realpath -e "$path") ]] || return 0
+    name="$name-$(basename "$path")"
+    if [[ -L "$state/roots/$name" ]]; then
+      [[ $(readlink -f "$state/roots/$name") == $(realpath -e "$path") ]]
+      return
+    fi
+  fi
   nix-store --add-root "$state/roots/$name" --indirect --realise "$path" >/dev/null
+}
+backup_accounts() {
+  local entry
+  for entry in passwd shadow group; do
+    [[ -f "/etc/$entry" ]] || die "Required account file is missing: $entry"
+    cp -a "/etc/$entry" "$state/account-backup/"
+  done
+  # NixOS does not require a gshadow file. Record its absence explicitly.
+  if [[ -f /etc/gshadow ]]; then
+    cp -a /etc/gshadow "$state/account-backup/"
+  else
+    touch "$state/account-backup/gshadow.absent"
+  fi
 }
 preflight() {
   root_only
@@ -96,7 +119,7 @@ case "$action" in
     pin "$(cat "$state/old-system")" old-system
     pin "$system" new-system
     pin "$(dirname "$(dirname "$(realpath -e "$0")")")" migration-tool
-    cp -a /etc/passwd /etc/shadow /etc/group /etc/gshadow "$state/account-backup/"
+    backup_accounts
     cp -aL /etc/sylphy "$state/legacy-etc"
     cp -a /etc/NetworkManager/system-connections "$state/network-connections"
     tar -C /boot -cpf "$state/boot-backup.tar" .

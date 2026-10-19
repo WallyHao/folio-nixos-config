@@ -401,6 +401,8 @@ An error during cutover attempts to restore the old identity and boot generation
 State, account/EFI/network backups and logs stay root-private under
 `/var/lib/folio-migration`; the home snapshot is under
 `/home/.folio-migration-backups`. No private file bytes are part of builds.
+Account backups require passwd/shadow/group; gshadow is optional on NixOS and
+its absence is recorded. Preparation retries retain existing protection roots.
 
 The original native browser profile, encrypted keyring, SSH/GPG, Codex account
 directories and Home Manager generation are kept. The transition does not apply

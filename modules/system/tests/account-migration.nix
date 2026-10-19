@@ -6,12 +6,17 @@ pkgs.testers.runNixOSTest {
     environment.systemPackages = [ migration pkgs.jq ];
     system.stateVersion = "26.05";
     virtualisation.memorySize = 1024;
+    virtualisation.additionalPaths = [ pkgs.hello ];
+    nix.settings.substituters = pkgs.lib.mkForce [ ];
   };
   testScript = ''
     machine.start()
     machine.wait_for_unit("multi-user.target")
     # Source the exact packaged helper definitions without running its dispatcher.
     machine.succeed("sed '/^action=/,$d' ${migration}/bin/folio-migrate-account >/root/identity-functions")
+    machine.succeed("mkdir -p /var/lib/folio-migration/account-backup /var/lib/folio-migration/roots; test ! -e /etc/gshadow; bash -c 'source /root/identity-functions; backup_accounts'")
+    machine.succeed("test -f /var/lib/folio-migration/account-backup/gshadow.absent; cmp /etc/shadow /var/lib/folio-migration/account-backup/shadow")
+    machine.succeed("bash -c 'source /root/identity-functions; pin ${pkgs.hello} retry; pin ${pkgs.hello} retry; pin ${pkgs.coreutils} retry; pin ${pkgs.coreutils} retry'")
     machine.succeed("mkdir -p /home/sylphy/.config/zen/profile /home/sylphy/.local/share/keyrings /home/sylphy/.local/state/nix/profiles /nix/var/nix/profiles/per-user/sylphy /nix/var/nix/gcroots/per-user/sylphy")
     machine.succeed("printf fixture-cookie >/home/sylphy/.config/zen/profile/cookies.sqlite; printf encrypted-fixture >/home/sylphy/.local/share/keyrings/login.keyring; chmod 600 /home/sylphy/.local/share/keyrings/login.keyring; chown -R 1000:users /home/sylphy")
     machine.succeed("ln -s /home/sylphy/.config/zen/profile /home/sylphy/absolute-profile; ln -s ${pkgs.hello} /home/sylphy/.local/state/nix/profiles/retained; ln -s /home/sylphy/.local/state/nix/profiles/retained /home/sylphy/.nix-profile")
