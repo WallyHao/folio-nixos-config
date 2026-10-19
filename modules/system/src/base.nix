@@ -4,39 +4,13 @@ let
   settings = context.settings."folio-system:system" or { };
 in
 {
-  # Disposable bootstrap fixture, never a physical installation description.
+  imports = [ (import ./storage.nix { inherit context; }) (import ./policy.nix { inherit context; }) ];
   system.stateVersion = "26.05";
   networking.hostName = context.identity.environment;
-  boot.loader.grub.enable = false;
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = false;
-  boot.initrd.availableKernelModules = [
-    "virtio_pci"
-    "virtio_blk"
-    "ahci"
-  ];
-  boot.kernelParams = [
-    "console=ttyS0,115200n8"
-    "console=tty0"
-  ];
-  fileSystems."/" = {
-    device = "/dev/disk/by-label/nixos";
-    fsType = "ext4";
-  };
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-label/ESP";
-    fsType = "vfat";
-  };
-  time.timeZone = settings.time-zone or "Asia/Shanghai";
-  i18n.defaultLocale = "en_US.UTF-8";
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
   users.users = lib.listToAttrs (
     map (
       user:
-      lib.nameValuePair user.name {
+      lib.nameValuePair user.name ({
         isNormalUser = true;
         linger = true;
         inherit (user) uid home;
@@ -47,8 +21,8 @@ in
           else
             if builtins.elem "terminal" context.enabledModules then pkgs.zsh
             else throw "Folio: Zsh login-shell requires the system terminal module";
-        initialPassword = "kl;'";
-      }
+      } // (if settings.prototype-password or true then { initialPassword = "kl;'"; }
+        else { hashedPassword = "!"; }))
     ) context.identity.users
   );
 }

@@ -2,9 +2,8 @@
 let userService = import ./user-service.nix { inherit pkgs runtime; };
 in
 context:
-    args@{ folioBootstrap, ... }:
+    { folioBootstrap, folioInput ? null, ... }:
     let
-      folioInput = args.folioInput or null;
       descriptor = pkgs.writeText "folio-system-descriptor.json" (
         builtins.toJSON {
           format = 1;

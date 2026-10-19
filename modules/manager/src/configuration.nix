@@ -59,6 +59,8 @@ let
           prepared.systemDescriptor.capabilities
         else
           {
+            network-provisioned = lib.any (entry: entry.name == "network" && (entry.enabled or false))
+              (configuration "system")."folio-environment:environment".modules;
             desktop-provisioned = lib.any (entry: entry.name == "desktop" && (entry.enabled or false))
               (configuration "system")."folio-environment:environment".modules;
             devices-provisioned = lib.any (entry: entry.name == "devices" && (entry.enabled or false))

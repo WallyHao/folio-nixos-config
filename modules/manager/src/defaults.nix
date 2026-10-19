@@ -24,6 +24,7 @@
       if scope == "system" then
         [
           { name = "terminal"; enabled = true; }
+          { name = "network"; enabled = true; }
           { name = "applications"; enabled = true; }
           { name = "appearance"; enabled = true; }
           { name = "desktop"; enabled = true; }

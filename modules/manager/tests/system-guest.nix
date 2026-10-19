@@ -11,6 +11,9 @@
     writableStoreUseTmpfs = false;
   };
   system.switch.enable = true;
+  # The disposable QEMU fixture follows its virtual RTC; production time-sync
+  # policy is evaluated separately and this guest does not attest NTP health.
+  services.timesyncd.enable = lib.mkForce false;
   nix.settings.substituters = lib.mkForce [ ];
   users.users.visitor = {
     isNormalUser = true;

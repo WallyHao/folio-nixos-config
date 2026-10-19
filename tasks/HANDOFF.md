@@ -3,8 +3,8 @@
 ## Current state (2026-10-19)
 
 The owner explicitly resumed implementation after the earlier handoff. Stages
-00–07 have passed their gates; Stage 06 is committed as `6cec01f` and Stage 07 is
-ready for its implementation commit. Stages 08–09 are not implemented. Physical acceptance remains
+00–08 have passed their gates; Stage 06 is committed as `6cec01f` and Stage 07 as
+`d09467b`. Stage 08's commit subject is recorded below; Stage 09 is pending. Physical acceptance remains
 separate and no development-host activation is authorized.
 
 Read README.md, STRUCTURE.md, tasks/WORKFLOW.md, tasks/SYLPHY-REUSE.md,
@@ -106,10 +106,10 @@ backlight and Wi-Fi remain unverified and belong to Stage 09 hardware evidence.
 
 ## Next steps and boundaries
 
-1. Review and commit the passing Stage 07 diff with explicit paths and subject
-   `feat(tools): migrate terminal and developer environment`. Report its actual
-   SHA and worktree state; do not amend for a self-reference. AGENTS.md is unchanged.
-2. Continue Stage 08, then Stage 09 VM acceptance. Read their ordered
+1. Stage 08 passed its complete gate and is delivered by the commit subject below.
+   AGENTS.md is unchanged. Read its task record and retained evidence before
+   changing network/system policy or claiming physical health.
+2. Continue with Stage 09 VM acceptance. Read its ordered
    requirements and reuse sources. Do not mark hardware acceptance complete from VM
    evidence. Target activation or physical writes require actual authorization.
 3. Maintain this handoff, the assigned stage record and INDEX as work progresses.
@@ -120,6 +120,37 @@ The resumed environment uses `/home/sylphy/.codex`; do not switch accounts, read
 credentials or use another session's telemetry as current evidence. The earlier
 owner policy was to sleep below 5% allowance and resume only on fresh recovery
 telemetry. No authentication/session files belong in source or build snapshots.
+
+## Passing Stage 08 evidence and interfaces
+
+Commit subject: `feat(network): complete modeled connectivity and system policy`.
+Report the resulting SHA after commit; do not amend to insert a self-reference.
+
+- Scope: network-owned system YANG/C/Bash controls; NetworkManager/DNS/firewall,
+  key-only SSH and optional local Mihomo; system storage/account/locale/time/
+  console/journal/zram/Nix policy; exact system-model 2026-10-18 archive and
+  hash-bound 2026-10-19 migration; public `nixosModules.portable` composition.
+- Gate log: `/tmp/folio-stage08-network-gate5.log`, exit 0. Output:
+  `/nix/store/fwhq9dab4gc7914aayklcpcihv3g207p-vm-test-run-folio-network-system`.
+  Script: 56.24 seconds; cleanup: 0.17 seconds, no guest/driver survivors.
+  Retained `network-status.json` and `folio-ssh-policy.txt` were inspected.
+  Final catalogue/foundation checks passed in `/tmp/folio-stage08-static-final.log`,
+  including actual isolated repository validation and restart preservation.
+- Passed real system-model upgrade, policy plan/build/apply, descriptor/timezone,
+  zram/journal, actual connection effects, scoped failures, DNS and SOCKS HTTP,
+  live proxy mode/selection, unavailable backends, peer key SSH and blocked HTTP.
+- Reproduce with `nix build --no-link --no-update-lock-file --max-jobs 2
+  --print-out-paths -L .#checks.x86_64-linux.network` (one shell command).
+  Earlier failed gates and precise fixes are recorded in tasks/08-network-system.md.
+- The upgrade fixture retains the exact prior system model in a documented
+  synthetic source; it is not an unchanged historical release. Test closures use
+  the same QEMU/instrumentation modules as the frozen fixture Flake.
+- Physical policy rejects missing/unstable devices and prototype passwords.
+  Runtime SSH keys and optional provider credentials are provisioned outside
+  desired data/builds. No private provider or real network records were imported.
+- Physical storage/boot, Wi-Fi, TUN, provider nodes and NTP are unverified. QEMU
+  follows its virtual RTC; production time-sync evaluates enabled. Stage 09 must
+  keep guest and hardware acceptance separate. Earlier GUI/tools gates are reused.
 
 ## Passing Stage 07 evidence and interfaces
 

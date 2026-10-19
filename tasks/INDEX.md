@@ -37,7 +37,8 @@ choices locally without replacing the specified architecture.
   `/nix/store/mz3i9kanf7r2kd73v3xxw18wxp7kxafd-vm-test-run-folio-desktop-session`.
   Stage 06 commit: `6cec01f`. Stage 07 passed its tools and real profile gates,
   including upgrade, selective removal/preservation and snapshot resumption.
-  Stages 08–09 remain unimplemented. See HANDOFF and the owning stage records.
+  Stage 07 commit: `d09467b`. Stage 08 passed the network/system guest gate and
+  catalogue/foundation checks; Stage 09 remains pending. See HANDOFF and task records.
 - Planning date: 2026-10-18.
 - Product implementation: foundation, user Foot deployment, root deployment and
   power verified in isolated UEFI guests; module-owned VM lifecycle also passed.
@@ -64,7 +65,7 @@ to run the full suite or create a commit after each checkbox.
 | 05 | [Applications](05-applications.md) | 04 | complete | Owned Zen/OBS lifecycle and regular-file delivery |
 | 06 | [Desktop](06-desktop.md) | 05 | complete | Niri, appearance, input, devices, capture |
 | 07 | [Developer tools](07-tools.md) | 06 | complete | Terminal, Git, Emacs, Codex migration |
-| 08 | [Network and system](08-network-system.md) | 07 | pending | Remaining modeled connectivity and system policy |
+| 08 | [Network and system](08-network-system.md) | 07 | complete | Modeled connectivity and system policy; isolated network/SSH/firewall gate |
 | 09 | [Acceptance](09-acceptance.md) | 08 | pending | Integrated guest evidence and separate hardware evidence |
 
 Main path: 00 -> 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07 -> 08 -> 09.

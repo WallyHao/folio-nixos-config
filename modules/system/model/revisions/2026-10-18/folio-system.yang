@@ -1,0 +1,38 @@
+module folio-system {
+  yang-version 1.1;
+  namespace "urn:folio:system";
+  prefix fs;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "System-owned guest policy, independent of user deployment.";
+  revision 2026-10-18 { description "Initial explicit disposable guest policy."; }
+  grouping power-request {
+    leaf request-id { type fe:identifier; mandatory true; }
+  }
+  grouping power-result {
+    leaf status { type fe:result-status; mandatory true; }
+    leaf request-id { type fe:identifier; }
+    leaf phase { type enumeration { enum accepted; } }
+    leaf error { type string; }
+  }
+  rpc reboot {
+    description "Accept a durable delayed reboot request; completion requires external observation.";
+    input { uses power-request; }
+    output { uses power-result; }
+  }
+  rpc poweroff {
+    description "Accept a durable delayed poweroff request; completion requires external observation.";
+    input { uses power-request; }
+    output { uses power-result; }
+  }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'system'";
+    container system {
+      leaf time-zone {
+        type string { length '1..128'; pattern '[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*'; }
+        default 'Asia/Shanghai';
+        description "IANA zone name; the Nix adapter verifies package availability.";
+      }
+    }
+  }
+}

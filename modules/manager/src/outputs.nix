@@ -55,6 +55,7 @@ let
     git = import ../../git/default.nix { inherit pkgs lib; };
     emacs = import ../../emacs/default.nix { inherit pkgs lib; };
     codex = import ../../codex/default.nix { inherit pkgs lib; };
+    network = import ../../network/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib; };
@@ -82,13 +83,20 @@ let
       }) collection.models.${scope}
     );
   };
+  systemModule = {
+    imports = adapters "system";
+    _module.args = {
+      folioBootstrap = bootstrap;
+      folioInput = if prepared != null && prepared.scope == "system" then prepared else null;
+    };
+  };
   portableSystem = inputs.nixpkgs.lib.nixosSystem {
     inherit system;
     specialArgs = {
       folioBootstrap = bootstrap;
       folioInput = if prepared != null && prepared.scope == "system" then prepared else null;
     };
-    modules = adapters "system";
+    modules = [ systemModule ];
   };
   bootstrap = pkgs.runCommand "folio-bootstrap" { } ''
     mkdir -p $out/models
@@ -157,6 +165,7 @@ in
     manager-bootstrap = bootstrap;
     folio = collection.packages.manager-cli;
   };
+  nixosModules.portable = systemModule;
   nixosConfigurations.portable = portableSystem;
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
@@ -246,6 +255,15 @@ in
       runtime = collection.packages.manager-runtime;
       cli = collection.packages.manager-cli;
       repository = collection.packages.sysrepo-tools;
+    };
+    network = import ../../network/tests/acceptance.nix {
+      inherit pkgs inputs bootstrap;
+      source = pkgs.folio.source;
+      runtime = collection.packages.manager-runtime;
+      cli = collection.packages.manager-cli;
+      prepareInput = collection.packages.manager-input;
+      guestInstrumentation = ../tests/system-guest.nix;
+      oldSystemModel = ../../system/model/revisions/2026-10-18/folio-system.yang;
     };
     tools-deployment = lib.makeOverridable ({ legacySource ? null }: import ../../terminal/tests/deployment.nix {
       inherit pkgs inputs bootstrap legacySource;

@@ -17,7 +17,9 @@ for directory ownership.
 
 Terminal/developer tools, the paired model upgrade and selective removal with
 personal-data preservation have also passed a disposable user-profile guest gate.
-Remaining network/system completion and integrated acceptance are planned below.
+System policy and network-owned connection/proxy actions have passed an isolated
+UEFI guest gate, including real DNS/proxy traffic, firewall and key-only SSH.
+Integrated release acceptance remains planned below.
 
 Implemented modules keep Nix implementation in `src/`, client entry points and
 command resources in `cli/`, subscribers and operations in `runtime/`, models in
@@ -797,6 +799,41 @@ Physical GPU, sound, backlight and Bluetooth acceptance remains separate from gu
 checks. The virtual DRM acceptance fixture observed changing OBS frames through
 the real portal and PipeWire. It uses software Mesa in an isolated SDL/Xvfb QEMU
 display; it does not establish physical GPU acceleration or encoder performance.
+
+## Network and system policy
+
+The system-owned `network` contribution enables NetworkManager, DHCP/connection
+DNS and a default-deny inbound firewall. Explicit `dns` addresses override
+connection DNS. SSH and Mihomo are opt-in; SSH permits public-key authentication
+and opens its configured port only when `ssh.open-firewall` is enabled. Provision
+authorized public keys on the target in `~/.ssh/authorized_keys` or
+`/run/folio/authorized_keys/ACCOUNT`.
+
+```sh
+folio --system network status
+folio --system network connect CONNECTION_UUID INTERFACE
+folio --system network disconnect INTERFACE
+folio --system network proxy-mode rule
+folio --system network proxy-select DIRECT
+```
+
+These commands require system operator access. Connection commands use an existing
+NetworkManager profile; provision its credentials outside Folio desired data.
+Proxy actions use Mihomo's private Unix controller and return actual observations.
+Live proxy mode/selection are application state; they do not commit desired policy.
+Disabled services, missing profiles/nodes and backend failures return unavailable.
+The optional `proxy.provider-file` references a target-local YAML under `/run` or
+`/var/lib`; systemd loads it as a runtime credential. Evaluation and builds never
+read its contents. The proxy listener binds loopback; TUN is separately opt-in.
+
+System policy models locale/time sync, console, bounded journald storage, zstd
+zram and Nix build/store settings. Storage defaults describe a disposable guest.
+Physical configuration requires explicit stable root/EFI device paths and
+`prototype-password=false`; accounts then start with locked password hashes.
+No adapter partitions disks. The public `nixosModules.portable` exposes the same
+frozen composition as `nixosConfigurations.portable` for explicit integration.
+Physical storage boot, Wi-Fi, TUN, private provider nodes and NTP synchronization
+require separate target evidence.
 
 ## Operations and VM policy
 

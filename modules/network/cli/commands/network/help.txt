@@ -1,0 +1,5 @@
+Usage: folio --system network status|connect UUID INTERFACE|disconnect INTERFACE|proxy-mode MODE|proxy-select NODE
+Observe actual NetworkManager/Mihomo state or change an existing connection or live proxy mode.
+NODE selects a runtime provider node in the PROXY group. MODE is rule, direct or global. Connection credentials are provisioned outside Folio desired data.
+Requires the system network contribution and system operator access. These bounded actions do not
+commit desired settings. Missing backends/connections return unavailable (exit 3).
