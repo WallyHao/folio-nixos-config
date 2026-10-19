@@ -15,8 +15,11 @@ Config editor drafts and exports already use two-space indented JSON.
 This work changes the interface and introduces a durable cross-scope coordinator.
 Reuse working scoped workers, model normalization, atomic writes and GC roots.
 Do not rewrite module backends, directly activate from the CLI, or treat a database
-commit as activation. Keep Bash/jq/sysrepocfg clients and C/libsysrepo/libyang
-subscriptions. Root composition remains in modules/manager/src/outputs.nix.
+commit as activation. Implement the shared Python CLI/TUI project in
+modules/panel/; retain sysrepocfg transport as appropriate, C/libsysrepo/libyang
+subscriptions and existing fixed Shell runtime helpers. Root composition remains
+in modules/manager/src/outputs.nix. Frontend migration does not authorize a
+backend rewrite.
 
 The current machine may still run a retired installed target. Normal apply must
 not silently migrate hardware targets. Establish a supported bootstrap/version
@@ -33,6 +36,7 @@ Deliver only these everyday commands:
 folio --help
 folio help COMMAND
 folio --version
+folio panel
 folio status [CHANGE_ID]
 folio config show
 folio config edit
@@ -47,7 +51,8 @@ folio --json COMMAND
 
 No public plan/build/task-ID workflow, scope-selection flags, logs command,
 overview/tasks/diff/doctor/update/reset/cleanup, setting shortcuts or module
-enable/disable shortcuts. No new network/device/app/VM CLI design, TUI or GUI.
+enable/disable shortcuts. No new network/device/app/VM CLI design or GUI.
+Panel TUI design is tracked separately below; it is not implemented yet.
 Retain necessary low-level maintenance privately; removing everyday commands
 must not destroy recovery capabilities or historical immutable workers.
 
@@ -79,7 +84,9 @@ internal design questions.
 
 | Area | Owner/location | Responsibility |
 | --- | --- | --- |
-| Command routing/help/rendering | manager/cli/ | Public command parsing, editor, progress and final summaries |
+| Command routing/help/rendering | panel/cli/ | Shared Python project, CLI, editor, progress and Textual TUI |
+| Client protocol layer | panel/cli/ | Shared typed requests/results, errors and transport; no direct datastore writes |
+| Frontend packaging | panel/src/ | Nix packaging and lazy Textual loading for the CLI |
 | Change protocol | manager/model/ | Typed submissions, status/history, outcomes and versioning |
 | Coordinator | manager/runtime/ | Persistent orchestration, checkpoints, recovery and child references |
 | Privileged entry | manager/runtime/ | Fixed sudo submission and operation-bound root authorization |
@@ -87,8 +94,9 @@ internal design questions.
 | Behavioral tests | manager/tests/ | Scoped integration, authorization, faults and unified lifecycle |
 
 Paths are relative to modules/. Exact new filenames should follow existing local
-patterns. Do not create another CLI framework, nested Flake, host/home tree or
-parallel generic module action router. Update root README only after behavior
+patterns. Do not create a second Python project, nested Flake, host/home tree or
+parallel generic module action router. CLI/TUI share one panel project and client
+layer; capability backends remain with their owners. Update root README only after behavior
 exists. IMPLEMENT.md and TASK.md are the owner's requested planning exceptions.
 
 ## 4. Unified configuration document
@@ -283,6 +291,9 @@ performing a reboot or claiming the running kernel has changed.
 
 ## 10. User output and logs
 
+All authored CLI/TUI content is English: labels, help, prompts, errors, shortcuts
+and progress. Preserve Unicode user comments/data without forced translation.
+
 Default output should show scope decisions, comment, bounded phase progress,
 actual outcome, full change ID and useful follow-up commands. Do not show raw
 JSON as a successful human summary. Non-TTY output stays readable without live
@@ -310,7 +321,9 @@ All items start pending. Commit coherent passing milestones with explicit paths.
   handling and durable parent/child orchestration using existing scoped workers.
 - [ ] M5: implement standard-change rollback and partial/restart recovery.
 - [ ] M6: replace public help/routing with the minimal command set, add module
-  list/details and version output, update README and migrate old clients safely.
+  list/details and version output in the panel Python project, update README and
+  migrate old clients safely. Verify shared client contracts and no Textual load
+  for ordinary CLI invocations.
 - [ ] M7: run one integrated disposable lifecycle, record actual evidence and
   limitations, commit the delivered milestone and document safe installation.
 
@@ -360,3 +373,25 @@ scope-read permissions and history visibility; first rollout from old targets.
 Resolve these with code inspection and disposable prototypes. Seek clarification
 only for material product/security choices that existing authorization does not
 settle; do independent work meanwhile. No live-system rollout is part of this task.
+
+## 14. Panel TUI design direction (not implementation)
+
+Use `modules/panel/` for one Python project, with `folio` as the CLI entry and
+`folio panel` launching Textual. Keep Nix implementation under src/, client code
+under cli/ and behavioral tests under tests/. No scaffolding is needed before
+implementation. TUI uses the shared client layer; manager keeps all change and
+authorization ownership. Other modules keep domain execution.
+
+The owner selected English-only authored UI and bordered sections, superseding
+the earlier borderless preference. Use standard Textual borders/containers and
+widgets. Avoid excessive nesting, preserve clear keyboard focus, and test compact
+terminal sizes, resizing, keyboard input and asynchronous backend failure.
+
+Candidate pages are Overview, Settings, Network & Devices, History. Contents and
+save/apply behavior need detailed agreement before implementation. Runtime knobs
+must report actual effects; persistent settings enter the unified configuration
+and apply workflow. No direct sysrepo mutation, independent desired-state store,
+custom password capture or privileged UI process. CLI/TUI must share typed APIs
+without parsing each other's human output. Closing panel does not cancel accepted
+work. A separate bounded TUI milestone follows the core API work; no prototype or
+visual acceptance pass is claimed by these documents.

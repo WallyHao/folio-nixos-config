@@ -18,8 +18,14 @@ authorization/recovery design and acceptance matrix.
 - Keep logs, but provide their locations rather than a log-viewing CLI.
 - Keep plans, task IDs, scoped repositories and privileged workers internally.
   Unified interaction does not make separate backend effects atomic.
-- Keep Bash/jq/sysrepocfg adapters and C/libsysrepo/libyang backends. No language
-  rewrite, frontend framework or TUI implementation is included in this phase.
+- Implement CLI and TUI in one Python project owned by `modules/panel/`.
+  The entry is `folio`; `folio panel` opens the Textual TUI. Share a typed client
+  layer, not human-output parsing. Keep C/libsysrepo/libyang and existing Shell
+  backends; migrate frontend adapters without rewriting proven runtime logic.
+- All authored CLI/TUI labels, help, prompts, errors and progress are English.
+  User-entered comments and application data retain Unicode, including Chinese.
+- Use bordered TUI sections, visible keyboard focus and compact layout. This
+  supersedes the earlier borderless preference. TUI implementation remains planned.
 - Editor drafts and exported configuration use two-space indented JSON with a
   trailing newline. Canonical compact JSON remains internal to digests/transport;
   whitespace-only editing must not change configuration meaning.
@@ -34,6 +40,7 @@ change. Comments may be Chinese or English and need not be unique.
 | `folio --help` | Show the short command list and common edit/apply/history/rollback workflows |
 | `folio help COMMAND` | Explain a command, arguments, authorization requirements and examples |
 | `folio --version` | Show CLI version/build identity without contacting subscribers |
+| `folio panel` | Open the planned bordered English-language Textual settings/status interface |
 | `folio status` | Summarize configuration health, pending changes, current standard change and partial recovery state |
 | `folio status CHANGE_ID` | Show a change's comment, before/after references, step results, actual effects, rollback availability and log locations |
 | `folio config show` | Read the current desired configuration, clearly separating system/user ownership in the display |
@@ -132,8 +139,30 @@ operations, with protected recovery generations retained.
 
 Network, device, application and VM CLI design is deferred. System reboot/poweroff
 are not part of this minimal daily interface; use the operating system facilities.
-TUI/GUI work is deferred. This proposal does not remove existing implemented
-commands or disable their backend capabilities.
+TUI design is now in discussion under the panel module; implementation is not
+started. GUI work remains deferred. This proposal does not remove existing
+implemented commands or disable their backend capabilities.
+
+## Panel technology and interaction direction
+
+Use Python + Textual for layout, widgets, borders, keyboard/mouse input and
+background refresh. CLI imports must not eagerly load Textual. Package the single
+Python project through Nix, with no independent dependency lock or manual pip step.
+Panel owns navigation/rendering; capability modules retain their actual operations.
+Routine network/device controls in TUI do not require new public CLI commands.
+
+Candidate English pages: Overview, Settings, Network & Devices, History.
+Their exact contents are still proposals. Clearly distinguish immediate runtime
+controls from saved configuration awaiting unified apply. Reuse the same change,
+comment, authorization and rollback APIs. Never collect sudo passwords in a
+custom widget or run the entire TUI as root.
+
+Borders and layouts are built-in framework features; use standard containers and
+widgets rather than hand-drawing a terminal renderer. Verify focus, resize/small
+terminals, asynchronous failures and detached-task behavior before delivery.
+References: [borders](https://textual.textualize.io/styles/border/),
+[layout](https://textual.textualize.io/guide/layout/),
+[testing](https://textual.textualize.io/guide/testing/).
 
 ## Delivery order and verification
 
