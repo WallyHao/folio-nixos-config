@@ -1,0 +1,9 @@
+[project]
+name = "folio-panel"
+version = "0.1.0"
+description = "Folio CLI and terminal control panel"
+requires-python = ">=3.11"
+dependencies = ["textual>=8,<9"]
+
+[project.scripts]
+folio = "folio_panel.__main__:main"

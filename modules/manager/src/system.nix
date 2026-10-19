@@ -45,7 +45,7 @@ context:
       };
       users.groups.folio-builder = { };
       environment.systemPackages = [
-        client.cli
+        pkgs.folio.frontend
         runtime
       ];
       system.systemBuilderCommands =

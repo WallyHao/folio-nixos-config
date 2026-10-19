@@ -22,6 +22,7 @@ let
       cliSupport = catalogue.manager.packages.cli-support;
       configClient = catalogue.manager.packages.config-client;
       cli = catalogue.manager.packages.cli;
+      frontend = catalogue.panel.packages.cli;
       inputLanguage = catalogue.input.packages.indicator;
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
@@ -67,6 +68,13 @@ let
     emacs = import ../../emacs/default.nix { inherit pkgs lib; };
     codex = import ../../codex/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };
+    panel = import ../../panel/default.nix {
+      inherit pkgs;
+      legacyCli = catalogue.manager.packages.cli;
+      wifi = catalogue.network.packages.wifi;
+      devices = catalogue.devices.packages.panel;
+      repository = catalogue.sysrepo.packages.tools;
+    };
   };
   collection = catalogueLib.collect catalogue;
   targets = import ./targets.nix { inherit catalogue; };
@@ -177,7 +185,7 @@ in
 {
   packages.${system} = collection.packages // {
     manager-bootstrap = bootstrap;
-    folio = collection.packages.manager-cli;
+    folio = catalogue.panel.packages.cli;
   };
   nixosModules.portable = systemModule;
   nixosConfigurations.portable = portableSystem;
@@ -200,7 +208,7 @@ in
       collection.packages.sysrepo-tools
       collection.packages.manager-normalizer
       collection.packages.manager-input
-      collection.packages.manager-cli
+      catalogue.panel.packages.cli
       collection.packages.manager-runtime
     ];
     inputsFrom = [
@@ -209,6 +217,15 @@ in
     ];
   };
   checks.${system} = {
+    panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
+    panel-network = import ../../network/tests/panel.nix {
+      inherit pkgs bootstrap;
+      repository = catalogue.sysrepo.packages.tools;
+      subscriber = catalogue.network.packages.subscriber;
+      wifi = catalogue.network.packages.wifi;
+      devices = catalogue.devices.packages.panel;
+      panel = catalogue.panel.packages.cli;
+    };
     account-migration = import ../../system/tests/account-migration.nix {
       inherit pkgs;
       migration = catalogue.system.packages.migration;

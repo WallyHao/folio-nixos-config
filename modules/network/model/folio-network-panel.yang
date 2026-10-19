@@ -1,0 +1,21 @@
+module folio-network-panel {
+  yang-version 1.1;
+  namespace "urn:folio:network-panel";
+  prefix fnp;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "Network-owned private proxy inventory and bounded panel controls. No credentials are modeled.";
+  revision 2026-10-19 { description "Initial panel proxy operations."; }
+  rpc control {
+    input {
+      leaf action { type enumeration { enum proxy-groups; enum proxy-delay; enum proxy-group-select; } mandatory true; }
+      leaf node { when "../action != 'proxy-groups'"; type string { length '1..256'; pattern '[^\r\n]+'; } mandatory true; }
+      leaf group { when "../action = 'proxy-group-select'"; type string { length '1..256'; pattern '[^\r\n]+'; } mandatory true; }
+    }
+    output {
+      leaf status { type fe:result-status; mandatory true; }
+      leaf result-json { type string; }
+      leaf error { type string; }
+    }
+  }
+}

@@ -139,8 +139,9 @@ operations, with protected recovery generations retained.
 
 Network, device, application and VM CLI design is deferred. System reboot/poweroff
 are not part of this minimal daily interface; use the operating system facilities.
-TUI design is now in discussion under the panel module; implementation is not
-started. GUI work remains deferred. This proposal does not remove existing
+The first TUI implementation is in progress under the panel module; actual
+validation and remaining work are recorded in TASK.md. GUI work remains deferred.
+This proposal does not remove existing
 implemented commands or disable their backend capabilities.
 
 ## Panel technology and interaction direction

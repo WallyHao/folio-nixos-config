@@ -2,7 +2,7 @@
 let packages = import ./src/package.nix { inherit pkgs; };
 in {
   inherit packages;
-  models.system = [ ./model/folio-network.yang ];
+  models.system = [ ./model/folio-network.yang ./model/folio-network-panel.yang ];
   subscribers.system = [ "folio-network.service" ];
   commands.network = {
     path = "${packages.client}/bin/folio-network";

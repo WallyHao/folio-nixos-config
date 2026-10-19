@@ -730,6 +730,46 @@ JSON as authentication. System handlers use library/session identity and the
 provisioned access policy; they do not assume NETCONF/NACM is automatically in
 the direct sysrepocfg path.
 
+## Terminal panel
+
+Build the shared frontend and launch it as your desktop user:
+
+```sh
+nix build .#folio
+./result/bin/folio panel
+```
+
+The Python/Textual panel uses English labels and bordered pages. Wi-Fi opens
+first; Tab moves focus, arrows navigate lists or adjust sliders, Enter activates
+controls, `r` refreshes and `q` quits outside text inputs.
+
+- **Wi-Fi:** select an adapter, scan, connect to saved/new/hidden personal
+  networks, disconnect, toggle radio and confirm profile deletion. Open and
+  personal WPA networks are supported; enterprise and legacy authentication
+  are unavailable. Credentials travel to the native libnm client on stdin and
+  are saved by NetworkManager in a user-restricted connection, outside Folio data.
+- **Proxy:** inspect Mihomo selector groups, select nodes, change runtime mode
+  and run bounded sequential latency tests. Tests use a fixed public endpoint;
+  results describe that endpoint only. The system network subscriber mediates
+  access to the private controller; unavailable services remain unavailable.
+- **Display & Audio:** select the default output, adjust volume up to 100 percent,
+  toggle mute and adjust supported backlights. Output selection does not promise
+  migration of existing streams. External-monitor DDC/CI control is not included.
+- **Device:** observe CPU, memory, graphics drivers, connected displays, network
+  interfaces, OS, uptime and available batteries. Missing metrics are unavailable.
+
+Runtime controls act immediately and are outside configuration rollback. Native
+NetworkManager/PipeWire/backlight permissions apply; proxy access requires the
+system operator group. Do not launch the panel with sudo. Existing installations
+need the new `folio-network-panel` model through the documented paired schema
+upgrade and a matching subscriber; building the frontend alone does not install
+these services. Ordinary CLI commands still delegate to the existing manager;
+the proposed intelligent apply and unified history/rollback remain pending.
+
+Run `nix build --no-link .#checks.x86_64-linux.panel` for headless UI checks and
+`.#checks.x86_64-linux.panel-network` for isolated native backend integration.
+Hardware acceptance remains separate from these checks.
+
 ## CLI contract
 
 ```text

@@ -7,3 +7,5 @@
 *.raw
 *.log
 /.nixos-test-history
+__pycache__/
+.pytest_cache/

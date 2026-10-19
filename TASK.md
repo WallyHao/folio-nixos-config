@@ -538,9 +538,9 @@ Panel work depends on its typed client/authorization contracts, not completion o
 the entire manager history/rollback UI. It can be developed in bounded milestones
 without expanding the agreed everyday CLI command list.
 
-- [ ] P0: audit native APIs and existing network/devices backends; define missing
+- [x] P0: audit native APIs and existing network/devices backends; define missing
   typed operations, credential channel and permissions before writing controls.
-- [ ] P1: create the shared Python panel package and English bordered four-page
+- [x] P1: create the shared Python panel package and English bordered four-page
   shell, lazy TUI import, unavailable/error states and keyboard/resize behavior.
 - [ ] P2: implement Wi-Fi first: inventory/scan, saved/new/hidden connections,
   secrets, radio, disconnect and confirmed profile deletion.
@@ -568,5 +568,156 @@ without expanding the agreed everyday CLI command list.
 Use Textual headless tests for interaction, not as proof of real Wi-Fi, proxy,
 audio or backlight effects. Real backend integration and authorized hardware
 evidence are required for those claims. Do not disconnect the development host
-or alter its real saved profiles merely to run automated tests. This file records
-planned work only; no panel prototype or physical acceptance pass is claimed.
+or alter its real saved profiles merely to run automated tests. The implementation
+status and evidence below distinguish the prototype from completed acceptance.
+
+## 15. Historical pause handoff (2026-10-19)
+
+Work was paused at the owner's request at base commit `0e8e27d`. Implementation
+changes were uncommitted; no milestone was declared complete. No build, test
+driver or QEMU guest remained running. The development host was not activated,
+disconnected or subjected to audio, brightness or saved-profile mutations.
+
+### Implemented working tree
+
+- `modules/panel/`: shared Python/Textual package, `folio panel`, four English
+  bordered pages, Wi-Fi as the default page, confirmation/password dialogs,
+  keyboard controls, debounced sliders and bounded background operations.
+  Existing CLI commands still delegate to the manager CLI. Smart apply,
+  unified change history and rollback are not implemented by this prototype.
+- `modules/network/`: native libnm Wi-Fi helper with JSON stdin credentials;
+  Mihomo group, selection and delay operations through a new
+  `folio-network-panel` YANG RPC and the private controller socket.
+- `modules/devices/`: native audio/default-output and backlight controls,
+  plus observed device information. Unsupported controls report unavailable.
+- Manager composition installs the panel wrapper. Headless tests and an
+  isolated VM integration fixture cover the new interfaces. Production network
+  authorization has not been relaxed.
+
+### Validation evidence
+
+- Textual headless interaction tests: **5 passed**; see
+  `/tmp/folio-panel-ui-tests.log` and `/tmp/folio-panel-gate8.log`.
+- Frontend build passed; output and log are recorded in
+  `/tmp/folio-panel-final-path` and `/tmp/folio-panel-final-build.log`.
+- An earlier system build and configuration integration check passed; see
+  `/tmp/folio-panel-system-build.log`. These must be refreshed against the final
+  source after remaining fixes; they are not a completed release gate.
+- Latest isolated VM run passed real WPA Wi-Fi scan, new connection with DHCP,
+  disconnect, saved-profile reconnect, forget and radio toggling. Its regular-file
+  check found no fixture password in Folio repository/runtime data. This is
+  partial credential evidence, not full argv/log/export acceptance.
+- `git diff --check` passed before this handoff. UI screenshots in
+  `/tmp/folio-panel-*.svg` and `.png` use synthetic data, not physical acceptance.
+
+### Current blocker and unverified behavior
+
+The VM check fails at the first proxy RPC, before reaching proxy operations:
+
+```text
+/run/current-system/sw/bin/folio-repository: line 46:
+/var/lib/folio/repository.lock: Permission denied
+```
+
+The minimal fixture initializes the repository as root without reproducing the
+production operator-group provisioning. Inspect the repository wrapper and init
+contract, then fix fixture ownership/modes for `folio-operators`; do not bypass
+authorization or make repository state world-accessible. Evidence:
+`/tmp/folio-panel-gate8.log`.
+
+Proxy integration and real audio tests were **not reached**. Wrong-password and
+hidden-network paths, complete credential exposure checks, physical backlight
+behavior and final hardware acceptance remain pending. Existing installations
+also need the new YANG model and subscriber upgrade before panel RPCs can work.
+
+### Resume order and reproduction
+
+1. Review the working diff and fix the VM repository permission fixture.
+2. Run the isolated network/proxy/audio gate and fix observed backend failures:
+
+   ```sh
+   nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+     .#checks.x86_64-linux.panel-network .#checks.x86_64-linux.panel
+   ```
+
+3. Complete missing failure/security cases, then refresh affected package,
+   system and configuration checks against the final source.
+4. Update README and this acceptance record with actual results and limitations.
+   Review explicit paths before making an implementation commit. Physical
+   mutation tests require a separately authorized device/session.
+
+Temporary logs and screenshots are local evidence and are not tracked artifacts.
+
+## 16. Resumed prototype implementation (2026-10-19)
+
+This section supersedes section 15's blocker and progress. The owner requested
+implementation to resume. The four-page prototype and native module interfaces
+are implemented; physical acceptance and the separate unified CLI milestones
+remain outstanding. P0/P1 are complete. P2–P4 have implemented controls and guest
+evidence; their full acceptance matrix and P5 hardware gate are not complete.
+
+### Fixes and implementation boundaries
+
+- Reproduced production root/operator-group provisioning in the isolated VM.
+  This resolves the repository-lock permission failure without relaxing policy.
+- Closed Mihomo HTTP connections explicitly, matched the integration RPC timeout
+  to the frontend, and exercised the installed asynchronous client against real
+  sysrepo and the root subscriber.
+- Added wrong-password failure and hidden-network connection checks against a
+  real WPA access point in mac80211_hwsim. Expired activation requests attempt
+  bounded native cancellation; saved profiles remain available for explicit retry.
+- Cleared stale Wi-Fi/proxy/audio controls when services disappear, rendered
+  unsupported sliders as Unavailable, and rejected running the TUI as root.
+- Verified native default-output changes, volume and mute with actual PipeWire
+  null sinks; removed outputs become invalid selections. PipeWire may create a
+  fallback sink, so tests do not mistake it for a surviving removed output.
+- Added the frontend to the development shell. Existing manager CLI/backend
+  behavior is retained through delegation. README documents launch, permissions,
+  runtime/configuration separation and the paired model-upgrade requirement.
+
+### Evidence and reproduction
+
+The native controls gate passed in `/tmp/folio-panel-gate13.log`, including Wi-Fi,
+wrong-password/hidden-network behavior, real Mihomo controls and unavailable
+latency/backend states, denied operator access, and native audio/device checks.
+The final run in `/tmp/folio-panel-gate14.log` also **passed**, including six
+headless UI tests, credential absence from backend replies, Folio exports,
+relevant service journals and frontend files, and adapter-disappearance UI
+coverage. Native connection permissions and root-owned mode-0600 credential
+files were checked. All test guests shut down after completion.
+
+Final check outputs:
+`/nix/store/6a1cq860rchqsjzhvbpdav5z7p7vwic4-vm-test-run-folio-panel-native-controls`
+and `/nix/store/14qnghc278sk9hivk9gcjlm2lcr3hsxx-folio-panel-interaction-tests`.
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.panel-network .#checks.x86_64-linux.panel
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
+  .#nixosConfigurations.folio.config.system.build.toplevel \
+  .#checks.x86_64-linux.configuration .#checks.x86_64-linux.catalogue
+git diff --check
+```
+
+The second build command passed against the current implementation:
+`/tmp/folio-panel-final-system2.log`. Its system output is
+`/nix/store/jfhdshb2dbhn7f12fx4q80g1yzb8y6wi-nixos-system-sylphy-portable-26.11.20261011.7fd4004`.
+Python source passes Ruff checks and formatting. Headless tests verify interaction
+only; native guest checks use disposable credentials, a real NetworkManager/WPA
+stack, Mihomo and PipeWire, not physical peripherals.
+
+### Remaining acceptance and next work
+
+1. Verify physical Wi-Fi/native authorization and audio in an appropriate desktop
+   session, plus a supported real backlight where available. No development-host
+   activation or live hardware mutation has been performed in this implementation.
+2. Complete positive external-node latency and bounded bulk-stop acceptance with
+   an authorized provider; current native evidence covers actual node selection
+   and failed/unavailable latency, not performance of a real provider.
+3. Extend hotplug and credential checks as needed: the UI covers adapter/backend
+   disappearance; physical hotplug, live process-argument inspection and the full
+   snapshot/security matrix are not established by the current guest evidence.
+4. Existing installations need paired schema/subscriber deployment. Do not bypass
+   repository model-identity checks or initialize over a live older repository.
+5. Resume M0–M7 separately for intelligent apply, standard changes/comments,
+   unified configuration/history and rollback. They are not shipped by this panel.

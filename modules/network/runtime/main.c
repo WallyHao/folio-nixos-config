@@ -99,6 +99,7 @@ int main(void)
     int code = sr_connect(0, &connection);
     if (!code) code = sr_session_start(connection, SR_DS_RUNNING, &session);
     if (!code) code = sr_rpc_subscribe_tree(session, "/folio-network:execute", execute, NULL, 0, 0, &subscription);
+    if (!code) code = sr_rpc_subscribe_tree(session, "/folio-network-panel:control", execute, NULL, 0, 0, &subscription);
     if (!code) {
         signal(SIGINT, stop); signal(SIGTERM, stop);
         fprintf(stderr, "Folio network subscriptions ready\n");

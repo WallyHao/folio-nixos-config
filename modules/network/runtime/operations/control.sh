@@ -39,6 +39,9 @@ if [[ "$action" != status ]]; then
   exec 9>/run/folio/network/control.lock
   flock -x -w 2 9 || reply conflict null 'Network controls are busy'
   case "$action" in
+    proxy-groups|proxy-delay|proxy-group-select)
+      @proxyTool@ <"$work/request.json"
+      exit ;;
     connect|disconnect)
       interface=$(jq -er '.interface | select(type=="string")' "$work/request.json")
       [[ "$interface" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}$ ]] || reply invalid null 'Invalid interface'

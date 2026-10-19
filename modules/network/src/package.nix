@@ -1,9 +1,22 @@
 { pkgs }:
 let
+  proxy = pkgs.writeShellApplication {
+    name = "folio-network-proxy";
+    text = "exec ${pkgs.python3}/bin/python3 ${../runtime/operations/proxy.py}";
+  };
+  wifiPython = pkgs.python3.withPackages (p: [ p.pygobject3 ]);
+  wifi = pkgs.writeShellApplication {
+    name = "folio-network-wifi";
+    text = ''
+      export GI_TYPELIB_PATH="${pkgs.networkmanager}/lib/girepository-1.0''${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
+      exec ${wifiPython}/bin/python3 ${../cli/wifi.py}
+    '';
+  };
   tools = pkgs.writeShellApplication {
     name = "folio-network-control";
     runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.networkmanager pkgs.curl ];
-    text = builtins.readFile ../runtime/operations/control.sh;
+    text = builtins.replaceStrings [ "@proxyTool@" ] [ "${proxy}/bin/folio-network-proxy" ]
+      (builtins.readFile ../runtime/operations/control.sh);
   };
   subscriber = pkgs.stdenv.mkDerivation {
     pname = "folio-network-subscriber";
@@ -27,4 +40,4 @@ let
       builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/network/request.jq}" ]
         (builtins.readFile ../cli/commands/network/command.sh);
   };
-in { inherit tools subscriber client; }
+in { inherit tools subscriber client wifi; }

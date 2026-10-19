@@ -1,5 +1,10 @@
 { pkgs }:
 let
+  panel = pkgs.writeShellApplication {
+    name = "folio-devices-panel";
+    runtimeInputs = [ pkgs.pulseaudio pkgs.wireplumber pkgs.brightnessctl pkgs.pciutils ];
+    text = "exec ${pkgs.python3}/bin/python3 ${../cli/panel.py}";
+  };
   tools = pkgs.writeShellApplication {
     name = "folio-devices-control";
     runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.systemd pkgs.pulseaudio
@@ -28,4 +33,4 @@ let
       builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/devices/request.jq}" ]
         (builtins.readFile ../cli/commands/devices/command.sh);
   };
-in { inherit tools subscriber client; }
+in { inherit tools subscriber client panel; }
