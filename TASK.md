@@ -374,7 +374,7 @@ Resolve these with code inspection and disposable prototypes. Seek clarification
 only for material product/security choices that existing authorization does not
 settle; do independent work meanwhile. No live-system rollout is part of this task.
 
-## 14. Panel TUI design direction (not implementation)
+## 14. Panel TUI implementation plan (pending)
 
 Use `modules/panel/` for one Python project, with `folio` as the CLI entry and
 `folio panel` launching Textual. Keep Nix implementation under src/, client code
@@ -387,11 +387,186 @@ the earlier borderless preference. Use standard Textual borders/containers and
 widgets. Avoid excessive nesting, preserve clear keyboard focus, and test compact
 terminal sizes, resizing, keyboard input and asynchronous backend failure.
 
-Candidate pages are Overview, Settings, Network & Devices, History. Contents and
-save/apply behavior need detailed agreement before implementation. Runtime knobs
-must report actual effects; persistent settings enter the unified configuration
-and apply workflow. No direct sysrepo mutation, independent desired-state store,
-custom password capture or privileged UI process. CLI/TUI must share typed APIs
-without parsing each other's human output. Closing panel does not cancel accepted
-work. A separate bounded TUI milestone follows the core API work; no prototype or
-visual acceptance pass is claimed by these documents.
+The owner's priority is routine connectivity and device control. The first
+release has exactly four English pages, in this order:
+
+| Page | Priority | Purpose |
+| --- | --- | --- |
+| Wi-Fi | First; default landing page | Scan, select, connect and manage saved wireless networks |
+| Proxy | Second | Observe Mihomo and select/test existing nodes and runtime mode |
+| Display & Audio | Third | Adjust supported backlight, output volume, mute and default output device |
+| Device | Fourth | Read the actual current machine's identity, hardware and runtime information |
+
+This supersedes Overview/Settings/Network & Devices/History. Do not implement
+generic configuration editing, apply, change-history or rollback pages in this
+first panel release; those remain CLI workflows. No app-management or VM pages.
+
+### 14.1 Shared interaction and module boundaries
+
+- Use visible tab navigation and bordered sections, with one clear primary action
+  per selection. Keyboard operation must work without a mouse. Preserve focus
+  across refreshes and avoid excessive nested borders.
+- Every authored label, hint, error and status is English. SSIDs, node names,
+  device names and other user/external data preserve Unicode without translation.
+  Escape terminal controls and disable markup interpretation of external strings.
+- Show observed state, loading, unavailable, authorization failure and backend
+  failure distinctly. Refresh on active pages without blocking input; do not
+  fabricate availability from enabled configuration or replace errors with zeros.
+- Runtime controls act immediately after applicable authorization/confirmation;
+  verify the observed result. No Nix build, standard-change comment or global
+  Apply button. Runtime selections are outside configuration rollback.
+- Saved Wi-Fi profiles are NetworkManager-managed operational data. Mihomo's
+  stored node selection is application state. Neither creates a second Folio
+  desired-configuration authority or enters immutable builds/history snapshots.
+- Panel remains unprivileged. Typed clients call network/devices-owned APIs;
+  extend those backends where capabilities are missing. No direct sysrepo edits,
+  shell-interpolated requests, arbitrary privileged command execution or parsing
+  human CLI output. A new public network/device CLI is not required.
+- Do not collect sudo passwords in widgets. Wi-Fi password entry is a distinct
+  feature: send network secrets only through an explicitly designed secure
+  NetworkManager credential path, as described below.
+- Bound background work, stale results and refresh frequency. On close, cancel
+  UI polling/probes; do not imply a submitted native connection/control operation
+  was canceled. On reopen, query actual backend state.
+
+### 14.2 Wi-Fi page
+
+Display adapter selection when multiple wireless adapters exist, Wi-Fi radio
+state, current SSID/connectivity, signal strength and assigned IP information.
+List nearby networks with SSID, signal, security and saved/connected markers.
+Track stable adapter/AP/profile identities; duplicate SSIDs must not cause an
+operation on an unrelated saved profile or access point after list refresh.
+
+Actions:
+
+1. Wi-Fi radio on/off, with observed software/hardware block explanations.
+2. **Refresh**: bounded scan of the selected adapter; entering the page can request
+   an initial scan. Do not repeatedly scan on every UI redraw.
+3. **Connect**: reuse a compatible saved profile/credential when available.
+4. For a new supported personal network, ask for a masked password with an
+   explicit show/hide toggle; provide open-network handling without a password.
+5. **Disconnect**: disconnect the selected active connection; explain connectivity
+   loss and confirm when it can disrupt the current session.
+6. **Forget Network**: confirm before deleting the specifically selected saved
+   profile. Make any active-connection impact explicit.
+7. **Hidden Network**: enter SSID and supported security/credential details.
+
+Show Connecting, Connected, Failed and Disconnected from native results. Keep a
+usable retry path for wrong credentials, disappearing APs and timeouts. Missing
+wireless hardware displays **No Wi-Fi Adapter**, not an empty successful scan.
+Do not promise Internet access solely because association or IP assignment worked.
+
+First-release authentication scope: open networks and supported WPA personal
+networks. Enterprise/802.1X, certificate enrollment and captive-portal login are
+deferred; recognize them and explain unsupported authentication. Check supported
+security modes against the pinned NetworkManager APIs before exposing choices.
+
+Credential design is a prerequisite: use NetworkManager's native secret-agent/
+credential mechanisms, with a narrow authenticated channel and explicit storage
+policy. No passwords in argv, environment variables, normal RPC diagnostics,
+temporary configuration files, Folio desired data, change records or Nix store.
+Keep UI secret buffers short-lived and clear them when forms close. Do not claim
+perfect memory erasure in Python. Test log/snapshot exclusion using disposable
+credentials. No manual reading or copying of existing real network secrets.
+
+Existing network backend covers observations and activation of existing UUIDs;
+scan/radio/profile creation/forget/secret handling require real new capabilities.
+Choose pinned libnm/D-Bus/native integration through network-owned resources;
+do not implement connection management inside generic manager callbacks.
+
+### 14.3 Proxy page
+
+Display actual Mihomo availability, runtime Rule/Global/Direct mode, proxy groups,
+selected group/node and available nodes. Support existing selectable groups while
+clearly identifying the owned default PROXY group; do not assume every returned
+group permits manual selection. Keep node identity separate from display markup.
+
+Actions: **Refresh**, **Select Node**, runtime mode selection, **Test Latency** for
+one node and **Test All** for the selected group's eligible nodes. Verify mode/node
+changes through fresh observations; do not modify desired policy or provider files.
+
+Delay tests use an explicit module-owned test target, timeouts and bounded
+concurrency. Do not start bulk tests automatically on every page visit/refresh.
+Associate results with node identity and test time. Show **Not Tested**,
+**Testing**, measured milliseconds, **Timeout** and other errors separately.
+Latency is reachability to that test target, not universal Internet health.
+
+Use the existing private Unix controller through the network backend; do not
+expose an unauthenticated TCP controller or weaken socket permissions. Extend
+network-owned typed operations for node/group inventory and delay tests. Show
+useful disabled states for stopped Mihomo, missing providers and stale nodes.
+Subscription import/edit/refresh policy and rule editing are deferred.
+
+### 14.4 Display & Audio page
+
+Audio: display available output devices, current default, volume percent and mute.
+Provide default-output selection, volume slider/keyboard adjustments and mute.
+Clearly define volume/mute as applying to the currently selected default output.
+Switching default output must not promise migration of existing streams unless
+the backend explicitly implements and verifies that behavior.
+
+Brightness: list supported backlight devices when needed, show actual percentage,
+and support slider/keyboard adjustment. Missing backlight on a desktop/external
+display shows a reason and disabled control. DDC/CI monitor brightness requires
+separate capability/permission testing and is not silently included in this release.
+
+Debounce/coalesce slider requests, bound changes and verify returned state; do not
+spawn a backend process for every pointer event. Avoid increasing audio volume
+past the supported 100-percent limit. Handle device disappearance and unavailable
+PipeWire/backlight permissions without losing navigation.
+
+Reuse device-owned volume/mute/brightness operations; add output enumeration and
+default-output selection there. Do not persist live sliders as Folio desired data.
+
+### 14.5 Device page
+
+Read-only information: machine/vendor/model, CPU, memory capacity/current usage,
+GPU models and active drivers, connected display outputs, network/audio adapters,
+OS/kernel version, uptime and installed Folio target. Show battery state when
+present; omit battery-only sections on machines without a battery.
+
+GPU utilization/temperature is optional only when a supported native query is
+available. Missing metrics are **Unavailable**, not inferred from configuration.
+Keep discovered PCI/DRM IDs tied to actual devices; do not hardcode card numbers.
+Use devices-owned observation APIs and public manager metadata where appropriate.
+Refresh expensive metrics only while visible and with bounded native calls.
+Do not expose hardware editing, disk writes or reboot controls here.
+
+### 14.6 Ordered panel milestones
+
+Panel work depends on its typed client/authorization contracts, not completion of
+the entire manager history/rollback UI. It can be developed in bounded milestones
+without expanding the agreed everyday CLI command list.
+
+- [ ] P0: audit native APIs and existing network/devices backends; define missing
+  typed operations, credential channel and permissions before writing controls.
+- [ ] P1: create the shared Python panel package and English bordered four-page
+  shell, lazy TUI import, unavailable/error states and keyboard/resize behavior.
+- [ ] P2: implement Wi-Fi first: inventory/scan, saved/new/hidden connections,
+  secrets, radio, disconnect and confirmed profile deletion.
+- [ ] P3: implement Mihomo inventory, group/node selection, runtime modes and
+  bounded latency tests, including unavailable and stale-node handling.
+- [ ] P4: implement audio output selection/volume/mute and available backlights;
+  add the read-only device page with capability-dependent metrics.
+- [ ] P5: run backend integration and headless UI tests, then bounded real-device
+  acceptance on named authorized machines; update README and record limitations.
+
+### 14.7 Panel acceptance requirements
+
+| Area | Required evidence |
+| --- | --- |
+| Wi-Fi | Real scan, saved and new personal-network connection, wrong-password failure, hidden SSID, radio, confirmed forget and adapter disappearance |
+| Credentials | Disposable secret absent from logs, argv, exports, snapshots and store outputs; native credential storage policy verified |
+| Proxy | Actual group/node inventory and selection, runtime mode changes, measured/timeout states, stopped backend and bounded bulk tests |
+| Audio | Actual default-output change, volume/mute observations and disconnected-output handling |
+| Brightness | Actual supported backlight change or explicit unavailable evidence; desktop slider never pretends to work |
+| Device | Observations match actual adapters/drivers; missing sensors/battery are represented accurately |
+| UI | English authored strings, Unicode external names, borders/focus, keyboard-only navigation, resize, busy/error states and stale-response handling |
+| Permissions | Unprivileged UI, denied operations fail before effects, no controller permission weakening or secret exposure |
+| Configuration separation | Runtime actions do not mutate Folio desired data or trigger apply/build/standard-change comments |
+
+Use Textual headless tests for interaction, not as proof of real Wi-Fi, proxy,
+audio or backlight effects. Real backend integration and authorized hardware
+evidence are required for those claims. Do not disconnect the development host
+or alter its real saved profiles merely to run automated tests. This file records
+planned work only; no panel prototype or physical acceptance pass is claimed.

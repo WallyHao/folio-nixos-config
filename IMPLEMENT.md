@@ -151,11 +151,15 @@ Python project through Nix, with no independent dependency lock or manual pip st
 Panel owns navigation/rendering; capability modules retain their actual operations.
 Routine network/device controls in TUI do not require new public CLI commands.
 
-Candidate English pages: Overview, Settings, Network & Devices, History.
-Their exact contents are still proposals. Clearly distinguish immediate runtime
-controls from saved configuration awaiting unified apply. Reuse the same change,
-comment, authorization and rollback APIs. Never collect sudo passwords in a
-custom widget or run the entire TUI as root.
+The owner selected four English pages: Wi-Fi (default), Proxy, Display & Audio,
+Device. Wi-Fi selection/setup is the highest priority, followed by Mihomo node
+status/selection, brightness/audio controls and actual device information.
+Detailed operations, backend gaps and acceptance requirements are in TASK.md
+section 14. The previous Overview/Settings/History panel proposal is superseded.
+Generic configuration/apply/history/rollback stays in CLI for the first release.
+Runtime panel controls do not trigger Nix builds or standard-change comments.
+Wi-Fi credentials use a dedicated native credential path, never Folio snapshots.
+Never collect sudo passwords in a custom widget or run the entire TUI as root.
 
 Borders and layouts are built-in framework features; use standard containers and
 widgets rather than hand-drawing a terminal renderer. Verify focus, resize/small
