@@ -721,3 +721,75 @@ stack, Mihomo and PipeWire, not physical peripherals.
    repository model-identity checks or initialize over a live older repository.
 5. Resume M0–M7 separately for intelligent apply, standard changes/comments,
    unified configuration/history and rollback. They are not shipped by this panel.
+
+## 17. Agents capability and terminal-owned Git (2026-10-19)
+
+Owner request: replace the standalone `codex` module with `agents`, choose the
+official DeepSeek Harness, and consolidate Git/GitHub CLI into `terminal`.
+
+### Delivered structure and configuration
+
+- `modules/agents/` owns `folio-agents`, Codex packaging/theme/completion and the
+  official dsh package. `folio-agents:agents.codex` has independent `enabled`,
+  `theme` and `shell-completion` switches; `.dsh.enabled` selects dsh.
+- dsh is pinned to `0.2.1-rc.2`; `src/dsh/package-lock.json` pins dependencies.
+  Nix builds node-pty and Sharp against Nix libraries, fixes native library paths
+  and provides Node/pnpm for plugin operations. An explicit Node internal-module
+  path replaces upstream machine-code probing, which fails with Nix's Node build.
+  No install-time network scripts, mutable profile templates, tokens or sessions
+  are embedded in managed user configuration.
+- `folio-terminal:terminal.git` owns Git enablement, identity, branch/pull
+  preferences and optional GitHub CLI. The standalone `modules/git/` and
+  `modules/codex/` directories and catalogue selections are removed.
+- Fresh defaults select `agents` with Codex and dsh enabled. Existing migrated
+  selections retain their previous enabled/disabled state; dsh starts disabled
+  until selected. Disabling `terminal.git` leaves the terminal selection intact.
+
+### Upgrade and preservation contract
+
+`folio-codex` becomes `folio-agents`; `folio-git` is absorbed by the new
+`folio-terminal` revision `2026-10-22`. Original models remain byte-identical in
+the owning modules' schema-history exports. Terminal revision `2026-10-21` is
+archived so its existing migration hash does not change retroactively.
+
+Repository maintenance now accepts an explicit hash-bound `toModule` replacement
+declaration. Unknown removal, missing replacement models, stale hashes, ambiguous
+edges and invalid revision progression fail before installation. Each migrated
+document is validated against the target models. Conflicting old/new settings
+and enabled legacy Git with a disabled terminal fail instead of overwriting data.
+Retained rollback restores the complete previous model/data identity.
+
+Codex/dsh authentication and sessions, GitHub credentials, repository-local Git
+settings, notes and other private state remain application owned. No host
+activation, live repository migration or external model request was performed.
+
+### Validation and reproduction
+
+The real isolated model replacement/retained restore check passed, including a
+wrong-source-hash rejection with unchanged live data:
+`/tmp/folio-agents-migration-final.log`, output
+`/nix/store/i4y77mi0mx2v9qkh89f478gifm7q79qv-vm-test-run-folio-agents-terminal-migration`.
+The final package/profile gate **passed** in `/tmp/folio-agents-final-gate.log`:
+agents startup/native/plugin-manager checks, real profile delivery/removal of
+Codex/dsh and terminal-owned Git, private-state preservation, developer tools,
+foundation, configuration integration, catalogue and the physical-target system
+build. All guests shut down after completion. Notable outputs:
+
+- Agents runtime: `/nix/store/a1wcq25m4ycmhi0synf6bfrqc1jb2k3v-folio-agents-runtime`.
+- Profile lifecycle: `/nix/store/3b6afmvmci54rrfkwl70v095bbdw7rcy-vm-test-run-folio-tools-deployment`.
+- System build: `/nix/store/xq5psb7ppqnfswa68fykjh2ic6wj3h22-nixos-system-sylphy-portable-26.11.20261011.7fd4004`.
+
+```sh
+nix build --no-link --no-update-lock-file --keep-going --max-jobs 2 --print-out-paths -L \
+  .#checks.x86_64-linux.agents .#checks.x86_64-linux.agents-migration \
+  .#checks.x86_64-linux.tools .#checks.x86_64-linux.tools-deployment \
+  .#checks.x86_64-linux.foundation .#checks.x86_64-linux.configuration \
+  .#checks.x86_64-linux.catalogue \
+  .#nixosConfigurations.folio.config.system.build.toplevel
+git diff --check
+```
+
+The agents runtime check exercises headless profile startup, native PTY/FFI/image
+library loading, plugin-manager availability and migration selection/conflict
+cases without credentials. DeepSeek inference and arbitrary third-party plugin
+compatibility require separate runtime evidence and are not claimed by this gate.

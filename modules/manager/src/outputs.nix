@@ -64,9 +64,8 @@ let
     devices = import ../../devices/default.nix { inherit pkgs lib; };
     appearance = import ../../appearance/default.nix { inherit pkgs lib; };
     input = import ../../input/default.nix { inherit pkgs lib; };
-    git = import ../../git/default.nix { inherit pkgs lib; };
     emacs = import ../../emacs/default.nix { inherit pkgs lib; };
-    codex = import ../../codex/default.nix { inherit pkgs lib; };
+    agents = import ../../agents/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };
     panel = import ../../panel/default.nix {
       inherit pkgs;
@@ -217,6 +216,17 @@ in
     ];
   };
   checks.${system} = {
+    agents = import ../../agents/tests/runtime.nix {
+      inherit pkgs bootstrap;
+      dsh = catalogue.agents.packages.dsh;
+    };
+    agents-migration = import ../../agents/tests/migration.nix {
+      inherit pkgs bootstrap;
+      repository = catalogue.sysrepo.packages.tools;
+      maintenance = catalogue.sysrepo.packages.maintenance;
+      agentsHistory = catalogue.agents.packages.schema-history;
+      terminalHistory = catalogue.terminal.packages.schema-history;
+    };
     panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
     panel-network = import ../../network/tests/panel.nix {
       inherit pkgs bootstrap;
@@ -327,7 +337,7 @@ in
       inherit pkgs inputs bootstrap;
       generation = userHome.activationPackage;
       editor = catalogue.emacs.packages.editor;
-      codex = catalogue.codex.packages.application;
+      codex = catalogue.agents.packages.codex;
     };
     catalogue = import ../tests/catalogue.nix { inherit pkgs catalogueLib; };
     foundation = import ../../sysrepo/tests/foundation.nix {

@@ -6,6 +6,7 @@ module folio-terminal {
 
   organization "Folio";
   description "Terminal-owned settings, initially the user Foot contribution.";
+  revision 2026-10-22 { description "Move Git and GitHub CLI preferences into the terminal capability."; }
   revision 2026-10-21 { description "Add independently selectable shell and terminal utilities."; }
   revision 2026-10-20 { description "Express background opacity as a unit fraction instead of a percentage."; }
   revision 2026-10-19 { description "Add configurable background opacity in percent."; }
@@ -15,6 +16,15 @@ module folio-terminal {
     when "fe:name = 'terminal'";
     container terminal {
       presence "Terminal settings are supplied.";
+      container git {
+        when "../../../fe:scope = 'user'";
+        leaf enabled { type boolean; default true; }
+        leaf user-name { type string { length '1..256'; pattern '[^\r\n]+'; } }
+        leaf user-email { type string { length '3..256'; pattern '[^\r\n]+'; } }
+        leaf github-cli { type boolean; default true; }
+        leaf default-branch { type string { pattern '[a-zA-Z][a-zA-Z0-9_/-]*'; } default main; }
+        leaf pull-rebase { type boolean; default true; }
+      }
       container shell {
         leaf enabled { type boolean; default true; }
         leaf prompt { type enumeration { enum simple; enum powerlevel10k; } default powerlevel10k; }

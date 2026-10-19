@@ -1,6 +1,6 @@
 { pkgs, lib }:
 context:
-let settings = context.settings."folio-git:git" or { };
+let settings = context.settings."folio-terminal:terminal".git or { };
 in {
   programs.git = {
     enable = true;

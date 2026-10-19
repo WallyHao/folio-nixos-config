@@ -551,10 +551,9 @@ System and user module selections are separate. Defaults are:
 | desktop | Niri session availability and portal prerequisites | Niri preferences, Waybar, Mako, launcher and clipboard |
 | appearance | System/console appearance where applicable | Fonts, cursor, GTK and shared resources |
 | input | Required input infrastructure where applicable | Fcitx5/Rime configuration and session integration |
-| terminal | Login shell registration | Foot, Zsh, prompt, tools and Typst |
-| git | None by default | Git/GitHub CLI |
+| terminal | Login shell registration | Foot, Zsh, prompt, tools, Typst and Git/GitHub CLI |
 | emacs | None | Emacs, Org, Org-roam |
-| codex | None | Codex |
+| agents | None | Codex and optional DeepSeek Harness |
 | applications | Flatpak support | Flatpak apps and their configuration |
 
 The concrete adapter owns the NixOS/Home Manager options. In particular, audio
@@ -990,9 +989,11 @@ unrar package is allowed by the unfree predicate. Zsh history/cache are writable
 per-user state. The system terminal contribution registers Zsh; changing a user's
 login shell still requires an explicit system account `login-shell` selection.
 
-`git` installs Git and optional GitHub CLI, defaults new repositories to `main`,
-and enables rebasing pulls. Set `folio-git:git.user-name` and `.user-email` in the
-user configuration; no personal identity, signing key or token is supplied.
+`terminal` also owns Git and optional GitHub CLI through
+`folio-terminal:terminal.git`. Git defaults new repositories to `main` and enables
+rebasing pulls. Set `.git.user-name` and `.git.user-email` in the terminal settings;
+no personal identity, signing key or token is supplied. `.git.enabled=false`
+removes only Git/GitHub CLI's managed contribution while keeping the terminal.
 
 `emacs` provides Org/Org-roam, backlinks, search/completion, the dashboard and
 Everforest preferences. `C-c n f` finds notes, `C-c n b` shows backlinks and
@@ -1001,13 +1002,37 @@ Everforest preferences. `C-c n f` finds notes, `C-c n b` shows backlinks and
 index and editor history stay in `$XDG_STATE_HOME/folio/emacs`. Optional personal
 additions live in `~/.config/folio/emacs/local.el`, which Folio does not manage.
 
-`codex` installs the pinned CLI, Zsh completion and a selectable Folio `.tmTheme`.
+`agents` groups independently selectable coding clients under
+`folio-agents:agents`. `.codex.enabled`, `.codex.theme` and
+`.codex.shell-completion` control the pinned Codex CLI, Zsh completion and
+a selectable Folio `.tmTheme`.
 Choose it with `/theme`; theme loading follows the
 [official Codex customization interface](https://learn.chatgpt.com/docs/cli-customization).
 Mutable Codex configuration, authentication and session state remain application
-owned. GitHub/Codex authentication requires the target user's own setup. Disabling
+owned. `.dsh.enabled` installs the official DeepSeek Harness, pinned to
+`0.2.1-rc.2` with a complete npm dependency lock. New default configurations enable
+both clients. Run `dsh web` or `dsh headless --help`; model credentials, profiles,
+plugins and sessions remain under the harness's own runtime management. Folio
+does not write API keys or replace mutable agent settings. The Nix package builds
+node-pty and Sharp against Nix libraries, patches native-library paths for NixOS, and uses Node's
+`--expose-internals` path instead of probing the machine code of a distro-built
+Node binary. This compatibility adjustment preserves the harness's plugin loader.
+
+GitHub/Codex/DeepSeek authentication requires the target user's own setup. Disabling
 a module removes its managed files while preserving repositories, notes, indexes
 and personal application data.
+
+The former standalone `git` and `codex` modules are retired. Their original YANG
+files remain only as hash-bound migration history in their new owning modules.
+Use paired schema maintenance when upgrading an existing repository; an ordinary
+configuration import cannot rename installed schemas. Migration moves Codex
+preferences to `agents.codex` and Git identity/preferences to `terminal.git`,
+preserves enabled/disabled choices and leaves dsh disabled for migrated users
+until explicitly selected. Fresh defaults enable dsh. Conflicting old/new agent
+settings, conflicting Git settings, or enabled Git with a disabled terminal fail
+explicitly rather than overriding preferences. Retained rollback restores the
+complete older model/data identity. Authentication, sessions and repository-local
+Git settings are outside these transforms.
 
 Use `folio config export desired.json`, edit the owning module settings, then
 `folio config import desired.json` and the plan/build/apply workflow above. A

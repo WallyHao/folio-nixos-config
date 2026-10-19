@@ -43,9 +43,8 @@
         [
           { name = "appearance"; enabled = true; }
           { name = "input"; enabled = true; }
-          { name = "git"; enabled = true; }
           { name = "emacs"; enabled = true; }
-          { name = "codex"; enabled = true; }
+          { name = "agents"; enabled = true; "folio-agents:agents".dsh.enabled = true; }
           { name = "desktop"; enabled = true; }
           { name = "devices"; enabled = true; }
           {

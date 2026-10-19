@@ -6,6 +6,7 @@ let
   foot = settings.foot or { };
   shell = settings.shell or { };
   tools = settings.tools or { };
+  git = settings.git or { };
   selected = name: tools.${name} or true;
   theme.colors = (builtins.fromJSON (builtins.readFile ./colors.json)) // { appearance = context.globals.appearance; };
   palette = theme.colors.palettes.${theme.colors.appearance};
@@ -28,6 +29,8 @@ let
     header = palette.grey1; border = palette.grey0; };
   colorFlags = lib.concatStringsSep "," (lib.mapAttrsToList (key: value: "${key}:${value}") colors);
 in { config, ... }: {
+  imports = lib.optional (git.enabled or true)
+    ((import ./git.nix { inherit pkgs lib; }) context);
   home.packages = lib.optionals (foot.enabled or true) [ pkgs.foot pkgs.maple-mono.NF-CN ]
     ++ lib.mapAttrsToList (_: value: value) (lib.filterAttrs (name: _: selected name) toolPackages);
   xdg.configFile."foot/foot.ini" = lib.mkIf (foot.enabled or true) {

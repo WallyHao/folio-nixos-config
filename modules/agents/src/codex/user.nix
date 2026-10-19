@@ -1,7 +1,7 @@
 { pkgs, lib, package }:
 context:
 let
-  settings = context.settings."folio-codex:codex" or { };
+  settings = context.settings.codex or { };
   theme.colors = (builtins.fromJSON (builtins.readFile ./colors.json)) // { appearance = context.globals.appearance; };
   completion = pkgs.runCommand "folio-codex-zsh-completion" { } ''
     mkdir -p $out/share/zsh/site-functions

@@ -118,21 +118,34 @@ candidate_command() {
     else "$@"; fi)
 }
 migrate_document() {
-  local document=$1 old target entry name from to hash target_hash transform count hop next_revision
+  local document=$1 old target entry name target_name from to hash target_hash transform count hop next_revision next_name
   cp "$document" "$work/migrating.json"
   while IFS= read -r old; do
     name=$(jq -er .name <<<"$old")
     from=$(jq -er .revision <<<"$old"); hash=$(jq -er .sha256 <<<"$old")
-    target=$(jq -ce --arg name "$name" '.[] | select(.name==$name)' "$backup/new-models.json") ||
-      emit unavailable 'Removing a model requires an explicit supported migration' 3
+    target_name=$name
+    if ! target=$(jq -ce --arg name "$name" '.[] | select(.name==$name)' "$backup/new-models.json"); then
+      # Model retirement requires an exact, hash-bound replacement declaration.
+      # Never silently drop a removed module or infer its destination by name.
+      entry=$(jq -c --arg name "$name" --arg from "$from" --arg hash "$hash" \
+        '[.[] | select(.module==$name and .from==$from and .fromSha256==$hash and (.toModule | type=="string"))]' \
+        "$new_bootstrap/migrations.json")
+      [[ $(jq length <<<"$entry") == 1 ]] || emit unavailable 'Removing a model requires an explicit supported migration' 3
+      target_name=$(jq -er '.[0].toModule' <<<"$entry")
+      target=$(jq -ce --arg name "$target_name" '.[] | select(.name==$name)' "$backup/new-models.json") ||
+        emit unavailable 'Replacement model is absent from the target bootstrap' 3
+    fi
     to=$(jq -er .revision <<<"$target"); target_hash=$(jq -er .sha256 <<<"$target")
     for (( hop=0; hop<32; hop++ )); do
-      [[ "$from" != "$to" || "$hash" != "$target_hash" ]] || break
+      [[ "$name" != "$target_name" || "$from" != "$to" || "$hash" != "$target_hash" ]] || break
       [[ "$from" != "$to" ]] || emit invalid 'A model changed without a new YANG revision' 2
       entry=$(jq -c --arg name "$name" --arg from "$from" --arg hash "$hash" \
         '[.[] | select(.module==$name and .from==$from and .fromSha256==$hash)]' "$new_bootstrap/migrations.json")
       count=$(jq length <<<"$entry")
       [[ "$count" == 1 ]] || emit unavailable 'No unique module-owned migration matches the installed revision and hash' 3
+      next_name=$(jq -er '.[0].toModule // .[0].module' <<<"$entry")
+      [[ "$next_name" == "$name" || "$next_name" == "$target_name" ]] ||
+        emit invalid 'Migration changes the declared replacement model' 2
       transform=$(jq -er '.[0].transform' <<<"$entry")
       [[ "$transform" =~ ^/nix/store/[a-z0-9]{32}-[^/]+/bin/[a-zA-Z0-9-]+$ && -x "$transform" ]]
       timeout --kill-after=2 20 "$transform" <"$work/migrating.json" >"$work/migrated.json"
@@ -141,9 +154,9 @@ migrate_document() {
       next_revision=$(jq -er '.[0].to' <<<"$entry")
       [[ "$next_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && "$next_revision" > "$from" ]] ||
         emit invalid 'Migration revisions must advance monotonically' 2
-      from=$next_revision; hash=$(jq -er '.[0].toSha256' <<<"$entry")
+      name=$next_name; from=$next_revision; hash=$(jq -er '.[0].toSha256' <<<"$entry")
     done
-    [[ "$from" == "$to" && "$hash" == "$target_hash" ]] || emit unavailable 'Migration chain does not reach the target revision' 3
+    [[ "$name" == "$target_name" && "$from" == "$to" && "$hash" == "$target_hash" ]] || emit unavailable 'Migration chain does not reach the target revision' 3
   done < <(jq -c '.[]' "$backup/old-models.json")
   folio-normalize "$new_bootstrap/models/$scope" "$work/migrating.json" >"$document"
 }

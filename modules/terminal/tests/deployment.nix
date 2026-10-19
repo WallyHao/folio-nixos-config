@@ -18,8 +18,9 @@ let
   selected = prepared "folio-tools-selected" source "${bootstrap}/user.json" bootstrap;
   disabledConfig = pkgs.runCommand "folio-tools-disabled.json" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '."folio-environment:environment".modules |= map(
-      if (.name=="emacs" or .name=="git" or .name=="codex") then .enabled=false
-      elif .name=="terminal" then ."folio-terminal:terminal".tools.fzf=false else . end)' \
+      if (.name=="emacs" or .name=="agents") then .enabled=false
+      elif .name=="terminal" then ."folio-terminal:terminal".tools.fzf=false |
+        ."folio-terminal:terminal".git.enabled=false else . end)' \
       ${bootstrap}/user.json >$out
   '';
   disabled = prepared "folio-tools-disabled" source disabledConfig bootstrap;
@@ -32,6 +33,7 @@ in pkgs.testers.runNixOSTest {
     imports = modules;
     _module.args.folioBootstrap = bootstrap;
     services.greetd.enable = lib.mkForce false;
+    services.timesyncd.enable = lib.mkForce false;
     systemd.user.services.folio-manager.serviceConfig = {
       ExecStartPre = lib.mkForce "${pkgs.folio.repository}/bin/folio-repository user init ${oldBootstrap}/models/user ${oldBootstrap}/user.json";
       ExecStart = lib.mkForce "${runtime}/bin/folio-manager-subscriber user ${oldBootstrap}";
@@ -82,15 +84,17 @@ in pkgs.testers.runNixOSTest {
     with subtest("real profile delivery and disposable note indexing"):
         # Interactive job control must not share the driver's controlling terminal.
         user("setsid --wait timeout --kill-after=2 30 zsh -i -c '[[ -n $HISTFILE ]] && (( $+functions[compdef] )) && (( $+functions[ll] ))' </dev/null >/home/folio/shell-check.log 2>&1", 40)
-        user("command -v fzf; git init /home/folio/test-repository; git -C /home/folio/test-repository symbolic-ref HEAD | grep refs/heads/main; codex --version")
+        user("command -v fzf; git init /home/folio/test-repository; git -C /home/folio/test-repository symbolic-ref HEAD | grep refs/heads/main; codex --version; dsh --version")
         user("test -s /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.codex/auth.json")
         user("emacs --batch --load ${../../emacs/tests/org-roam.el}")
         user("printf keep > /home/folio/Documents/Notes/keep; printf keep > /home/folio/.codex/personal-state; git -C /home/folio/test-repository config user.email disposable@example.invalid")
+        user("mkdir -p /home/folio/.dsh; printf keep >/home/folio/.dsh/personal-state")
     configure("${disabledConfig}")
     apply("${disabled}")
     with subtest("selection removes only owned contributions"):
         user("test ! -e /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.config/folio/emacs/settings.el; test ! -e /home/folio/.config/git/config")
         user("test -z \"$(command -v fzf || true)\"; test -n \"$(command -v jq)\"")
+        user("test -z \"$(command -v dsh || true)\"; grep keep /home/folio/.dsh/personal-state")
         user("grep keep /home/folio/Documents/Notes/keep; grep keep /home/folio/.codex/personal-state; ${pkgs.gitMinimal}/bin/git -C /home/folio/test-repository config --local user.email | grep disposable@example.invalid")
         user("test -s /home/folio/.local/state/folio/emacs/org-roam.db")
         assert folio("status")["data"]["health"]=="healthy"
