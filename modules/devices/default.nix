@@ -1,8 +1,6 @@
 { pkgs, lib }:
 let packages = import ./src/package.nix { inherit pkgs; };
 in {
-  targetModules.laptop = import ./src/laptop.nix;
-  targetModules.desktop = import ./src/desktop.nix;
   targetModules.folio = import ./src/folio.nix;
   inherit packages;
   models.system = [ ./model/folio-devices.yang ];

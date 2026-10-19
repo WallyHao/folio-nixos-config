@@ -10,7 +10,7 @@ let
   };
 in
 {
-  targetSettings = let usb = {
+  targetSettings.folio = {
     "folio-system:system" = {
       time-zone = "Asia/Shanghai";
       storage-profile = "physical";
@@ -19,12 +19,8 @@ in
       root-device = "/dev/disk/by-uuid/4e59b522-0ecc-4bc7-b6d0-edc4531e4a00";
       boot-device = "/dev/disk/by-uuid/767D-8E97";
     };
-  }; in { laptop = usb; desktop = usb; folio = usb; };
-  targetModules = {
-    laptop = import ./src/usb-storage.nix;
-    desktop = import ./src/usb-storage.nix;
-    folio = import ./src/folio.nix;
   };
+  targetModules.folio = import ./src/folio.nix;
   migrationModule = import ./src/migration.nix { migration = power.migration; };
   subscribers.system = [ "folio-system.service" ];
   packages = {

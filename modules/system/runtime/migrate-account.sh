@@ -52,7 +52,8 @@ preflight() {
   [[ -f "$system/folio-system.json" && -x "$system/bin/switch-to-configuration" ]] || die 'Invalid system closure';
   local bootstrap
   bootstrap=$(jq -er .bootstrap "$system/folio-system.json")
-  jq -e '.name == "laptop-migration"' "$bootstrap/target.json" >/dev/null || die 'Wrong system target';
+  # Retained recovery closures may still carry the retired target name.
+  jq -e '.name == "folio" or .name == "laptop-migration"' "$bootstrap/target.json" >/dev/null || die 'Wrong system target';
   [[ $(findmnt -n -o UUID --target /) == 4e59b522-0ecc-4bc7-b6d0-edc4531e4a00 ]] || die 'Root UUID differs from inspected target';
   [[ $(findmnt -n -o UUID --target /boot) == 767D-8E97 ]] || die 'EFI UUID differs from inspected target';
   jq -e '.tun.enable == true' /var/lib/sylphy-mihomo/config.json >/dev/null || die 'Unexpected current proxy mode';

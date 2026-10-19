@@ -17,7 +17,8 @@ case "$action" in
     home=$(realpath -e "${3:?Home generation required}")
     [[ $system == /nix/store/* && $home == /nix/store/* ]] || die 'Immutable store outputs required'
     bootstrap=$(jq -er .bootstrap "$system/folio-system.json")
-    jq -e '.name == "laptop-migration"' "$bootstrap/target.json" >/dev/null
+    # Accept the retired name only for retained recovery closures.
+    jq -e '.name == "folio" or .name == "laptop-migration"' "$bootstrap/target.json" >/dev/null
     if grep -RIl -- '/home/sylphy' "$system/etc/tmpfiles.d" > /dev/null; then
       die 'System still recreates the legacy home alias'
     fi

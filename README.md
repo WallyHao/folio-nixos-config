@@ -22,7 +22,7 @@ UEFI guest gate, including real DNS/proxy traffic, firewall and key-only SSH.
 Integrated release acceptance has passed one disposable UEFI lifecycle, including
 both scopes, interrupted recovery, retained rollback, cached apps, actual Chinese
 input/OBS capture, denied effects and externally observed reboot/poweroff. The
-selectable laptop, desktop and Folio hardware configurations build successfully; physical acceptance
+unified Folio hardware configuration builds successfully; physical acceptance
 remains deferred.
 
 Implemented modules keep Nix implementation in `src/`, client entry points and
@@ -335,143 +335,96 @@ paths and disable the prototype password. That model support is not an installer
 or proof of physical driver/boot compatibility. Keep existing data and recovery
 access; a physical target needs its own reviewed configuration and acceptance.
 
-### Selectable hardware targets
+### Hardware targets
 
 One root Flake and `modules/manager/src/defaults.nix` supply shared software,
-preferences and user identity. `modules/manager/src/targets.nix` composes target
-differences through public module exports: system owns storage/boot and devices
-owns CPU/GPU/firmware. There are no separate host/home trees or copied desktops.
+preferences and user identity. Manager composition uses public system storage/boot
+and devices CPU/GPU exports. There are two supported targets:
+
+| Target | Purpose |
+| --- | --- |
+| `folio` | Existing migrated USB installation shared across the laptop and desktop |
+| `portable` | Disposable UEFI guest for development and acceptance tests |
 
 ```sh
-nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
-nix build --no-link .#nixosConfigurations.laptop.config.system.build.toplevel
-nix build --no-link .#nixosConfigurations.desktop.config.system.build.toplevel
-nix build --no-link .#nixosConfigurations.desktop-migration.config.system.build.toplevel
-nix build --no-link .#nixosConfigurations.folio.config.system.build.toplevel
+nix build --no-link --print-out-paths .#nixosConfigurations.folio.config.system.build.toplevel
+nix build --no-link --print-out-paths .#nixosConfigurations.portable.config.system.build.toplevel
 nix eval --json .#lib.folio.targets
 ```
 
-The checkout defaults to the disposable `portable` guest. `laptop` prepares the
-inspected Lenovo Legion Y7000 IRX9 (i7-13650HX, Intel UHD + RTX 4060 Mobile),
-Intel microcode, redistributable firmware, open NVIDIA kernel modules and PRIME
-offload (`nvidia-offload PROGRAM`). These settings follow the pinned NixOS NVIDIA
-module; see the [NixOS NVIDIA documentation](https://wiki.nixos.org/wiki/NVIDIA).
-Wi-Fi/Ethernet use the kernel's iwlwifi/r8169 drivers. Physical driver operation,
-external displays, suspend and battery behavior still need hardware acceptance.
+The ordinary checkout defaults to `portable`. Use the explicit `folio` output to
+prepare the physical USB system. Its bootstrap `target.json` and frozen source
+`folio-target.json` record the hardware selection. Plans retain the installed
+selection; conflicting source targets are rejected. Within a frozen source,
+`nixosConfigurations.portable` is the manager's stable entry for its selected
+target. Hardware names are separate from the existing environment/account
+identity. Builds never autodetect hardware or read live sysrepo.
 
-The laptop and desktop storage exports describe **the current USB installation**, using
-inspected root/EFI UUIDs and Btrfs `root`, `home`, `nix` subvolumes. It does not
-select or repartition the internal NVMe. Replace the system-owned storage export
-when installing elsewhere; changing storage must not require copying the GPU or
-software configuration. Its public prototype password is disabled and the Folio
-account is locked; working credentials/recovery access must be provisioned before
-any installation. These build commands do not activate the target.
-
-The selected target is carried in the bootstrap's `target.json` and the immutable
-source's `folio-target.json`. Plans retain the installed selection even when
-`--source` points to an ordinary checkout; a conflicting source target is rejected.
-Within a frozen target source, `nixosConfigurations.portable` is the manager's
-stable build entry for that selected target. The environment/account remain the
-shared `portable`/`folio` identity; hardware selection is separate from that name.
-Hardware profiles are source-versioned policy, while modeled desired settings
-and deployment records remain in sysrepo. No hardware is autodetected during a
-Nix build.
-
-`desktop` targets the inspected MSI MAG B650M MORTAR WIFI with Ryzen 7 9700X,
-GeForce RTX 3090 (PCI ID `10de:2204`) and AMD integrated graphics (`1002:13c0`).
-It enables AMD microcode, AMD graphics firmware/Mesa and the pinned stable NVIDIA
-driver with open kernel modules and DRM modesetting. NVIDIA supports open modules
-on this Ampere GPU; see the [NVIDIA module documentation](https://github.com/NVIDIA/open-gpu-kernel-modules).
-Both adapters remain available without the laptop's Intel driver or PRIME offload
-PCI topology. Shared USB mounts live in `modules/system/src/usb-storage.nix`;
-GPU/CPU policy lives in `modules/devices/src/desktop.nix`. Internal NVMe partitions
-are not mounted or modified by these targets.
-
-For the existing migrated USB installation moved to the desktop, use
-`desktop-migration`: it adds the same migrated account/password, keyring and
-private runtime proxy compatibility as `laptop-migration`. The regular `desktop`
-target instead starts with the physical profile's locked account policy. These
-targets do not repeat the account rename. Changing machines does not automatically
-change the installed target: an existing `laptop-migration` bootstrap still freezes
-that target in plans. Building `desktop-migration` prepares a replacement closure;
-it does not activate it, change sysrepo data or bypass target-conflict checks.
-Switching the installed target requires an explicit reviewed system transition.
-Fresh driver operation, display outputs and suspend remain physical acceptance
-work after activation; a successful build alone does not establish those results.
-
-Preparation validation (2026-10-19): both desktop system builds above and
-`nix build --no-link .#checks.x86_64-linux.catalogue` passed. Focused evaluation
-confirmed AMD microcode, both graphics adapters, disabled desktop PRIME offload,
-preserved migration password policy and unchanged laptop PRIME policy. Build log:
-`/tmp/folio-desktop-build.log`; evaluated policy: `/tmp/folio-desktop-policy-eval.json`.
-The built bootstraps identify `desktop` and `desktop-migration` respectively.
-No system activation or disk changes were performed during preparation.
+The old `laptop`, `desktop`, `laptop-migration` and `desktop-migration` build
+outputs and dedicated GPU profiles have been removed. Old installed bootstraps
+still name their original targets: ordinary plans against this simplified source
+cannot update those installations until an explicit transition to `folio`.
+Retained immutable system generations and recovery data remain available; source
+cleanup does not switch the live system or remove old boot entries. Recovery
+helpers still recognize retained `laptop-migration` closures.
 
 ### One USB system across the laptop and desktop
 
-`folio` is the long-term target for this existing migrated USB installation.
-It shares the same account, password/keyring policy, runtime proxy compatibility,
-software and Btrfs mounts across both machines. It is not a generic fresh-install
-image: the existing Folio account and migration runtime state must already exist.
-The CPU/GPU combination is in `modules/devices/src/folio.nix`; storage and boot
-policy are in `modules/system/src/folio.nix`.
+`folio` preserves the existing migrated account, password/keyring policy, private
+runtime proxy compatibility, software and Btrfs mounts across both machines. It
+is not a fresh-install image: the Folio account and migration runtime state must
+already exist. CPU/GPU policy lives in `modules/devices/src/folio.nix`; storage and
+boot policy live in `modules/system/src/folio.nix`.
 
-The driver closure contains Intel and AMD microcode, i915 and amdgpu kernel
-modules, Mesa and the same stable NVIDIA driver for the RTX 4060 and RTX 3090.
-Kernel PCI matching chooses applicable drivers; Niri selects display/render
-devices without a global GPU override. No fixed PRIME bus IDs, DRM card numbers,
-Intel-only display topology or hardware-dependent Nix evaluation is used.
-This provides driver support, not a guarantee of integrated-GPU rendering or
-automatic discrete-GPU power saving. CUDA applications still require their own
-appropriate application environment; no CUDA SDK is added to the base desktop.
+Supported machines are the Lenovo Legion Y7000 IRX9 with Intel i7-13650HX and
+RTX 4060, and MSI MAG B650M MORTAR WIFI with Ryzen 7 9700X, RTX 3090 and AMD
+integrated graphics. The closure supplies Intel/AMD microcode, i915/amdgpu,
+firmware/Mesa and one stable NVIDIA driver with open modules and DRM modesetting.
+See the [NVIDIA module documentation](https://github.com/NVIDIA/open-gpu-kernel-modules).
+Kernel PCI matching selects applicable drivers; Niri selects display/render
+adapters without fixed PRIME addresses, DRM card numbers or global render
+variables. Integrated-GPU rendering, discrete-GPU power saving and application
+compute environments still require appropriate runtime configuration/validation.
+No CUDA SDK is installed in the base desktop.
 
-The USB root/EFI UUIDs remain fixed and no internal disks are configured. The
-mobile boot menu keeps up to ten generations with a five-second selection window;
-EFI variable writes stay disabled. Firmware must support x86_64 UEFI USB boot.
-The current ESP's removable fallback loader must be checked during deployment;
-its contents were not readable without privilege during preparation. No EFI files
-were changed. Secure Boot enrollment/signing is not provided by this target.
+Storage uses inspected USB root/EFI UUIDs and Btrfs `root`, `home`, `nix`
+subvolumes. Internal disks are not configured or partitioned. The boot menu keeps
+up to ten generations with a five-second selection window; EFI variable writes
+are disabled. Machines must support x86_64 UEFI USB boot. Check the ESP removable
+fallback loader during deployment: its contents were not readable without
+privilege during preparation. Secure Boot enrollment/signing is not provided.
 
-Build with the `folio` command above. The installed hardware target remains
-unchanged until an explicit deployment transition; a normal Folio plan inherits
-that installed target. After deploying `folio` once, future plans retain
-`folio` on either machine. Shut down normally before moving the disk; no rebuild
-or target selection is required merely because the attached computer changes.
-Keep a known-working boot generation while testing each machine. Existing
-machine-specific targets remain available for fixed installations and diagnosis.
+After deploying `folio` once, future plans retain that target on either machine.
+Shut down normally before moving the disk. Moving it alone requires no rebuild
+or target selection. Keep a known-working system generation while validating both
+machines. Builds do not establish physical display, suspend or power health.
 
-Preparation validation (2026-10-19) passed:
+Earlier build/policy evidence is retained outside source under
+`/tmp/folio-mobile-*` and `/tmp/folio-target-rename-build.log`; the earlier name
+`mobile` was renamed to `folio`. No activation, EFI writes or reboot was performed
+while preparing or simplifying these targets. Live desired data and personal files
+were not changed.
+
+Simplification validation (2026-10-19) passed:
 
 ```sh
 nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
-  .#nixosConfigurations.folio.config.system.build.toplevel
+  .#nixosConfigurations.folio.config.system.build.toplevel \
+  .#system-retirement .#checks.x86_64-linux.catalogue
 nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
-  .#nixosConfigurations.laptop.config.system.build.toplevel \
-  .#nixosConfigurations.desktop.config.system.build.toplevel \
-  .#checks.x86_64-linux.catalogue
+  .#checks.x86_64-linux.account-migration
 ```
 
-Initial validation used the earlier target name `mobile`; its retained logs are
-`/tmp/folio-mobile-build.log` and `/tmp/folio-mobile-regression-build.log`.
-Focused policy evaluation and a frozen-source evaluation through the manager's
-stable `portable` entry passed; reports are `/tmp/folio-mobile-policy-eval.json`
-and `/tmp/folio-mobile-frozen-eval.json`. That earlier bootstrap records `mobile`;
-actual kernel-module files for i915, amdgpu, NVIDIA, iwlwifi and r8169 were checked
-in `/tmp/folio-mobile-driver-files.txt`. Source policy shares the NVIDIA driver
-definition across physical targets, retaining the laptop-only PRIME setup in its
-own profile. No live activation, reboot or physical cross-machine acceptance was
-performed. Existing user data and live desired configuration were not changed.
+Evidence: `/tmp/folio-simplify-build.log`, `/tmp/folio-simplify-account-check.log`
+and `/tmp/folio-simplify-policy.json`. Evaluation confirmed exactly the two public
+targets, rejection of retired targets, frozen `folio` identity, retained driver
+support and existing password preservation. The account guest verified rename/
+restore and login-service recovery; this does not establish physical activation.
 
-The target was subsequently renamed to `folio`. Its system build passed with
-log `/tmp/folio-target-rename-build.log`; the built bootstrap and frozen source
-both record `{"name":"folio"}`. The frozen manager entry retains dual-vendor
-microcode and disabled PRIME offload. This names the hardware target; the CLI
-package `folio`, user account and existing environment identity remain unchanged.
+### Migrating the existing Sylphy account
 
-### Migrating the existing Sylphy laptop account
-
-`nixosConfigurations.laptop-migration` is a guarded transition target for the
-inspected existing installation. It keeps the laptop hardware/storage, adds
+`nixosConfigurations.folio` retains guarded account migration support for the
+inspected existing USB installation. It supplies both machines' hardware, adds
 administrator access and login/passwd GNOME Keyring integration, and retains the
 existing private proxy policy at runtime. It is not a fresh-install target:
 activation refuses to create a duplicate UID 1000 or run before the offline rename.
@@ -481,7 +434,7 @@ tool with local sudo authentication:
 
 ```sh
 tool=$(nix build --no-link --print-out-paths .#system-migration)
-system=$(nix build --no-link --print-out-paths .#nixosConfigurations.laptop-migration.config.system.build.toplevel)
+system=$(nix build --no-link --print-out-paths .#nixosConfigurations.folio.config.system.build.toplevel)
 sudo "$tool/bin/folio-migrate-account" launch "$system"
 ```
 
@@ -540,7 +493,7 @@ restored over newer personal data. Preserve aliases and GC roots until verified.
 
 Retiring `/home/sylphy` requires a Home Manager generation built for `folio` at
 `/home/folio`, while retaining existing application profiles. Build
-`system-retirement` and a `laptop-migration` system without the old tmpfiles rule,
+`system-retirement` and a `folio` system without the old tmpfiles rule,
 then run `sudo TOOL/bin/folio-retire-home launch SYSTEM HOME_GENERATION` locally.
 It waits 20 seconds, stops the login session, snapshots the home filesystem,
 updates live text/link references, SQLite TEXT fields and Mozilla compressed
