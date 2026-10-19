@@ -3,7 +3,7 @@ let
   migration = pkgs.writeShellApplication {
     name = "folio-migrate-account";
     runtimeInputs = with pkgs; [ coreutils findutils gnugrep gnused gawk diffutils
-      jq util-linux shadow btrfs-progs nix systemd gnutar procps glibc.bin ];
+      jq util-linux shadow btrfs-progs nix systemd gnutar procps getent glibc.bin ];
     text = builtins.readFile ../runtime/migrate-account.sh;
   };
   runtime = pkgs.stdenv.mkDerivation {

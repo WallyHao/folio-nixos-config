@@ -106,6 +106,19 @@ failed() {
   systemctl start greetd.service
   exit "$code"
 }
+queue_worker() {
+  echo 'Cutover starts in 20 seconds and closes the desktop. The previous generation and rollback tool are pinned.'
+  echo "Journal: journalctl -u folio-account-migration; state: $state"
+  echo 'First login: folio, using the existing password. Then run folio-migrate-account finish.'
+  systemd-run --unit=folio-account-migration --collect --property=Type=exec --property=UMask=0077 \
+    "$(realpath -e "$0")" cutover "$system"
+  sleep 2
+  if ! systemctl is-active --quiet folio-account-migration.service; then
+    journalctl -u folio-account-migration.service -n 20 --no-pager >&2
+    die 'Worker exited during initial validation; cutover was not started'
+  fi
+  echo 'Worker is active; the journal reports when preflight and the countdown begin.'
+}
 
 action=${1:-status}
 case "$action" in
@@ -124,11 +137,24 @@ case "$action" in
     cp -a /etc/NetworkManager/system-connections "$state/network-connections"
     tar -C /boot -cpf "$state/boot-backup.tar" .
     printf '%s\n' queued >"$state/phase"
-    echo 'Cutover starts in 20 seconds and closes the desktop. The previous generation and rollback tool are pinned.'
-    echo "Journal: journalctl -u folio-account-migration; state: $state"
-    echo 'First login: folio, using the existing password. Then run folio-migrate-account finish.'
-    systemd-run --unit=folio-account-migration --property=Type=exec --property=UMask=0077 \
-      "$(realpath -e "$0")" cutover "$system"
+    queue_worker
+    ;;
+  resume)
+    system=$(realpath -e -- "${2:?System closure is required}")
+    preflight
+    [[ $(cat "$state/phase") == queued ]] || die 'Only a queued, unmodified preparation can be resumed'
+    [[ $(cat "$state/old-system") == $(readlink -f /run/current-system) ]] || die 'Running system changed since preparation'
+    [[ ! -e "$state/home-snapshot" && ! -e /home/.folio-migration-backups/sylphy-before-folio ]] || die 'A snapshot already exists; inspect the interrupted migration instead'
+    case $(systemctl show folio-account-migration.service -p ActiveState --value) in
+      inactive|failed) ;;
+      *) die 'Migration service is still running' ;;
+    esac
+    [[ -s "$state/boot-backup.tar" && -d "$state/legacy-etc" && -s "$state/account-backup/shadow" ]] || die 'Preparation backups are incomplete'
+    pin "$system" new-system
+    pin "$(dirname "$(dirname "$(realpath -e "$0")")")" migration-tool
+    printf '%s\n' "$system" >"$state/new-system"
+    systemctl reset-failed folio-account-migration.service || true
+    queue_worker
     ;;
   cutover)
     root_only
@@ -136,6 +162,7 @@ case "$action" in
     [[ $(cat "$state/phase") == queued ]] || die 'Cutover was not prepared'
     preflight
     trap failed ERR
+    echo 'Worker preflight passed; waiting 20 seconds before closing the desktop.'
     sleep 20
     # Existing state is snapshotted only after all UID 1000 writers have stopped.
     systemctl stop greetd.service
@@ -232,5 +259,5 @@ case "$action" in
     if [[ -r "$state/phase" ]]; then cat "$state/phase"; fi
     echo 'Do not remove the legacy home alias or garbage-collection roots until application state has been verified.'
     ;;
-  *) die 'Usage: folio-migrate-account launch SYSTEM | status | finish | rollback' ;;
+  *) die 'Usage: folio-migrate-account launch SYSTEM | resume SYSTEM | status | finish | rollback' ;;
 esac

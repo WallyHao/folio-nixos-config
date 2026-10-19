@@ -12,23 +12,31 @@ pkgs.testers.runNixOSTest {
   testScript = ''
     machine.start()
     machine.wait_for_unit("multi-user.target")
+    machine.succeed("systemd-run --wait --pipe --unit=folio-migration-clean-env ${pkgs.coreutils}/bin/env -i PATH=/nonexistent ${migration}/bin/folio-migrate-account status | grep '^sylphy:'")
     # Source the exact packaged helper definitions without running its dispatcher.
     machine.succeed("sed '/^action=/,$d' ${migration}/bin/folio-migrate-account >/root/identity-functions")
     machine.succeed("mkdir -p /var/lib/folio-migration/account-backup /var/lib/folio-migration/roots; test ! -e /etc/gshadow; bash -c 'source /root/identity-functions; backup_accounts'")
     machine.succeed("test -f /var/lib/folio-migration/account-backup/gshadow.absent; cmp /etc/shadow /var/lib/folio-migration/account-backup/shadow")
+    machine.succeed("printf queued >/var/lib/folio-migration/phase")
+    # This disposable guest intentionally differs from the physical target.
+    # A submitted worker must surface that immediate preflight failure instead
+    # of reporting successful cutover merely because systemd-run returned 0.
+    failed_worker = machine.fail("bash -c 'source /root/identity-functions; system=${pkgs.hello}; queue_worker' ${migration}/bin/folio-migrate-account 2>&1")
+    assert "Worker exited during initial validation" in failed_worker, failed_worker
+    assert machine.succeed("getent passwd sylphy | cut -d: -f3").strip() == "1000"
     machine.succeed("bash -c 'source /root/identity-functions; pin ${pkgs.hello} retry; pin ${pkgs.hello} retry; pin ${pkgs.coreutils} retry; pin ${pkgs.coreutils} retry'")
     machine.succeed("mkdir -p /home/sylphy/.config/zen/profile /home/sylphy/.local/share/keyrings /home/sylphy/.local/state/nix/profiles /nix/var/nix/profiles/per-user/sylphy /nix/var/nix/gcroots/per-user/sylphy")
     machine.succeed("printf fixture-cookie >/home/sylphy/.config/zen/profile/cookies.sqlite; printf encrypted-fixture >/home/sylphy/.local/share/keyrings/login.keyring; chmod 600 /home/sylphy/.local/share/keyrings/login.keyring; chown -R 1000:users /home/sylphy")
     machine.succeed("ln -s /home/sylphy/.config/zen/profile /home/sylphy/absolute-profile; ln -s ${pkgs.hello} /home/sylphy/.local/state/nix/profiles/retained; ln -s /home/sylphy/.local/state/nix/profiles/retained /home/sylphy/.nix-profile")
     machine.succeed("getent shadow sylphy | cut -d: -f2 >/root/before-hash; stat -c '%i %u %g %a' /home/sylphy/.local/share/keyrings/login.keyring >/root/before-inode")
-    machine.succeed("bash -c 'source /root/identity-functions; rename_identity'")
+    machine.succeed("systemd-run --wait --pipe --unit=folio-identity-rename ${pkgs.coreutils}/bin/env -i PATH=/nonexistent ${pkgs.bash}/bin/bash -c 'source /root/identity-functions; rename_identity'")
     assert machine.succeed("getent passwd folio | cut -d: -f3,6").strip() == "1000:/home/folio"
     machine.fail("getent passwd sylphy")
     machine.succeed("getent shadow folio | cut -d: -f2 | cmp - /root/before-hash; stat -c '%i %u %g %a' /home/folio/.local/share/keyrings/login.keyring | cmp - /root/before-inode")
     assert machine.succeed("cat /home/folio/absolute-profile/cookies.sqlite").strip() == "fixture-cookie"
     assert machine.succeed("/home/folio/.nix-profile/bin/hello").strip() == "Hello, world!"
     machine.succeed("test -z \"$(find /home/folio -xtype l -print -quit)\"; test -d /nix/var/nix/profiles/per-user/folio; test -d /nix/var/nix/profiles/per-user/sylphy")
-    machine.succeed("bash -c 'source /root/identity-functions; restore_identity'")
+    machine.succeed("systemd-run --wait --pipe --unit=folio-identity-restore ${pkgs.coreutils}/bin/env -i PATH=/nonexistent ${pkgs.bash}/bin/bash -c 'source /root/identity-functions; restore_identity'")
     assert machine.succeed("getent passwd sylphy | cut -d: -f3,6").strip() == "1000:/home/sylphy"
     machine.fail("getent passwd folio")
     machine.succeed("getent shadow sylphy | cut -d: -f2 | cmp - /root/before-hash; stat -c '%i %u %g %a' /home/sylphy/.local/share/keyrings/login.keyring | cmp - /root/before-inode")

@@ -403,6 +403,12 @@ State, account/EFI/network backups and logs stay root-private under
 `/home/.folio-migration-backups`. No private file bytes are part of builds.
 Account backups require passwd/shadow/group; gshadow is optional on NixOS and
 its absence is recorded. Preparation retries retain existing protection roots.
+The migration tool declares its own systemd-service dependencies and checks for
+immediate worker failure after submission. If a worker stopped before quiescing,
+`resume SYSTEM` accepts only a queued journal with the original account/home and
+running system, complete preparation backups, no snapshot or new proxy state,
+and no running worker. It retains backups and pins the updated tool/system before
+restarting. Other interrupted phases require inspection rather than blind retry.
 
 The original native browser profile, encrypted keyring, SSH/GPG, Codex account
 directories and Home Manager generation are kept. The transition does not apply
