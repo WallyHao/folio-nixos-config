@@ -5,6 +5,9 @@ previous explicit user/system plan/build/apply command proposal. Unified command
 forms below are not implemented yet. The existing editor/export JSON readability
 fix is implemented separately. README remains actual product documentation.
 
+See [TASK.md](TASK.md) for the detailed technical plan, ordered milestones,
+authorization/recovery design and acceptance matrix.
+
 ## Accepted direction
 
 - One everyday `apply` entry detects user/system/source changes and performs the
