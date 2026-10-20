@@ -1,1 +1,1 @@
-"""Shared Folio frontend; Textual is loaded only for the panel command."""
+"""Shared Folio CLI frontend and authenticated local web control panel."""

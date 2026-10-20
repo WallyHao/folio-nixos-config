@@ -252,7 +252,10 @@ in
       inherit inputs;
       switcher = userPackages.sd-switch;
     };
+    appearance = import ../../appearance/tests/gtk.nix { inherit pkgs; };
     panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
+    panel-browser = import ../../panel/tests/browser.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
+    browser-windows = import ../../applications/tests/browser-windows.nix { inherit pkgs; browser = catalogue.applications.packages.zen; };
     panel-network = import ../../network/tests/panel.nix {
       inherit pkgs bootstrap;
       repository = catalogue.sysrepo.packages.tools;

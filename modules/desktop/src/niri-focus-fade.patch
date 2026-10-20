@@ -50,7 +50,7 @@ index 0000000..01da3c8
 +            from,
 +            if active { 1. } else { 0. },
 +            0.,
-+            150,
++            300,
 +            Curve::EaseOutCubic,
 +        ));
 +    }
@@ -93,19 +93,19 @@ index 0000000..01da3c8
 +        assert!(!fade.is_ongoing());
 +        fade.update(true);
 +        assert_eq!(fade.value(), 0.);
-+        clock.set_unadjusted(Duration::from_millis(75));
++        clock.set_unadjusted(Duration::from_millis(150));
 +        assert!(fade.value() > 0. && fade.value() < 1.);
 +        // Repeated render updates must not restart a transition.
 +        fade.update(true);
-+        clock.set_unadjusted(Duration::from_millis(150));
++        clock.set_unadjusted(Duration::from_millis(300));
 +        fade.advance();
 +        assert_eq!(fade.value(), 1.);
 +        assert!(!fade.is_ongoing());
 +        fade.update(false);
 +        assert!(fade.is_fading_out());
-+        clock.set_unadjusted(Duration::from_millis(225));
++        clock.set_unadjusted(Duration::from_millis(450));
 +        assert!(fade.value() > 0. && fade.value() < 1.);
-+        clock.set_unadjusted(Duration::from_millis(300));
++        clock.set_unadjusted(Duration::from_millis(600));
 +        fade.advance();
 +        assert_eq!(fade.value(), 0.);
 +        assert!(!fade.is_fading_out());
@@ -117,16 +117,16 @@ index 0000000..01da3c8
 +        let mut clock = Clock::with_time(Duration::ZERO);
 +        let mut fade = FocusFade::new(clock.clone());
 +        fade.update(true);
-+        clock.set_unadjusted(Duration::from_millis(40));
++        clock.set_unadjusted(Duration::from_millis(80));
 +        let before = fade.value();
 +        fade.update(false);
 +        assert_eq!(fade.value(), before);
-+        clock.set_unadjusted(Duration::from_millis(60));
++        clock.set_unadjusted(Duration::from_millis(120));
 +        assert!(fade.value() < before);
 +        let before = fade.value();
 +        fade.update(true);
 +        assert_eq!(fade.value(), before);
-+        clock.set_unadjusted(Duration::from_millis(210));
++        clock.set_unadjusted(Duration::from_millis(420));
 +        fade.advance();
 +        assert_eq!(fade.value(), 1.);
 +    }
@@ -137,7 +137,7 @@ index 0000000..01da3c8
 +        let mut fade = FocusFade::new(clock.clone());
 +        clock.set_rate(0.5);
 +        fade.update(true);
-+        clock.set_unadjusted(Duration::from_millis(150));
++        clock.set_unadjusted(Duration::from_millis(300));
 +        assert!(fade.value() > 0. && fade.value() < 1.);
 +        clock.set_complete_instantly(true);
 +        assert_eq!(fade.value(), 1.);

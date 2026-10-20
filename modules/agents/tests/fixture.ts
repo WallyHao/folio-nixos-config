@@ -16,7 +16,7 @@ export default function (pi: any) {
   pi.registerCommand("folio-fixture", {
     description: "Verify Folio configuration and private session state",
     handler: async () => {
-      for (const command of ["npm", "git"]) {
+      for (const command of ["npm", "git", "wl-copy", "wl-paste"]) {
         const result = await pi.exec(command, ["--version"]);
         if (result.code !== 0) throw new Error(`${command} is unavailable`);
       }

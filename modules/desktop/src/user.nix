@@ -10,6 +10,7 @@ let
   renderer = import ./niri.nix { };
   launcher = import ./fuzzel.nix { };
   bar = settings.bar or true;
+  borderWidth = settings.border-width or 3;
 in {
   assertions = [{
     assertion = context.capabilities.desktop-provisioned or false;
@@ -36,15 +37,15 @@ in {
     modifier = "Super";
     deviceControl = if builtins.elem "devices" context.enabledModules then "${pkgs.folio.cli}/bin/folio" else null;
     layout = {
-      gaps = settings.gaps or 8;
+      gaps = settings.gaps or 16;
       # Waybar already reserves its exclusive height; retain the normal edge
       # inset rather than subtracting the bar from the compositor work area.
       top = -4;
       # Add to the window gaps for a 24px outer inset at the default gap size.
-      bottom = 16;
-      left = 16;
-      right = 16;
-      borderWidth = settings.border-width or 3;
+      bottom = 8;
+      left = 8;
+      right = 8;
+      inherit borderWidth;
       cornerRadius = settings.corner-radius or 12;
     };
   } + lib.optionalString config.home.pointerCursor.enable ''
@@ -54,7 +55,10 @@ in {
     }
   '';
   xdg.configFile."fuzzel/fuzzel.ini" = lib.mkIf (settings.launcher or true) {
-    text = launcher.renderConfig { inherit lib theme; font = "${context.globals.font-family}:size=${toString context.globals.font-size}"; };
+    text = launcher.renderConfig {
+      inherit lib theme borderWidth;
+      font = "${context.globals.font-family}:size=${toString context.globals.font-size}";
+    };
   };
   services.mako = lib.mkIf (settings.notifications or true) {
     enable = true;

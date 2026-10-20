@@ -1,6 +1,6 @@
 { pkgs, package }:
 pkgs.runCommand "folio-panel-interaction-tests" {
-  nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.textual p.pytest ])) ];
+  nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.pytest ])) ];
 } ''
   export PYTHONPATH=${package}/lib
   export HOME=$TMPDIR/home

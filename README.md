@@ -392,7 +392,7 @@ No CUDA SDK is installed in the base desktop.
 
 Storage uses inspected USB root/EFI UUIDs and Btrfs `root`, `home`, `nix`
 subvolumes. Internal disks are not configured or partitioned. The boot menu keeps
-up to ten generations with a five-second selection window; EFI variable writes
+up to ten generations and boots the default immediately with the menu hidden; EFI variable writes
 are disabled. Machines must support x86_64 UEFI USB boot. Check the ESP removable
 fallback loader during deployment: its contents were not readable without
 privilege during preparation. Secure Boot enrollment/signing is not provided.
@@ -766,7 +766,7 @@ JSON as authentication. System handlers use library/session identity and the
 provisioned access policy; they do not assume NETCONF/NACM is automatically in
 the direct sysrepocfg path.
 
-## Terminal panel
+## Local web panel
 
 Build the shared frontend and launch it as your desktop user:
 
@@ -775,11 +775,23 @@ nix build --out-link modules/panel/result .#folio
 ./modules/panel/result/bin/folio panel
 ```
 
-The Python/Textual panel is deliberately text-first: one line of tabs, unframed
-lists and inline command hints, using the terminal's ANSI palette instead of a
-second hard-coded application theme. Wi-Fi opens first; Tab moves focus, arrows
-navigate lists or adjust sliders, Enter activates controls, `r` refreshes and `q`
-quits outside text inputs.
+`folio panel` opens the local web panel in the default browser. You can also
+launch **Folio Panel** from the application launcher. The responsive interface
+uses Everforest colors and the installed appearance font family and size, with
+pages for Wi-Fi, proxy, sound/display and device information. Wi-Fi opens first;
+use the navigation or keyboard focus to move between pages, and Refresh to reload
+state. Half-width Niri windows use a compact top navigation bar; the side rail
+appears only at 1600 CSS pixels and wider. Network cards stack below 1120 pixels,
+with connection details and action buttons arranged to suit the available width.
+
+The Python standard-library server listens only on `127.0.0.1` at an allocated
+port. A private runtime record under `$XDG_RUNTIME_DIR/folio-panel` lets repeated
+launches reuse it. Each API request requires a random session token; host and
+origin checks reject cross-site requests. The launch URL delivers the token in
+its fragment, then the browser removes it from the URL and retains it in tab
+session storage. No external assets, cloud service or frontend build is required.
+Closing a tab leaves the local service available in the user runtime; a later launch
+replaces a server from an older installed package automatically.
 
 - **Wi-Fi:** select an adapter, scan, connect to saved/new/hidden personal
   networks, disconnect, toggle radio and confirm profile deletion. Open and
@@ -804,8 +816,10 @@ upgrade and a matching subscriber; building the frontend alone does not install
 these services. Ordinary CLI commands still delegate to the existing manager;
 the proposed intelligent apply and unified history/rollback remain pending.
 
-Run `nix build --no-link .#checks.x86_64-linux.panel` for headless UI checks and
-`.#checks.x86_64-linux.panel-network` for isolated native backend integration.
+Run `nix build --no-link .#checks.x86_64-linux.panel` for HTTP/authorization checks,
+`.#checks.x86_64-linux.panel-browser` for real Chromium interaction checks and
+desktop/mobile screenshots, and `.#checks.x86_64-linux.panel-network` for isolated
+native backend integration.
 Hardware acceptance remains separate from these checks.
 
 ## CLI contract
@@ -955,6 +969,15 @@ preference file and owned browser/content CSS through Home Manager, using the
 same renderer as the Flatpak delivery. The directory must already exist; unmanaged
 `user.js` or CSS entry files cause a conflict instead of being overwritten.
 Browser databases, logins, session data and `prefs.js` remain application owned.
+Native Zen opens each new tab in a separate normal window for Niri to tile.
+The pinned, signed One Tab per Window extension handles new tabs (including
+private browsing); a browser-owned AutoConfig hook prevents Zen workspace
+replication and adopts restored tabs into independent windows after Zen finishes
+restoring them. Page state is moved rather than recreated from URLs. Link and
+external-open preferences use new windows. This behavior is bundled with the
+native browser package and requires fully quitting Zen and opening it again after
+applying a generation. `checks.x86_64-linux.browser-windows` exercises new tabs,
+links, private tabs and actual session restoration in a disposable profile.
 Restart Zen to load changed preferences and styles. OBS configuration
 also remains application owned. Native selections default to false when upgrading
 an existing repository; enabling them is a separate explicit desired change.
@@ -1135,6 +1158,10 @@ use Pi login or environment-based credentials. Do not commit downloaded package
 caches or dependencies. To update Pi itself, update the root nixpkgs lock and
 rebuild; runtime package installation remains independent of that lock.
 
+The launcher supplies `wl-clipboard` for Wayland copy/paste, including Pi's
+native clipboard commands and image reads. It inherits the desktop's
+`WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; restart Pi after updating its launcher.
+
 GitHub/Codex/Pi authentication requires the target user's own setup. Disabling
 a module removes its managed files while preserving repositories, notes, indexes
 and personal application data.
@@ -1159,14 +1186,34 @@ configuration commit alone does not install software or change the login shell.
 
 ## Desktop, input and device integration
 
+The greetd/tuigreet login screen uses the console's Everforest ANSI palette:
+background, foreground, yellow accents and gray borders match the desktop.
+A centered 60-column prompt shows only the login form, without a greeting or clock.
+It retains the console's Terminus font, since a Linux TTY cannot use the desktop
+OpenType font. Apply this change in system scope; greetd is not restarted during
+activation, and the new greeter appears on the next boot.
+
 User modules render Niri, Waybar, Mako, Fuzzel, clipboard
 history and screenshots; system desktop owns the login session and portal
-prerequisites. Appearance provides Everforest palettes, Maple Mono NF CN, a
-recolored GoogleDot cursor and GTK resources. Shared preference and module override
-origins are recorded in `~/.config/folio/appearance.json`. Applying a generation
-does not log out the current desktop; session-dependent changes need a new login.
+prerequisites. Fuzzel's border width follows `desktop.border-width` (default 3),
+so the launcher and Niri focus rings have the same thickness. Reboot and
+power-off confirmations use a Fuzzel dmenu prompt and therefore share the
+launcher's font size, colors, selection and border style. Appearance provides
+Everforest palettes, Maple Mono NF CN, a recolored GoogleDot cursor and GTK
+resources. Shared preference and module override origins are recorded in
+`~/.config/folio/appearance.json`. Applying a generation does not log out the
+current desktop; session-dependent changes need a new login.
 
-The desktop owns a patched Niri 26.04 package with a 150 ms focus-ring opacity
+GTK 3 uses adw-gtk3 with the selected Everforest palette. GTK 4/libadwaita keeps
+its native stylesheet and receives both legacy named colors and modern CSS
+variables. GTK interface, document, monospace and titlebar fonts share the
+resolved appearance font family and point size (by default Maple Mono NF CN 16).
+Restart open applications after applying to reload their user stylesheet.
+Run `nix build --no-link .#checks.x86_64-linux.appearance` to check real GTK 3
+and libadwaita widgets in both dark and light modes, including CSS parsing,
+resolved fonts, foreground colors and the libadwaita accent color.
+
+The desktop owns a patched Niri 26.04 package with a 300 ms focus-ring opacity
 transition. The previous ring fades out while the new ring fades in; interrupted
 transitions resume from their current opacity. Window content opacity is unchanged.
 The transition follows Niri's global animation disable and slowdown settings.

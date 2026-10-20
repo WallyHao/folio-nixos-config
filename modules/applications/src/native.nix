@@ -3,15 +3,7 @@ let
   settings = context.settings."folio-applications:applications".native or { };
   zenEnabled = settings.zen or false;
   obsEnabled = settings.obs or false;
-  # Import the reviewed upstream Beta package with this repository's Nixpkgs.
-  upstream = builtins.fetchTree {
-    type = "github";
-    owner = "0xc000022070";
-    repo = "zen-browser-flake";
-    rev = "a12d482485d877cc066516ea256b435b209a1a8c";
-    narHash = "sha256-C9BpLH4dNggam12nz/Fx/M0Vlbw8WcT/cpOc37DPQAA=";
-  };
-  browser = (import (upstream.outPath + "/default.nix") { inherit pkgs; }).beta;
+  browser = import ./zen.nix { inherit pkgs; };
   profile = "${config.xdg.configHome}/zen/${settings.zen-profile or ""}";
   managedProfile = zenEnabled && settings ? zen-profile;
   browserFiles = (import ./apps/zen.nix {

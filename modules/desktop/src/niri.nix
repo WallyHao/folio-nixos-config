@@ -27,7 +27,7 @@ let
     };
   };
 
-  defaultLayout = { gaps = 8; top = -4; bottom = -4; left = -4; right = -4; borderWidth = 3; cornerRadius = 12; };
+  defaultLayout = { gaps = 16; top = -4; bottom = -4; left = -4; right = -4; borderWidth = 3; cornerRadius = 12; };
   normalizeLayout = layout:
     if !builtins.isAttrs layout then throw "folio-desktop: layout must be an attribute set"
     else if builtins.any (key: !(builtins.hasAttr key defaultLayout)) (builtins.attrNames layout)

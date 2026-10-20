@@ -16,6 +16,7 @@ in
   }];
   subscribers.user = [ "folio-applications.service" ];
   packages = (builtins.removeAttrs implementation [ "client" ]) // {
+    zen = import ./src/zen.nix { inherit pkgs; };
     schema-history = pkgs.linkFarm "folio-applications-schema-history" [
       { name = "2026-10-18/folio-applications.yang"; path = ./model/revisions/2026-10-18/folio-applications.yang; }
     ];

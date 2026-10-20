@@ -2,7 +2,7 @@
 let
   launcher = pkgs.writeShellApplication {
     name = "pi";
-    runtimeInputs = [ pkgs.coreutils pkgs.util-linux pkgs.nodejs pkgs.gitMinimal ];
+    runtimeInputs = [ pkgs.coreutils pkgs.util-linux pkgs.nodejs pkgs.gitMinimal pkgs.wl-clipboard ];
     runtimeEnv = {
       FOLIO_PI_PACKAGE = "${pkgs.pi-coding-agent}";
       FOLIO_PI_BUNDLED_CONFIG = "${./config}";

@@ -53,7 +53,7 @@ prefer-no-csd
 hotkey-overlay { skip-at-startup; }
 window-rule { geometry-corner-radius 0; clip-to-geometry true; }
 animations {
-    slowdown 10
+    slowdown 5
     window-open { off; }
     window-close { off; }
     horizontal-view-movement { off; }

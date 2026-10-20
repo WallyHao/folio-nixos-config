@@ -3,24 +3,23 @@ import sys
 
 
 def main():
-    if sys.argv[1:] == ["panel"]:
+    if sys.argv[1:] in (["panel"], ["--serve"]):
         if os.geteuid() == 0:
             print(
                 "Run folio panel as your desktop user, without sudo.", file=sys.stderr
             )
             return 2
-        from .app import Panel
+        from .server import launch, serve
 
-        Panel().run()
-        return 0
+        return serve() if sys.argv[1:] == ["--serve"] else launch()
     if sys.argv[1:] == ["--version"]:
-        print("folio-panel 0.1.0")
+        print("folio-panel 0.2.0")
         return 0
     from .paths import LEGACY
 
     if sys.argv[1:] in (["--help"], ["-h"], []):
         print(
-            "  folio panel                 Open the Wi-Fi, proxy and device control panel",
+            "  folio panel                 Open the local web control panel in your browser",
             flush=True,
         )
     # Compatibility bridge: unified apply/change history is a separate milestone.

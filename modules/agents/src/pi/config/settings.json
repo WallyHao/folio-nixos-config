@@ -5,5 +5,10 @@
   "defaultModel": "deepseek-v4-pro",
   "enabledModels": [
     "deepseek/deepseek-flash"
+  ],
+  "packages": [
+    "npm:pi-web-access@0.43.0",
+    "npm:billion-context@0.1.202",
+    "npm:@juicesharp/rpiv-ask-user-question@2.13.9"
   ]
 }

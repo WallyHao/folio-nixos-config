@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Folio · Control panel</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/theme.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark">f</span>folio<span class="brand-note">control panel</span></a>
+    <nav aria-label="Panel pages">
+      <button data-page="wifi" class="nav active" aria-current="page"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-label">Wi-Fi</span></button>
+      <button data-page="proxy" class="nav"><span class="nav-icon" aria-hidden="true">⇄</span><span class="nav-label">Proxy</span></button>
+      <button data-page="devices" class="nav"><span class="nav-icon" aria-hidden="true">◐</span><span class="nav-label">Sound &amp; display</span></button>
+      <button data-page="information" class="nav"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">Device</span></button>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span>On this computer<p>Small controls.<br>A quieter workspace.</p></div>
+  </aside>
+  <main>
+    <header><div><div class="eyebrow">YOUR WORKSPACE</div><h1 id="page-title">Wi-Fi</h1><p id="page-description">Find your network. Stay connected.</p></div><button id="refresh" class="subtle">↻ Refresh</button></header>
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+    <section id="wifi" class="page">
+      <div class="toolbar"><label>Adapter <select id="adapter" aria-label="Wi-Fi adapter"></select></label><span id="wifi-status" class="badge">Loading…</span><button id="radio" class="subtle" disabled>Turn off Wi-Fi</button></div>
+      <div class="split">
+        <section class="card"><div class="card-heading"><h2>Nearby networks</h2><button id="scan" class="subtle" disabled>Scan</button></div><div id="networks" class="list" aria-label="Nearby networks"></div><button id="hidden-network" class="full subtle" disabled>+ Join a hidden network</button></section>
+        <section class="card detail"><div class="eyebrow">CONNECTION</div><h2 id="network-name">Select a network</h2><p id="network-description" class="muted">Available networks will appear on the left.</p><dl id="network-details"></dl><div class="stack"><button id="connect" class="primary" disabled>Connect</button><button id="disconnect" class="subtle" disabled>Disconnect</button><button id="forget" class="danger subtle" disabled>Forget saved network</button></div><p class="footnote">Passwords are saved by NetworkManager for your user.</p></section>
+      </div>
+    </section>
+    <section id="proxy" class="page" hidden>
+      <div class="toolbar"><span id="proxy-status" class="badge">Loading…</span><label>Mode <select id="mode"><option>rule</option><option>global</option><option>direct</option></select></label><button id="set-mode" class="subtle" disabled>Apply mode</button></div>
+      <section class="card"><div class="card-heading"><label>Group <select id="group" aria-label="Proxy group"></select></label><button id="test-all" class="subtle" disabled>Test all</button></div><div id="nodes" class="list"></div><p class="footnote">Latency is measured against the configured test endpoint.</p></section>
+    </section>
+    <section id="devices" class="page" hidden>
+      <div class="two-columns"><section class="card"><div class="eyebrow">AUDIO</div><h2>Make yourself comfortable</h2><p class="muted">Choose where your sound goes.</p><label class="field">Output<select id="output" aria-label="Audio output"></select></label><button id="set-output" class="subtle" disabled>Use this output</button><div class="range-label"><label for="volume">Volume</label><output id="volume-value">Unavailable</output></div><input id="volume" type="range" min="0" max="100" disabled><button id="mute" class="subtle" disabled>Mute</button></section>
+      <section class="card"><div class="eyebrow">DISPLAY</div><h2>A little more light</h2><p class="muted">Adjust supported built-in backlights.</p><label class="field">Backlight<select id="backlight" aria-label="Backlight device"></select></label><div class="range-label"><label for="brightness">Brightness</label><output id="brightness-value">Unavailable</output></div><input id="brightness" type="range" min="0" max="100" disabled><p id="backlight-note" class="footnote">No supported backlight.</p></section></div>
+      <p class="page-note">These controls take effect immediately.</p>
+    </section>
+    <section id="information" class="page" hidden><div id="information-content" class="two-columns"></div></section>
+    <footer><span>FOLIO</span><span id="updated">Waiting for current state</span></footer>
+  </main>
+  <dialog id="connect-dialog"><form id="connect-form"><div class="eyebrow">WI-FI</div><h2 id="dialog-title">Join network</h2><p id="dialog-description" class="muted"></p><div id="hidden-fields" hidden><label class="field">Network name<input id="ssid" maxlength="32" autocomplete="off"></label><label class="field">Security<select id="security"><option>WPA Personal</option><option>WPA3</option><option>Open</option></select></label></div><label class="field">Password<input id="password" type="password" autocomplete="off" maxlength="2048"></label><label class="checkbox"><input id="show-password" type="checkbox">Show password</label><p class="footnote">Leave the password empty to reuse a saved connection.</p><div class="dialog-actions"><button type="button" id="cancel-connect" class="subtle">Cancel</button><button type="submit" class="primary">Connect</button></div></form></dialog>
+  <dialog id="confirm-dialog"><form method="dialog"><div class="eyebrow">PLEASE CONFIRM</div><h2 id="confirm-title"></h2><p id="confirm-description" class="muted"></p><div class="dialog-actions"><button value="cancel" class="subtle">Cancel</button><button value="confirm" class="primary">Confirm</button></div></form></dialog>
+</body>
+</html>

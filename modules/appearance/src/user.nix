@@ -9,8 +9,16 @@ in {
   gtk = {
     enable = true;
     font = { name = theme.font-family; size = theme.font-size; };
-    gtk3.extraCss = css;
-    gtk4.extraCss = css;
+    colorScheme = theme.colors.appearance;
+    # adw-gtk3 consumes the same named colors as our GTK 4 overrides.
+    gtk3.theme = {
+      package = pkgs.adw-gtk3;
+      name = if theme.colors.appearance == "dark" then "adw-gtk3-dark" else "adw-gtk3";
+    };
+    # Keep libadwaita's stylesheet; its palette is overridden through CSS variables.
+    gtk4.theme = null;
+    gtk3.extraCss = css.gtk3;
+    gtk4.extraCss = css.gtk4;
     gtk3.extraConfig.gtk-application-prefer-dark-theme = theme.colors.appearance == "dark";
     gtk4.extraConfig.gtk-application-prefer-dark-theme = theme.colors.appearance == "dark";
   };
@@ -27,7 +35,11 @@ in {
     cursor-theme = cursor.cursorName;
     cursor-size = theme.cursor-size;
     font-name = "${theme.font-family} ${toString theme.font-size}";
+    document-font-name = "${theme.font-family} ${toString theme.font-size}";
+    monospace-font-name = "${theme.font-family} ${toString theme.font-size}";
   };
+  dconf.settings."org/gnome/desktop/wm/preferences".titlebar-font =
+    "${theme.font-family} ${toString theme.font-size}";
   xdg.configFile."folio/appearance.json".text = builtins.toJSON {
     format = 1;
     appearance = theme.colors.appearance;

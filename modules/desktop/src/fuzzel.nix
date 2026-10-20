@@ -31,7 +31,7 @@ let
     if builtins.isString value && builtins.match "#[0-9A-Fa-f]{6}" value != null
     then "${builtins.substring 1 6 value}ff"
     else throw "folio-desktop: theme colors must be six-digit hexadecimal values";
-  renderConfig = { lib, theme, font ? defaultFont, width ? 40, lines ? 8, borderWidth ? 2, borderRadius ? 0, horizontalPadding ? 16, verticalPadding ? 10, innerPadding ? 8 }:
+  renderConfig = { lib, theme, font ? defaultFont, width ? 40, lines ? 8, borderWidth ? 3, borderRadius ? 0, horizontalPadding ? 16, verticalPadding ? 10, innerPadding ? 8 }:
     let
       colors = theme.colors or { };
       appearance = colors.appearance or "dark";
@@ -46,7 +46,7 @@ let
     else if !singleLine font then throw "folio-desktop: font must be a non-empty single-line FontConfig string without brackets"
     else if !(integerIn 20 100 width) then throw "folio-desktop: width must be an integer from 20 through 100"
     else if !(integerIn 1 30 lines) then throw "folio-desktop: lines must be an integer from 1 through 30"
-    else if !(integerIn 0 10 borderWidth) then throw "folio-desktop: borderWidth must be an integer from 0 through 10"
+    else if !(integerIn 0 16 borderWidth) then throw "folio-desktop: borderWidth must be an integer from 0 through 16"
     else if !(integerIn 0 100 borderRadius) then throw "folio-desktop: borderRadius must be an integer from 0 through 100"
     else if !(integerIn 0 100 horizontalPadding && integerIn 0 100 verticalPadding && integerIn 0 100 innerPadding) then throw "folio-desktop: padding must be an integer from 0 through 100"
     else ''

@@ -1,255 +1,152 @@
-"""UI contract checks; fake transport is not hardware acceptance evidence."""
+"""Exercise the real HTTP boundary; fake clients do not establish hardware health."""
 
-import asyncio
 import copy
+import json
+import threading
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-from folio_panel.app import Confirm, Connect, Panel, Slider
+import pytest
+
 from folio_panel.client import BackendError
-from textual.widgets import Button, DataTable, Input, Static, TabbedContent
+from folio_panel.server import PanelServer, session, theme_css
 
 
 class Client:
     def __init__(self):
         self.calls = []
+        self.fail = False
         self.wireless = {
-            "enabled": True,
-            "hardwareEnabled": True,
-            "adapters": [
-                {
-                    "interface": "wlan0",
-                    "state": "disconnected",
-                    "addresses": [],
-                    "profiles": [],
-                    "networks": [
-                        {
-                            "path": "/ap/1",
-                            "ssid": "[red]测试[/red]",
-                            "signal": 80,
-                            "security": "WPA Personal",
-                            "active": False,
-                            "profiles": [],
-                        }
-                    ],
-                }
-            ],
-        }
-        self.device = {
-            "audio": {
-                "available": True,
-                "default": "sink1",
-                "sinks": [
-                    {
-                        "name": "sink1",
-                        "description": "Speakers",
-                        "volume": 30,
-                        "mute": False,
-                    },
-                    {
-                        "name": "sink2",
-                        "description": "Headphones",
-                        "volume": 20,
-                        "mute": False,
-                    },
-                ],
-            },
-            "backlights": [],
-        }
+            "enabled": True, "hardwareEnabled": True,
+            "adapters": [{"interface": "wlan0", "state": "connected", "addresses": ["192.168.1.24"],
+                          "networks": [
+                              {"path": "/ap/1", "ssid": "Everforest", "signal": 92, "security": "WPA Personal", "active": True, "profiles": ["saved-uuid"]},
+                              {"path": "/ap/2", "ssid": "Studio guest", "signal": 68, "security": "Open", "active": False, "profiles": []},
+                              {"path": "/ap/3", "ssid": "<img src=x onerror=alert(1)>", "signal": 30, "security": "WPA Personal", "active": False, "profiles": []}]}]}
 
     async def wifi(self, action="status", **fields):
         self.calls.append(("wifi", action, copy.deepcopy(fields)))
+        if self.fail:
+            raise BackendError("fixture-secret-only")
         return copy.deepcopy(self.wireless)
 
     async def devices(self, action="status", **fields):
         self.calls.append(("devices", action, fields))
+        if self.fail:
+            raise BackendError("Stopped")
         if action == "information":
-            return {
-                "model": "Fixture Computer",
-                "board": "Fixture Board",
-                "cpu": "Fixture CPU",
-                "memoryKiB": 8388608,
-                "availableMemoryKiB": 4194304,
-                "gpus": [{"name": "Fixture Graphics", "driver": "amdgpu"}],
-                "displays": [{"name": "DP-1", "modes": ["1920x1080"]}],
-                "interfaces": ["eth0", "wlan0"],
-                "batteries": [],
-                "os": "NixOS",
-                "kernel": "fixture-kernel",
-                "uptimeSeconds": 600,
-                "target": "folio",
-            }
-        if action == "volume":
-            self.device["audio"]["sinks"][0]["volume"] = fields["level"]
-        return copy.deepcopy(self.device)
+            return {"model": "Folio workstation", "board": "MSI MAG B650M MORTAR WIFI", "cpu": "AMD Ryzen 7 9700X", "memoryKiB": 33554432, "availableMemoryKiB": 25165824, "os": "NixOS", "kernel": "6.18", "target": "folio", "uptimeSeconds": 5400, "gpus": [{"name": "NVIDIA RTX 3090", "driver": "nvidia"}], "displays": [{"name": "DP-1", "modes": ["2560×1440 @ 144 Hz"]}], "interfaces": ["wlan0", "eth0"], "batteries": []}
+        return {"audio": {"available": True, "default": "speaker", "sinks": [{"name": "speaker", "description": "Built-in speakers", "volume": 42, "mute": False}, {"name": "headphones", "description": "USB headphones", "volume": 30, "mute": False}]}, "backlights": [{"name": "intel_backlight", "percent": 65}]}
 
     async def proxy(self, action, **fields):
         self.calls.append(("proxy", action, fields))
+        if self.fail:
+            raise BackendError("Stopped")
         if action == "status":
             return {"proxy": {"available": True, "mode": "rule"}}
         if action == "proxy-groups":
-            return {
-                "groups": [
-                    {
-                        "name": "PROXY",
-                        "type": "Selector",
-                        "selected": "DIRECT",
-                        "nodes": ["DIRECT", "[blue]Node"],
-                    }
-                ]
-            }
-        if action == "proxy-delay":
-            raise BackendError("Unavailable")
-        return {}
+            return {"groups": [{"name": "PROXY", "selected": "Hong Kong · 01", "type": "Selector", "nodes": ["Hong Kong · 01", "Tokyo · 02", "Singapore · 03", "DIRECT"]}]}
+        return {"delay": 24}
 
 
-def test_wifi_connect_password_is_masked_and_not_in_worker_description():
-    async def scenario():
-        client = Client()
-        app = Panel(client)
-        async with app.run_test(size=(110, 40)) as pilot:
-            await pilot.pause()
-            assert app.theme == "folio"
-            table = app.query_one("#networks", DataTable)
-            assert table.get_row_at(0)[0].plain == "[red]测试[/red]"
-            await pilot.click("#wifi-connect")
-            await pilot.pause()
-            assert isinstance(app.screen, Connect)
-            password = app.screen.query_one("#password", Input)
-            assert password.password
-            await pilot.click("#toggle-password")
-            await pilot.pause()
-            assert not password.password
-            await pilot.click("#toggle-password")
-            await pilot.pause()
-            assert password.password
-            password.value = "fixture-secret-only"
-            await pilot.click("#connect")
-            await pilot.pause()
-            assert any(
-                call[1] == "connect" and call[2]["password"] == "fixture-secret-only"
-                for call in client.calls
-            )
-            assert all(
-                "fixture-secret-only" not in worker.description
-                for worker in app.workers
-            )
-            assert not isinstance(app.screen, Connect)
-
-    asyncio.run(scenario())
+@pytest.fixture
+def panel():
+    server = PanelServer(Client())
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server
+    server.shutdown()
+    server.server_close()
+    thread.join()
 
 
-def test_no_adapter_and_backend_error_remain_usable():
-    async def scenario():
-        client = Client()
-        app = Panel(client)
-        async with app.run_test(size=(80, 24)) as pilot:
-            await pilot.pause()
-            assert app.query_one("#networks", DataTable).row_count == 1
-            client.wireless["adapters"] = []
-            app.refresh_page()
-            await pilot.pause()
-            assert "No Wi-Fi Adapter" in str(
-                app.query_one("#wifi-state", Static).render()
-            )
-            assert app.query_one("#wifi-connect", Button).disabled
-
-            async def unavailable(*args, **kwargs):
-                raise BackendError("Permission denied")
-
-            client.wifi = unavailable
-            app.refresh_page()
-            await pilot.pause()
-            assert "Permission denied" in str(app.query_one("#banner", Static).render())
-            assert app.query_one("#radio", Button).disabled
-
-    asyncio.run(scenario())
+def request(server, path, data=None, token=True, headers=None, raw=None):
+    body = json.dumps(data).encode() if data is not None else raw
+    values = {"Authorization": "Bearer " + server.token} if token else {}
+    if body is not None:
+        values["Content-Type"] = "application/json"
+    values.update(headers or {})
+    req = Request(server.origin + path, data=body, headers=values)
+    try:
+        response = urlopen(req, timeout=5)
+    except HTTPError as error:
+        response = error
+    with response:
+        return response.status, response.read(), response.headers
 
 
-def test_backend_disappearance_clears_stale_audio_and_proxy_controls():
-    async def scenario():
-        client = Client()
-        app = Panel(client)
-        async with app.run_test(size=(100, 38)) as pilot:
-            app.query_one(TabbedContent).active = "controls"
-            await pilot.pause()
-            assert not app.query_one("#volume", Slider).disabled
-
-            async def unavailable(*args, **kwargs):
-                raise BackendError("Backend stopped")
-
-            client.devices = unavailable
-            app.refresh_page()
-            await pilot.pause()
-            assert app.query_one("#volume", Slider).disabled
-            assert app.query_one("#mute", Button).disabled
-            assert "unavailable" in app.query_one("#volume", Slider).render().plain
-            app.query_one(TabbedContent).active = "proxy"
-            await pilot.pause()
-            assert app.query_one("#nodes", DataTable).row_count == 2
-            client.proxy = unavailable
-            app.refresh_page()
-            await pilot.pause()
-            assert app.query_one("#nodes", DataTable).row_count == 0
-            assert app.query_one("#select-node", Button).disabled
-
-    asyncio.run(scenario())
+def test_reads_and_assets(panel):
+    for endpoint in ("wifi", "devices", "information", "proxy", "ping"):
+        code, body, _ = request(panel, "/api/" + endpoint)
+        assert code == 200 and "data" in json.loads(body)
+    for path, mime in (("/", "text/html"), ("/app.js", "text/javascript"), ("/style.css", "text/css"), ("/theme.css", "text/css")):
+        code, body, headers = request(panel, path, token=False)
+        assert code == 200 and body and headers["Content-Type"].startswith(mime)
+        assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
+    assert request(panel, "/../server.py")[0] == 404
 
 
-def test_slider_debounces_and_missing_backlight_is_disabled():
-    async def scenario():
-        client = Client()
-        app = Panel(client)
-        async with app.run_test(size=(100, 38)) as pilot:
-            app.query_one(TabbedContent).active = "controls"
-            await pilot.pause()
-            assert app.query_one("#brightness", Slider).disabled
-            slider = app.query_one("#volume", Slider)
-            slider.focus()
-            await pilot.press("right", "right", "right")
-            await pilot.pause(0.6)
-            writes = [c for c in client.calls if c[:2] == ("devices", "volume")]
-            assert len(writes) == 1 and writes[0][2]["level"] == 33
-            assert slider.value == 33
-
-    asyncio.run(scenario())
+def test_http_authentication_and_cross_site_requests(panel):
+    assert request(panel, "/api/wifi", token=False)[0] == 403
+    assert request(panel, "/api/wifi", headers={"Authorization": "Bearer invalid"})[0] == 403
+    assert request(panel, "/api/wifi", headers={"Host": "evil.example"})[0] == 403
+    assert request(panel, "/api/wifi", headers={"Origin": "https://evil.example"})[0] == 403
+    assert request(panel, "/api/wifi", headers={"Origin": "null"})[0] == 403
+    assert not panel.client.calls
 
 
-def test_proxy_timeout_and_resize_do_not_change_selection():
-    async def scenario():
-        client = Client()
-        app = Panel(client)
-        async with app.run_test(size=(100, 38)) as pilot:
-            app.query_one(TabbedContent).active = "proxy"
-            await pilot.pause()
-            assert app.query_one("#nodes", DataTable).row_count == 2
-            await pilot.click("#test-node")
-            await pilot.pause(0.5)
-            assert app.delays["DIRECT"] == "Timeout / Unavailable"
-            assert not any(c[1] == "proxy-group-select" for c in client.calls)
-            await pilot.resize_terminal(65, 22)
-            await pilot.pause()
-            assert app.query_one("#nodes", DataTable).row_count == 2
-
-    asyncio.run(scenario())
+def test_actions_reach_module_clients_and_secrets_are_not_reflected(panel):
+    fields = {"interface": "wlan0", "ap": "/ap/1", "password": "fixture-secret-only"}
+    body = {"domain": "wifi", "action": "connect", "fields": fields}
+    code, response, _ = request(panel, "/api/action", body)
+    assert code == 200 and b"fixture-secret-only" not in response
+    assert panel.client.calls[-1] == ("wifi", "connect", fields)
+    panel.client.fail = True
+    code, response, _ = request(panel, "/api/action", body)
+    assert code == 503 and b"fixture-secret-only" not in response
+    assert request(panel, "/api/wifi")[0] == 503
 
 
-def test_forget_and_radio_require_confirmation():
-    async def scenario():
-        client = Client()
-        client.wireless["adapters"][0]["networks"][0]["profiles"] = ["fixture-uuid"]
-        app = Panel(client)
-        async with app.run_test(size=(110, 40)) as pilot:
-            await pilot.pause()
-            await pilot.click("#forget")
-            assert isinstance(app.screen, Confirm)
-            await pilot.click("#cancel")
-            await pilot.pause()
-            assert not any(c[1] == "forget" for c in client.calls)
-            await pilot.click("#radio")
-            assert isinstance(app.screen, Confirm)
-            await pilot.click("#confirm")
-            await pilot.pause()
-            assert any(
-                c[1] == "radio" and c[2]["enabled"] is False for c in client.calls
-            )
+@pytest.mark.parametrize("body", [
+    {"domain": "system", "action": "reboot", "fields": {}},
+    {"domain": "devices", "action": "volume", "fields": {"level": 101}},
+    {"domain": "devices", "action": "volume", "fields": {"level": True}},
+    {"domain": "wifi", "action": "radio", "fields": {"enabled": "false"}},
+    {"domain": "devices", "action": "output", "fields": {}},
+    {"domain": "wifi", "action": "scan", "fields": {"interface": "wlan0", "command": "touch /tmp/escape"}},
+    {"domain": [], "action": "scan", "fields": {}}, [],
+])
+def test_invalid_operations_have_no_effect(panel, body):
+    assert request(panel, "/api/action", body)[0] == 400
+    assert not panel.client.calls
 
-    asyncio.run(scenario())
+
+def test_invalid_json_and_concurrent_mutations(panel):
+    assert request(panel, "/api/action", raw=b"{")[0] == 400
+    assert request(panel, "/api/action", raw=b"x" * 17000)[0] == 400
+    with panel.operation:
+        code, _, _ = request(panel, "/api/action", {"domain": "devices", "action": "mute", "fields": {}})
+    assert code == 409 and not panel.client.calls
+
+
+def test_runtime_record_requires_a_matching_live_server(panel, tmp_path):
+    record = {"origin": panel.origin, "token": panel.token, "source": "fixture"}
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps(record))
+    assert session(tmp_path) == record
+    record["token"] = "wrong-token"
+    path.write_text(json.dumps(record))
+    assert session(tmp_path) is None
+    path.write_text(json.dumps({"origin": "https://example.com", "token": panel.token}))
+    assert session(tmp_path) is None
+
+
+def test_theme_uses_installed_appearance(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    (tmp_path / "folio").mkdir()
+    path = tmp_path / "folio/appearance.json"
+    path.write_text(json.dumps({"appearance": "light", "font-family": "Maple Mono NF CN", "font-size": 18}))
+    css = theme_css()
+    assert b"--bg:#fffbef" in css and b"18pt" in css and b"Maple Mono NF CN" in css
+    path.write_text("invalid json")
+    assert b"16pt" in theme_css()
