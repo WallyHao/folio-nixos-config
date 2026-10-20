@@ -1,5 +1,6 @@
 { pkgs }:
 {
+  niri = import ./compositor.nix { inherit pkgs; };
   clipboard = pkgs.writeShellApplication {
     name = "folio-clipboard-pick";
     runtimeInputs = [ pkgs.cliphist pkgs.fuzzel pkgs.wl-clipboard ];

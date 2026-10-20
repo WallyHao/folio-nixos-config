@@ -10,6 +10,6 @@ in {
   };
   models.system = [ ./model/folio-desktop.yang ];
   models.user = [ ./model/folio-desktop.yang ];
-  nixosModule = import ./src/system.nix { inherit pkgs lib; };
+  nixosModule = import ./src/system.nix { inherit pkgs lib packages; };
   homeManagerModule = import ./src/user.nix { inherit pkgs lib packages; };
 }

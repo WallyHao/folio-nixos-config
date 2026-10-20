@@ -30,7 +30,7 @@ let
       touch "$XDG_RUNTIME_DIR/folio-test-session-exported"
     '';
   };
-in { lib, ... }: {
+in { lib, config, ... }: {
     # Keep the helper in every guest/root-generation closure, not just in the
     # host-side driver string's references.
     environment.etc."folio-test/obs-capture.py".source = ./obs-capture.py;
@@ -57,16 +57,16 @@ in { lib, ... }: {
         StandardInput = "tty";
         StandardOutput = "journal";
         Environment = [ "XDG_RUNTIME_DIR=/run/user/1000" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus" "XDG_SESSION_TYPE=wayland" "XDG_CURRENT_DESKTOP=niri" ];
-        ExecStart = "${pkgs.niri}/bin/niri-session";
+        ExecStart = "${config.programs.niri.package}/bin/niri-session";
       };
     };
     systemd.user.services.niri.serviceConfig = lib.mkIf (!drm) {
       Environment = "LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath (with pkgs; [ libxcursor libxrandr libxi libx11 libxkbcommon libglvnd ])}";
-      ExecStart = lib.mkForce [ "" "${pkgs.niri}/bin/niri --config /home/folio/.config/niri/config.test.kdl -- ${exportSession}/bin/folio-test-export-niri-session" ];
+      ExecStart = lib.mkForce [ "" "${config.programs.niri.package}/bin/niri --config /home/folio/.config/niri/config.test.kdl -- ${exportSession}/bin/folio-test-export-niri-session" ];
       ExecStartPost = "${pkgs.coreutils}/bin/timeout 20 ${pkgs.bash}/bin/bash -c 'until test -f /run/user/1000/folio-test-session-exported; do sleep 0.1; done'";
     };
     environment.systemPackages = [ pkgs.jq pkgs.xdotool pkgs.libnotify pkgs.wayland-utils
-      pkgs.wl-clipboard pkgs.glib pkgs.pipewire pkgs.cliphist pkgs.mako pkgs.niri testPython ];
+      pkgs.wl-clipboard pkgs.glib pkgs.pipewire pkgs.cliphist pkgs.mako config.programs.niri.package testPython ];
     virtualisation = {
       qemu.package = lib.mkIf drm (lib.mkForce softwareQemu);
       qemu.options = pkgs.lib.optionals drm [ "-vga none" "-device virtio-vga-gl" ];

@@ -1,10 +1,10 @@
-{ pkgs, lib }:
+{ pkgs, lib, packages }:
 context: {
-  programs.niri = { enable = true; useNautilus = false; };
+  programs.niri = { enable = true; package = packages.niri; useNautilus = false; };
   services.greetd = {
     enable = true;
     settings.default_session = {
-      command = "${pkgs.tuigreet}/bin/tuigreet --cmd ${pkgs.niri}/bin/niri-session";
+      command = "${pkgs.tuigreet}/bin/tuigreet --cmd ${packages.niri}/bin/niri-session";
       user = "greeter";
     };
   };

@@ -1085,6 +1085,15 @@ recolored GoogleDot cursor and GTK resources. Shared preference and module overr
 origins are recorded in `~/.config/folio/appearance.json`. Applying a generation
 does not log out the current desktop; session-dependent changes need a new login.
 
+The desktop owns a patched Niri 26.04 package with a 150 ms focus-ring opacity
+transition. The previous ring fades out while the new ring fades in; interrupted
+transitions resume from their current opacity. Window content opacity is unchanged.
+The transition follows Niri's global animation disable and slowdown settings.
+Both the system session and the user session unit select this package. Applying
+it preserves the running compositor; log out and back in to load a new binary.
+Run `nix build .#checks.x86_64-linux.desktop-focus-fade` for an isolated software
+display check that samples actual ring pixels before, during and after a switch.
+
 Fcitx5/Rime Ice starts as a user service. Initial profile and candidate defaults
 are seeded only when absent; existing personal profiles, dictionaries and history
 are preserved. The bar observes the real input-method indicator. Chinese input

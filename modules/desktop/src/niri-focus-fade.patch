@@ -1,0 +1,256 @@
+diff --git a/src/layout/floating.rs b/src/layout/floating.rs
+index d102f40..6d21803 100644
+--- a/src/layout/floating.rs
++++ b/src/layout/floating.rs
+@@ -1076,7 +1076,8 @@ impl<W: LayoutElement> FloatingSpace<W> {
+         let active = self.active_window_id.clone();
+         for (tile, tile_pos) in self.tiles_with_render_positions() {
+             // For the active tile, draw the focus ring.
+-            let focus_ring = focus_ring && Some(tile.window().id()) == active.as_ref();
++            let focus_ring = (focus_ring && Some(tile.window().id()) == active.as_ref())
++                || tile.is_focus_ring_fading_out();
+ 
+             let xray_pos = xray_pos.offset(tile_pos);
+             tile.render(ctx.r(), tile_pos, xray_pos, focus_ring, &mut |elem| {
+diff --git a/src/layout/focus_fade.rs b/src/layout/focus_fade.rs
+new file mode 100644
+index 0000000..01da3c8
+--- /dev/null
++++ b/src/layout/focus_fade.rs
+@@ -0,0 +1,131 @@
++//! A reversible opacity transition for focus rings, independent of window opacity.
++
++use crate::animation::{Animation, Clock, Curve};
++
++#[derive(Debug)]
++pub(super) struct FocusFade {
++    clock: Clock,
++    active: bool,
++    animation: Option<Animation>,
++}
++
++impl FocusFade {
++    pub(super) fn new(clock: Clock) -> Self {
++        Self {
++            clock,
++            active: false,
++            animation: None,
++        }
++    }
++
++    pub(super) fn update(&mut self, active: bool) {
++        if self.active == active {
++            return;
++        }
++        // Sample before changing the target so an interrupted fade never jumps.
++        let from = self.value();
++        self.active = active;
++        self.animation = Some(Animation::ease(
++            self.clock.clone(),
++            from,
++            if active { 1. } else { 0. },
++            0.,
++            150,
++            Curve::EaseOutCubic,
++        ));
++    }
++
++    pub(super) fn value(&self) -> f64 {
++        self.animation
++            .as_ref()
++            .map_or(if self.active { 1. } else { 0. }, |animation| {
++                animation.clamped_value().clamp(0., 1.)
++            })
++    }
++
++    pub(super) fn advance(&mut self) {
++        if self.animation.as_ref().is_some_and(Animation::is_done) {
++            self.animation = None;
++        }
++    }
++
++    pub(super) fn is_ongoing(&self) -> bool {
++        self.animation
++            .as_ref()
++            .is_some_and(|animation| !animation.is_done())
++    }
++
++    pub(super) fn is_fading_out(&self) -> bool {
++        !self.active && self.is_ongoing()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::time::Duration;
++
++    #[test]
++    fn fades_in_and_out_and_stops_requesting_frames() {
++        let mut clock = Clock::with_time(Duration::ZERO);
++        let mut fade = FocusFade::new(clock.clone());
++        assert_eq!(fade.value(), 0.);
++        assert!(!fade.is_ongoing());
++        fade.update(true);
++        assert_eq!(fade.value(), 0.);
++        clock.set_unadjusted(Duration::from_millis(75));
++        assert!(fade.value() > 0. && fade.value() < 1.);
++        // Repeated render updates must not restart a transition.
++        fade.update(true);
++        clock.set_unadjusted(Duration::from_millis(150));
++        fade.advance();
++        assert_eq!(fade.value(), 1.);
++        assert!(!fade.is_ongoing());
++        fade.update(false);
++        assert!(fade.is_fading_out());
++        clock.set_unadjusted(Duration::from_millis(225));
++        assert!(fade.value() > 0. && fade.value() < 1.);
++        clock.set_unadjusted(Duration::from_millis(300));
++        fade.advance();
++        assert_eq!(fade.value(), 0.);
++        assert!(!fade.is_fading_out());
++        assert!(!fade.is_ongoing());
++    }
++
++    #[test]
++    fn rapid_focus_reversal_preserves_current_opacity() {
++        let mut clock = Clock::with_time(Duration::ZERO);
++        let mut fade = FocusFade::new(clock.clone());
++        fade.update(true);
++        clock.set_unadjusted(Duration::from_millis(40));
++        let before = fade.value();
++        fade.update(false);
++        assert_eq!(fade.value(), before);
++        clock.set_unadjusted(Duration::from_millis(60));
++        assert!(fade.value() < before);
++        let before = fade.value();
++        fade.update(true);
++        assert_eq!(fade.value(), before);
++        clock.set_unadjusted(Duration::from_millis(210));
++        fade.advance();
++        assert_eq!(fade.value(), 1.);
++    }
++
++    #[test]
++    fn respects_global_animation_disable_and_slowdown() {
++        let mut clock = Clock::with_time(Duration::ZERO);
++        let mut fade = FocusFade::new(clock.clone());
++        clock.set_rate(0.5);
++        fade.update(true);
++        clock.set_unadjusted(Duration::from_millis(150));
++        assert!(fade.value() > 0. && fade.value() < 1.);
++        clock.set_complete_instantly(true);
++        assert_eq!(fade.value(), 1.);
++        fade.advance();
++        assert!(!fade.is_ongoing());
++        fade.update(false);
++        assert_eq!(fade.value(), 0.);
++        fade.advance();
++        assert!(!fade.is_ongoing());
++    }
++}
+diff --git a/src/layout/mod.rs b/src/layout/mod.rs
+index 5c4dd63..091bd9c 100644
+--- a/src/layout/mod.rs
++++ b/src/layout/mod.rs
+@@ -77,6 +77,7 @@ use crate::window::ResolvedWindowRules;
+ 
+ pub mod closing_window;
+ pub mod floating;
++mod focus_fade;
+ pub mod focus_ring;
+ pub mod insert_hint_element;
+ pub mod monitor;
+diff --git a/src/layout/scrolling.rs b/src/layout/scrolling.rs
+index 007bcaf..24c1fd8 100644
+--- a/src/layout/scrolling.rs
++++ b/src/layout/scrolling.rs
+@@ -2942,8 +2942,8 @@ impl<W: LayoutElement> ScrollingSpace<W> {
+ 
+                 // And now the drawing logic.
+ 
+-                // For the active tile (which comes first), draw the focus ring.
+-                let focus_ring = focus_ring && first;
++                // Retain the outgoing ring until its opacity transition finishes.
++                let focus_ring = (focus_ring && first) || tile.is_focus_ring_fading_out();
+                 first = false;
+ 
+                 // In the scrolling layout, we currently use visible only for hidden tabs in the
+diff --git a/src/layout/tile.rs b/src/layout/tile.rs
+index 86c7eba..7891361 100644
+--- a/src/layout/tile.rs
++++ b/src/layout/tile.rs
+@@ -8,6 +8,7 @@ use smithay::backend::renderer::element::{Element, Kind};
+ use smithay::backend::renderer::gles::GlesRenderer;
+ use smithay::utils::{Logical, Point, Rectangle, Scale, Size};
+ 
++use super::focus_fade::FocusFade;
+ use super::focus_ring::{FocusRing, FocusRingRenderElement};
+ use super::opening_window::{OpenAnimation, OpeningWindowRenderElement};
+ use super::shadow::Shadow;
+@@ -47,6 +48,9 @@ pub struct Tile<W: LayoutElement> {
+     /// The focus ring around the window.
+     focus_ring: FocusRing,
+ 
++    /// Opacity transition for this tile's focus ring only.
++    focus_fade: FocusFade,
++
+     /// The shadow around the window.
+     shadow: Shadow,
+ 
+@@ -192,6 +196,7 @@ impl<W: LayoutElement> Tile<W> {
+             window,
+             border: FocusRing::new(border_config.into()),
+             focus_ring: FocusRing::new(focus_ring_config),
++            focus_fade: FocusFade::new(clock.clone()),
+             shadow: Shadow::new(shadow_config),
+             sizing_mode,
+             fullscreen_backdrop: SolidColorBuffer::new((0., 0.), [0., 0., 0., 1.]),
+@@ -411,6 +416,8 @@ impl<W: LayoutElement> Tile<W> {
+     }
+ 
+     pub fn advance_animations(&mut self) {
++        self.focus_fade.advance();
++
+         if let Some(open) = &mut self.open_animation {
+             if open.is_done() {
+                 self.open_animation = None;
+@@ -446,7 +453,8 @@ impl<W: LayoutElement> Tile<W> {
+     }
+ 
+     pub fn are_transitions_ongoing(&self) -> bool {
+-        self.open_animation.is_some()
++        self.focus_fade.is_ongoing()
++            || self.open_animation.is_some()
+             || self.resize_animation.is_some()
+             || self.move_x_animation.is_some()
+             || self.move_y_animation.is_some()
+@@ -456,7 +464,12 @@ impl<W: LayoutElement> Tile<W> {
+                 .is_some_and(|alpha| !alpha.anim.is_done())
+     }
+ 
++    pub fn is_focus_ring_fading_out(&self) -> bool {
++        self.focus_fade.is_fading_out()
++    }
++
+     pub fn update_render_elements(&mut self, is_active: bool, view_rect: Rectangle<f64, Logical>) {
++        self.focus_fade.update(is_active);
+         let rules = self.window.rules();
+         let animated_tile_size = self.animated_tile_size();
+         let expanded_progress = self.expanded_progress();
+@@ -527,13 +540,13 @@ impl<W: LayoutElement> Tile<W> {
+         let radius = radius.expanded_by(self.focus_ring.width() as f32);
+         self.focus_ring.update_render_elements(
+             animated_tile_size,
+-            is_active,
++            true,
+             !draw_focus_ring_with_background,
+             self.window.is_urgent(),
+             view_rect,
+             radius,
+             self.scale,
+-            1. - expanded_progress as f32,
++            (1. - expanded_progress as f32) * self.focus_fade.value() as f32,
+         );
+ 
+         self.fullscreen_backdrop.resize(animated_tile_size);

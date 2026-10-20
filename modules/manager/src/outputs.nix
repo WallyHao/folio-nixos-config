@@ -224,6 +224,10 @@ in
     ];
   };
   checks.${system} = {
+    desktop-focus-fade = import ../../desktop/tests/focus-fade.nix {
+      inherit pkgs;
+      niri = catalogue.desktop.packages.niri;
+    };
     agents = import ../../agents/tests/runtime.nix {
       inherit pkgs bootstrap;
       dsh = catalogue.agents.packages.dsh;

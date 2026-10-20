@@ -119,3 +119,47 @@ are in `~/.local/state/folio/migration/outer-margins-KENsChI0/`.
 1252 × 1376 logical pixels on the current 2560 × 1440 logical output, matching
 the retained 40-pixel top reservation and new 24-pixel bottom inset. The running
 Niri PID stayed 1715 throughout activation. `git diff --check` passes.
+
+## Focus-ring transitions — 2026-10-20
+
+The desktop now owns a version-guarded patch of Niri 26.04. Each tile animates
+only its focus-ring opacity over 150 ms with ease-out-cubic timing. Outgoing
+rings remain rendered until their fade finishes; interrupted fades resume from
+their current opacity. The shared animation clock preserves global disable and
+slowdown behavior. Idle transitions stop requesting frames. Window content,
+straight corners, colors and margins are unchanged.
+
+`src/compositor.nix` and `src/niri-focus-fade.patch` belong to the desktop module;
+its public `desktop-niri` package is selected by both the system login entry and
+the user service. Existing guest instrumentation now follows the configured
+compositor package. The protected user unit retains `X-SwitchMethod=keep-old`.
+No compositor restart, logout or system activation was performed.
+
+Validation:
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --cores 8 -L \
+  .#desktop-niri .#checks.x86_64-linux.desktop-focus-fade
+niri --version
+niri validate
+systemctl --user show niri.service -p MainPID -p ExecStart
+folio --json status
+git diff --check
+```
+
+The package's Rust gate passed 196 tests (including three new transition tests);
+two upstream EGL tests are excluded by the existing Nixpkgs package. The isolated
+Xvfb/software-GL check passed with actual screenshot samples: outgoing red
+255 → 98 → 0; incoming red 0 → 157 → 255. Its deliberately slowed clock makes
+the intermediate frames observable. Screenshots, samples and logs are in
+`/nix/store/dlq3aa6wgqqqzqpal4cvli2piah27h36-folio-niri-focus-fade`.
+
+Built and applied the frozen source through the normal user plan/build/apply
+flow. Records are in `~/.local/state/folio/migration/focus-fade-Gtvx6afm/`.
+Desired configuration exports before/after are identical. User health is healthy,
+artifact `/nix/store/kpciyzlmy8v2w5bl4kdiw3brzyxzhlqi-home-manager-generation`.
+The installed binary reports `niri 26.04 (Folio focus-fade)`, and the loaded user
+unit points to that binary. The running compositor remains PID 1715 on the old
+binary: log out and back in when convenient to use the transition on the actual
+desktop. The system module selects the same patched package on the next normal
+system deployment; the installed user unit already selects it for the next login.

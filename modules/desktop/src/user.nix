@@ -15,7 +15,7 @@ in {
     assertion = context.capabilities.desktop-provisioned or false;
     message = "Desktop requires the system-provisioned Niri session and portals";
   }];
-  home.packages = [ pkgs.niri pkgs.foot pkgs.xwayland-satellite packages.session ]
+  home.packages = [ packages.niri pkgs.foot pkgs.xwayland-satellite packages.session ]
     ++ lib.optionals (settings.launcher or true) [ pkgs.fuzzel ]
     ++ lib.optionals (settings.clipboard or true) [ packages.clipboard ];
   home.sessionVariables = { MOZ_ENABLE_WAYLAND = "1"; NIXOS_OZONE_WL = "1"; };
@@ -23,7 +23,7 @@ in {
   # its user-level file makes sd-switch stop the running compositor even though
   # the same service remains available from NixOS.
   xdg.configFile."systemd/user/niri.service".source = pkgs.runCommand "folio-niri-session-unit" { } ''
-    cat ${pkgs.niri}/lib/systemd/user/niri.service >$out
+    cat ${packages.niri}/lib/systemd/user/niri.service >$out
     printf '\n[Unit]\nX-SwitchMethod=keep-old\n' >>$out
   '';
   xdg.configFile."niri/config.kdl".text = renderer.renderConfig {
