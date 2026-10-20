@@ -40,7 +40,10 @@ in {
       # Waybar already reserves its exclusive height; retain the normal edge
       # inset rather than subtracting the bar from the compositor work area.
       top = -4;
-      bottom = -4; left = -4; right = -4;
+      # Add to the window gaps for a 24px outer inset at the default gap size.
+      bottom = 16;
+      left = 16;
+      right = 16;
       borderWidth = settings.border-width or 3;
       cornerRadius = settings.corner-radius or 12;
     };

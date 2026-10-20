@@ -102,3 +102,20 @@ Passed evidence:
 The checks do not claim a DeepSeek inference result, browser sign-in health or an
 OBS recording/portal-sharing result. Those application-owned operations were not
 needed to restore the requested packages and existing profile selection.
+
+## Outer window margins — 2026-10-20
+
+Increased the desktop adapter's left, right and bottom struts to 16 logical
+pixels. Combined with the default 8-pixel window gaps, this leaves 24 pixels at
+those edges. The top strut remains -4 to preserve the existing Waybar reservation.
+Fuzzel remains the launcher, bound to Super+D.
+
+Built and applied the frozen source through `folio --json plan --source DIR`,
+`folio --json build PLAN_ID` and `folio --json apply PLAN_ID`. Transaction records
+are in `~/.local/state/folio/migration/outer-margins-KENsChI0/`.
+`folio --json status` reports healthy with user artifact
+`/nix/store/a9qj7mn53x2nycd3r92kjdp47s2n0q59-home-manager-generation`.
+`niri validate` passes; `niri msg --json windows` reports tiled windows of
+1252 × 1376 logical pixels on the current 2560 × 1440 logical output, matching
+the retained 40-pixel top reservation and new 24-pixel bottom inset. The running
+Niri PID stayed 1715 throughout activation. `git diff --check` passes.
