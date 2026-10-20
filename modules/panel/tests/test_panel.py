@@ -107,12 +107,19 @@ def test_wifi_connect_password_is_masked_and_not_in_worker_description():
         app = Panel(client)
         async with app.run_test(size=(110, 40)) as pilot:
             await pilot.pause()
+            assert app.theme == "folio"
             table = app.query_one("#networks", DataTable)
             assert table.get_row_at(0)[0].plain == "[red]测试[/red]"
             await pilot.click("#wifi-connect")
             await pilot.pause()
             assert isinstance(app.screen, Connect)
             password = app.screen.query_one("#password", Input)
+            assert password.password
+            await pilot.click("#toggle-password")
+            await pilot.pause()
+            assert not password.password
+            await pilot.click("#toggle-password")
+            await pilot.pause()
             assert password.password
             password.value = "fixture-secret-only"
             await pilot.click("#connect")
@@ -174,7 +181,7 @@ def test_backend_disappearance_clears_stale_audio_and_proxy_controls():
             await pilot.pause()
             assert app.query_one("#volume", Slider).disabled
             assert app.query_one("#mute", Button).disabled
-            assert "Unavailable" in app.query_one("#volume", Slider).render().plain
+            assert "unavailable" in app.query_one("#volume", Slider).render().plain
             app.query_one(TabbedContent).active = "proxy"
             await pilot.pause()
             assert app.query_one("#nodes", DataTable).row_count == 2

@@ -1,4 +1,4 @@
-"""English, bordered terminal controls. Domain effects belong to module clients."""
+"""English, text-first terminal controls. Domain effects belong to module clients."""
 # ruff: noqa: SIM117 -- nested contexts document the widget hierarchy.
 
 import asyncio
@@ -13,16 +13,15 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.reactive import reactive
 from textual.screen import ModalScreen
+from textual.theme import Theme
 from textual.widget import Widget
 from textual.widgets import (
     Button,
     DataTable,
     Footer,
     Input,
-    Label,
     Select,
     Static,
-    Switch,
     TabbedContent,
     TabPane,
 )
@@ -33,6 +32,72 @@ from .client import BackendError, Client
 def safe(value):
     """External SSIDs/node/device names are plain text, never terminal markup."""
     return re.sub(r"[\x00-\x1f\x7f-\x9f]", "", str(value))
+
+
+# Follow the terminal palette instead of imposing a second application theme.
+# Foot is configured with Everforest ANSI colours, so the same roles work there
+# and remain readable in any other correctly configured terminal.
+FOLIO_THEME = Theme(
+    name="folio",
+    primary="ansi_green",
+    secondary="ansi_blue",
+    accent="ansi_yellow",
+    warning="ansi_yellow",
+    error="ansi_red",
+    success="ansi_green",
+    foreground="ansi_default",
+    background="ansi_default",
+    surface="ansi_default",
+    panel="ansi_default",
+    boost="ansi_default",
+    dark=True,
+    ansi=True,
+    variables={
+        "ansi-background": "ansi_default",
+        "ansi-foreground": "ansi_default",
+        "border": "ansi_bright_black",
+        "border-blurred": "ansi_bright_black",
+        "text-muted": "ansi_bright_black",
+        "text-disabled": "ansi_bright_black",
+        "foreground-muted": "ansi_bright_black",
+        "block-cursor-foreground": "ansi_default",
+        "block-cursor-background": "ansi_bright_black",
+        "block-cursor-text-style": "none",
+        "block-cursor-blurred-foreground": "ansi_default",
+        "block-cursor-blurred-background": "ansi_default",
+        "block-cursor-blurred-text-style": "none",
+        "block-hover-background": "ansi_bright_black",
+        "footer-foreground": "ansi_default",
+        "footer-background": "ansi_default",
+        "footer-key-foreground": "ansi_yellow",
+        "footer-key-background": "transparent",
+        "footer-description-foreground": "ansi_bright_black",
+        "footer-description-background": "transparent",
+        "footer-item-background": "transparent",
+        "input-selection-background": "ansi_blue",
+        "input-selection-foreground": "ansi_default",
+        "button-foreground": "ansi_default",
+        "button-color-foreground": "ansi_default",
+        "button-focus-text-style": "bold",
+    },
+)
+
+
+def status_line(parts):
+    """Compose one quiet text line from (value, style) fragments."""
+    text = Text()
+    for index, (value, style) in enumerate(parts):
+        if index:
+            text.append("  ·  ", style="dim")
+        text.append(safe(value), style=style)
+    return text
+
+
+def action(label, button_id, variant="default"):
+    """Render a command as text rather than as a bordered control."""
+    button = Button(label, id=button_id, variant=variant, compact=True, flat=True)
+    button.active_effect_duration = 0
+    return button
 
 
 class Slider(Widget):
@@ -52,10 +117,14 @@ class Slider(Widget):
 
     def render(self):
         if self.disabled:
-            return Text("Unavailable")
+            return Text("unavailable", style="dim")
         width = max(4, self.size.width - 10)
         filled = round(self.value * width / 100)
-        return Text("━" * filled + "─" * (width - filled) + f" {self.value:3d}%")
+        return Text.assemble(
+            ("━" * filled, "bold yellow" if self.has_focus else "yellow"),
+            ("─" * (width - filled), "dim"),
+            (f" {self.value:3d}%", "dim"),
+        )
 
     def change(self, value):
         value = max(0, min(100, round(value)))
@@ -96,10 +165,10 @@ class Confirm(ModalScreen):
 
     def compose(self):
         with Vertical(classes="dialog"):
-            yield Static(Text(self.message))
-            with Horizontal():
-                yield Button("Cancel", id="cancel")
-                yield Button("Confirm", id="confirm", variant="warning")
+            yield Static(Text(self.message, style="bold"))
+            with Horizontal(classes="dialog-actions"):
+                yield action("cancel", "cancel")
+                yield action("confirm", "confirm", "warning")
 
     @on(Button.Pressed)
     def choose(self, event):
@@ -116,37 +185,55 @@ class Connect(ModalScreen):
 
     def compose(self):
         with Vertical(classes="dialog"):
-            yield Label("Connect to Wi-Fi" if self.network else "Hidden Network")
+            yield Static(
+                Text(
+                    "connect to wi-fi" if self.network else "hidden network",
+                    style="bold yellow",
+                )
+            )
             if self.network:
                 yield Static(
                     Text(safe(self.network["ssid"]) + " · " + self.network["security"])
                 )
                 if self.network["profiles"]:
-                    yield Label("Leave password empty to reuse the saved profile.")
+                    yield Static(
+                        "leave password empty to reuse the saved profile.",
+                        classes="note",
+                    )
             else:
-                yield Input(placeholder="SSID", id="ssid")
+                yield Static("ssid", classes="field-label")
+                yield Input(placeholder="network name", id="ssid", compact=True)
+                yield Static("security", classes="field-label")
                 yield Select(
                     [(v, v) for v in ("WPA Personal", "WPA3", "Open")],
                     value="WPA Personal",
                     allow_blank=False,
                     id="security",
+                    compact=True,
                 )
-            yield Input(placeholder="Network password", password=True, id="password")
-            with Horizontal():
-                yield Switch(id="show-password")
-                yield Label("Show password")
-            yield Static("Credentials are stored by NetworkManager for this user.")
-            with Horizontal():
-                yield Button("Cancel", id="cancel")
-                yield Button("Connect", id="connect", variant="primary")
-
-    @on(Switch.Changed)
-    def show_password(self, event):
-        self.query_one("#password", Input).password = not event.value
+            yield Static("password", classes="field-label")
+            yield Input(
+                placeholder="network password",
+                password=True,
+                id="password",
+                compact=True,
+            )
+            yield Static(
+                "credentials are stored by NetworkManager for this user.",
+                classes="note",
+            )
+            with Horizontal(classes="dialog-actions"):
+                yield action("show", "toggle-password")
+                yield action("cancel", "cancel")
+                yield action("connect", "connect", "primary")
 
     @on(Button.Pressed)
     def choose(self, event):
-        if event.button.id == "cancel":
+        if event.button.id == "toggle-password":
+            password = self.query_one("#password", Input)
+            password.password = not password.password
+            event.button.label = "show" if password.password else "hide"
+        elif event.button.id == "cancel":
             self.query_one("#password", Input).value = ""
             self.dismiss(None)
         elif event.button.id == "connect":
@@ -173,35 +260,103 @@ class Connect(ModalScreen):
 class Panel(App):
     TITLE = "Folio"
     CSS = """
-    Screen { background: #272e33; color: #d3c6aa; }
+    Screen { background: $background; color: $foreground; }
+    #title { height: 1; padding: 0 2; }
     TabbedContent { height: 1fr; }
-    TabPane { padding: 0 1; }
-    .section { border: round #859289; padding: 0 1; height: auto; }
-    .toolbar { height: auto; min-height: 3; }
-    .toolbar Button { min-width: 10; margin-right: 1; }
-    Select { width: 1fr; }
-    DataTable { height: 1fr; min-height: 5; border: round #859289; }
-    #banner { height: auto; max-height: 4; padding: 0 1; color: #a7c080; }
+    TabbedContent > ContentSwitcher { height: 1fr; }
+    Tabs { height: 2; padding: 0 2; background: transparent; }
+    Tab { height: 1; padding: 0 1; background: transparent; color: $text-muted; }
+    Tab:hover { background: transparent; color: $foreground; }
+    Tab.-active { color: $accent; text-style: bold; }
+    Underline { height: 1; }
+    Underline > .underline--bar { color: $accent; background: $text-muted; }
+    TabPane { height: 1fr; padding: 1 0; align-horizontal: center; }
+    .page { width: 100%; max-width: 110; height: 1fr; padding: 0 2; }
+    .field { height: auto; min-height: 1; }
+    .field-label { width: 10; height: 1; color: $text-muted; }
+    .section-label { height: 1; margin-top: 1; color: $text-muted; }
+    .note { height: auto; margin-top: 1; color: $text-muted; }
+    .actions { height: 1; margin-top: 1; }
     #wifi-state, #proxy-state, #audio-state { height: auto; margin-bottom: 1; }
-    Slider { height: 3; border: round #859289; padding: 0 1; }
-    Slider:focus { border: round #a7c080; }
+    #banner { height: 1; padding: 0 2; color: $text-muted; }
+    DataTable.list {
+        height: auto; max-height: 1fr; min-height: 3; padding: 0; border: none;
+        background: transparent; background-tint: transparent;
+    }
+    DataTable.list > .datatable--header {
+        background: transparent; color: $text-muted; text-style: none;
+    }
+    DataTable.list > .datatable--cursor {
+        background: transparent; color: $accent; text-style: bold;
+    }
+    DataTable.list > .datatable--even-row,
+    DataTable.list > .datatable--odd-row { background: transparent; }
+    DataTable.list > .datatable--hover {
+        background: transparent; color: $foreground;
+    }
+    DataTable.list:focus { background-tint: transparent; }
+    DataTable.list:focus > .datatable--cursor {
+        background: transparent; color: $accent; text-style: bold;
+    }
+    Button {
+        height: 1; min-width: 0; padding: 0 1;
+        border: none; background: transparent; color: $text-muted;
+    }
+    Button:hover { border: none; background: transparent; color: $foreground; }
+    Button:focus {
+        border: none; background: transparent; color: $accent; text-style: bold;
+    }
+    Button.-primary { border: none; background: transparent; color: $accent; }
+    Button.-warning { border: none; background: transparent; color: $warning; }
+    Button:disabled {
+        border: none; background: transparent; color: $text-disabled;
+    }
+    Input { height: 1; padding: 0; border: none; background: transparent; }
+    Input:focus {
+        border: none; background: transparent; background-tint: transparent;
+    }
+    Select > SelectCurrent {
+        border: none; background: transparent; padding: 0; height: 1;
+    }
+    Select:focus > SelectCurrent {
+        border: none; background: transparent; background-tint: transparent;
+    }
+    SelectOverlay { border: none; background: $background; padding: 0; }
+    OptionList { border: none; background: $background; padding: 0 1; }
+    OptionList > .option-list--option-highlighted {
+        background: transparent; color: $accent; text-style: bold;
+    }
+    Slider { height: 1; padding: 0; border: none; background: transparent; }
+    Slider:focus { border: none; background: transparent; }
     Slider:disabled { opacity: 40%; }
-    Button:focus, Input:focus { border: tall #a7c080; }
-    Confirm, Connect { align: center middle; }
-    .dialog { width: 64; max-width: 95%; height: auto; max-height: 95%; overflow-y: auto;
-              padding: 1 2; border: round #a7c080; background: #2d353b; }
-    .dialog Horizontal { height: auto; min-height: 3; }
-    .dialog Static, .dialog Label { margin-bottom: 1; height: auto; }
+    Footer { padding: 0 2; background: transparent; color: $text-muted; }
+    FooterKey { background: transparent; }
+    FooterKey > .footer-key--key { background: transparent; color: $accent; }
+    FooterKey > .footer-key--description {
+        background: transparent; color: $text-muted;
+    }
+    Confirm, Connect { align: center middle; background: $background; }
+    .dialog {
+        width: 60; max-width: 95%; height: auto; max-height: 95%;
+        overflow-y: auto; padding: 1 2; border: none;
+        border-left: thick $accent; background: $background;
+    }
+    .dialog .field-label { width: auto; margin-top: 1; }
+    .dialog Static { height: auto; }
+    .dialog Input, .dialog Select { margin-bottom: 1; }
+    .dialog-actions { height: 1; margin-top: 1; align-horizontal: right; }
     #information { height: auto; }
     """
     BINDINGS: ClassVar = [
-        ("q", "quit", "Quit"),
-        ("r", "refresh", "Refresh"),
-        ("?", "help", "Help"),
+        ("q", "quit", "quit"),
+        ("r", "refresh", "refresh"),
+        ("?", "help", "help"),
     ]
 
     def __init__(self, client=None):
         super().__init__()
+        self.register_theme(FOLIO_THEME)
+        self.theme = "folio"
         self.client = client or Client()
         self.interface = ""
         self.wifi_data = {}
@@ -213,90 +368,112 @@ class Panel(App):
         self.slider_timers = {}
 
     def compose(self) -> ComposeResult:
+        yield Static(
+            Text.assemble(("folio", "bold yellow"), ("  panel", "dim")),
+            id="title",
+        )
         with TabbedContent(initial="wifi"):
-            with TabPane("Wi-Fi", id="wifi"):
-                with Vertical(classes="section"):
-                    yield Label("Wireless adapter")
-                    yield Select([], id="adapter", prompt="No Wi-Fi Adapter")
+            with TabPane("wi-fi", id="wifi"):
+                with Vertical(classes="page"):
+                    with Horizontal(classes="field"):
+                        yield Static("adapter", classes="field-label")
+                        yield Select(
+                            [], id="adapter", prompt="No Wi-Fi Adapter", compact=True
+                        )
                     yield Static(
                         "Loading wireless state…", id="wifi-state", markup=False
                     )
-                    with Horizontal(classes="toolbar"):
-                        yield Button("Refresh", id="scan")
-                        yield Button("Radio On/Off", id="radio")
-                        yield Button("Hidden Network", id="hidden")
-                yield DataTable(id="networks", cursor_type="row")
-                with Horizontal(classes="toolbar"):
-                    yield Button("Connect", id="wifi-connect", variant="primary")
-                    yield Button("Disconnect", id="disconnect")
-                    yield Button("Forget Network", id="forget")
-            with TabPane("Proxy", id="proxy"):
-                with Vertical(classes="section"):
+                    yield DataTable(id="networks", cursor_type="row", classes="list")
+                    with Horizontal(classes="actions"):
+                        yield action("scan", "scan")
+                        yield action("radio", "radio")
+                        yield action("hidden", "hidden")
+                        yield action("connect", "wifi-connect", "primary")
+                        yield action("disconnect", "disconnect")
+                        yield action("forget", "forget")
+            with TabPane("proxy", id="proxy"):
+                with Vertical(classes="page"):
                     yield Static("Loading proxy state…", id="proxy-state", markup=False)
-                    yield Select([], id="group", prompt="No selectable proxy group")
-                    with Horizontal(classes="toolbar"):
+                    with Horizontal(classes="field"):
+                        yield Static("group", classes="field-label")
                         yield Select(
-                            [(v.title(), v) for v in ("rule", "global", "direct")],
+                            [],
+                            id="group",
+                            prompt="No selectable proxy group",
+                            compact=True,
+                        )
+                        yield Static("mode", classes="field-label")
+                        yield Select(
+                            [(v, v) for v in ("rule", "global", "direct")],
                             value="rule",
                             allow_blank=False,
                             id="mode",
+                            compact=True,
                         )
-                        yield Button("Set Mode", id="set-mode")
-                        yield Button("Refresh", id="proxy-refresh")
-                yield DataTable(id="nodes", cursor_type="row")
-                with Horizontal(classes="toolbar"):
-                    yield Button("Select Node", id="select-node", variant="primary")
-                    yield Button("Test Latency", id="test-node")
-                    yield Button("Test All", id="test-all")
-            with TabPane("Display & Audio", id="controls"):
-                with VerticalScroll():
-                    with Vertical(classes="section"):
-                        yield Label("Audio Output")
-                        yield Select([], id="output", prompt="No audio output")
-                        yield Static(
-                            "Loading audio state…", id="audio-state", markup=False
-                        )
-                        yield Label("Volume · Left/Right to adjust")
-                        yield Slider(id="volume", disabled=True)
-                        with Horizontal(classes="toolbar"):
-                            yield Button("Set Output", id="set-output")
-                            yield Button("Mute / Unmute", id="mute")
-                    with Vertical(classes="section"):
-                        yield Label("Display Backlight")
+                    yield DataTable(id="nodes", cursor_type="row", classes="list")
+                    with Horizontal(classes="actions"):
+                        yield action("set mode", "set-mode")
+                        yield action("select", "select-node", "primary")
+                        yield action("latency", "test-node")
+                        yield action("test all", "test-all")
+                        yield action("refresh", "proxy-refresh")
+            with TabPane("audio", id="controls"):
+                with VerticalScroll(classes="page"):
+                    yield Static("Loading audio state…", id="audio-state", markup=False)
+                    with Horizontal(classes="field"):
+                        yield Static("output", classes="field-label")
                         yield Select(
-                            [], id="backlight", prompt="No supported backlight"
+                            [], id="output", prompt="No audio output", compact=True
                         )
-                        yield Slider(id="brightness", disabled=True)
-                        yield Static(
-                            "External monitor DDC/CI control is not included.",
-                            markup=False,
+                    with Horizontal(classes="actions"):
+                        yield action("set output", "set-output")
+                        yield action("mute / unmute", "mute")
+                    yield Static(
+                        "volume · left/right to adjust", classes="section-label"
+                    )
+                    yield Slider(id="volume", disabled=True)
+                    yield Static("backlight", classes="section-label")
+                    with Horizontal(classes="field"):
+                        yield Static("device", classes="field-label")
+                        yield Select(
+                            [],
+                            id="backlight",
+                            prompt="No supported backlight",
+                            compact=True,
                         )
+                    yield Slider(id="brightness", disabled=True)
                     yield Static(
                         "Runtime controls take effect immediately. They are not included in configuration rollback.",
+                        classes="note",
                         markup=False,
                     )
-            with TabPane("Device", id="device"):
-                with VerticalScroll(classes="section"):
+            with TabPane("device", id="device"):
+                with VerticalScroll(classes="page"):
                     yield Static(
                         "Loading device information…", id="information", markup=False
                     )
-        yield Static("Ready", id="banner", markup=False)
-        yield Footer()
+        yield Static("ready", id="banner", markup=False)
+        yield Footer(compact=True, show_command_palette=False)
 
     async def on_mount(self):
-        self.query_one("#networks", DataTable).add_columns(
-            "Network", "Signal", "Security", "State"
-        )
-        self.query_one("#nodes", DataTable).add_columns("Node", "State", "Latency")
+        networks = self.query_one("#networks", DataTable)
+        nodes = self.query_one("#nodes", DataTable)
+        networks.add_columns("network", "signal", "security", "state")
+        nodes.add_columns("node", "state", "latency")
+        for table in (networks, nodes):
+            table.show_row_labels = False
+            table.zebra_stripes = False
+            table.cell_padding = 1
         self.set_interval(8, self.poll)
         self.refresh_page()
 
-    def message(self, value):
-        self.query_one("#banner", Static).update(Text(safe(value)))
+    def message(self, value, style="dim"):
+        self.query_one("#banner", Static).update(Text(safe(value), style=style))
 
     def action_help(self):
         self.message(
-            "Tab: focus · arrows: lists/sliders · Enter: select · r: refresh · q: quit. Runtime controls act immediately."
+            "tab/shift+tab: focus · arrows: lists and sliders · enter: select · r: refresh · q: quit",
+            "dim",
         )
 
     def action_refresh(self):
@@ -410,7 +587,7 @@ class Panel(App):
                         "backlights": [],
                     }
                 )
-            self.message(str(error))
+            self.message(str(error), "red")
             label = {
                 "wifi": "wifi-state",
                 "proxy": "proxy-state",
@@ -418,7 +595,7 @@ class Panel(App):
                 "device": "information",
             }[page]
             self.query_one("#" + label, Static).update(
-                Text("Unavailable: " + safe(error))
+                Text("unavailable: " + safe(error), style="red")
             )
 
     def show_wifi(self, data):
@@ -433,16 +610,24 @@ class Panel(App):
             self.interface,
         )
         adapter = self.adapter_data()
-        state = (
-            "No Wi-Fi Adapter"
-            if not adapters
-            else ("Radio On" if data["enabled"] else "Radio Off")
-        )
-        if not data["hardwareEnabled"]:
-            state += " · Hardware radio blocked"
-        state += " · " + adapter.get("state", "Unavailable")
-        state += " · " + ", ".join(adapter.get("addresses", []))
-        self.query_one("#wifi-state", Static).update(Text(safe(state)))
+        if not adapters:
+            state = Text("No Wi-Fi Adapter", style="dim")
+        else:
+            link = adapter.get("state", "unavailable")
+            parts = [
+                (self.interface or "wireless", "bold"),
+                (link, "green" if link == "connected" else "yellow"),
+                (
+                    "radio on" if data["enabled"] else "radio off",
+                    "green" if data["enabled"] else "red",
+                ),
+            ]
+            if not data["hardwareEnabled"]:
+                parts.append(("hardware radio blocked", "red"))
+            for address in adapter.get("addresses", [])[:2]:
+                parts.append((address, "dim"))
+            state = status_line(parts)
+        self.query_one("#wifi-state", Static).update(state)
         rows = [
             (
                 a["path"],
@@ -479,7 +664,13 @@ class Panel(App):
         )
         self.query_one("#mode", Select).value = status["proxy"]["mode"]
         self.query_one("#proxy-state", Static).update(
-            Text("Mihomo Available · " + safe(status["proxy"]["mode"]))
+            status_line(
+                [
+                    ("mihomo", "bold"),
+                    (status["proxy"]["mode"], "yellow"),
+                    ("available", "green"),
+                ]
+            )
         )
         self.show_nodes()
 
@@ -515,13 +706,18 @@ class Panel(App):
         if sink:
             self.query_one("#volume", Slider).value = min(100, sink["volume"])
         self.query_one("#audio-state", Static).update(
-            Text(
-                "Muted"
-                if sink and sink["mute"]
-                else "Ready"
-                if sink
-                else "Audio backend or output unavailable"
+            status_line(
+                [
+                    (sink["description"], "bold"),
+                    (
+                        "muted" if sink["mute"] else "active",
+                        "yellow" if sink["mute"] else "green",
+                    ),
+                    (f"{sink['volume']}%", "dim"),
+                ]
             )
+            if sink
+            else Text("Audio backend or output unavailable", style="red")
         )
         self.select_options(
             "backlight", [(b["name"], b["name"]) for b in data["backlights"]]
@@ -544,40 +740,57 @@ class Panel(App):
 
     def show_information(self, data):
         memory = data["memoryKiB"]
-        lines = [
-            "Current Device",
-            "",
-            "Model       " + data["model"],
-            "Board       " + data["board"],
-            "CPU         " + data["cpu"],
-            "Memory      "
-            + (
-                f"{memory / 1048576:.1f} GiB total · {data['availableMemoryKiB'] / 1048576:.1f} GiB available"
-                if memory
-                else "Unavailable"
-            ),
-            "OS          " + data["os"],
-            "Kernel      " + data["kernel"],
-            "Folio Target " + data["target"],
-            "Uptime      " + str(round(data["uptimeSeconds"] / 60)) + " minutes",
-            "",
-            "Graphics",
-        ]
-        lines += [g["name"] + " · " + g["driver"] for g in data["gpus"]] or [
-            "Unavailable"
-        ]
-        lines += ["", "Connected Displays"] + [
-            d["name"] + " · " + ", ".join(d["modes"][:3]) for d in data["displays"]
-        ]
-        lines += ["", "Network Interfaces", ", ".join(data["interfaces"])]
-        if data["batteries"]:
-            lines += ["", "Battery"] + [
-                b["name"] + " · " + b["capacity"] + "% · " + b["status"]
-                for b in data["batteries"]
-            ]
-        self.query_one("#information", Static).update(
-            Text("\n".join(safe(line) for line in lines))
+        text = Text()
+
+        def heading(label):
+            text.append(label + "\n", style="bold yellow")
+
+        def row(label, value):
+            text.append(f"{label:<12}", style="dim")
+            text.append(safe(value) + "\n")
+
+        heading("device")
+        row("model", data["model"])
+        row("board", data["board"])
+        row("cpu", data["cpu"])
+        row(
+            "memory",
+            f"{memory / 1048576:.1f} GiB total · "
+            f"{data['availableMemoryKiB'] / 1048576:.1f} GiB available"
+            if memory
+            else "unavailable",
         )
+        row("os", data["os"])
+        row("kernel", data["kernel"])
+        row("target", data["target"])
+        row("uptime", str(round(data["uptimeSeconds"] / 60)) + " minutes")
+
+        text.append("\n")
+        heading("graphics")
+        for gpu in data["gpus"] or [{"name": "unavailable", "driver": ""}]:
+            row("gpu", (gpu["name"] + " · " + gpu["driver"]).rstrip(" ·"))
+        for display in data["displays"]:
+            row("display", display["name"] + " · " + ", ".join(display["modes"][:3]))
+        if not data["displays"]:
+            row("display", "unavailable")
+
+        text.append("\n")
+        heading("network")
+        row("interfaces", ", ".join(data["interfaces"]) or "unavailable")
+
+        if data["batteries"]:
+            text.append("\n")
+            heading("power")
+            for battery in data["batteries"]:
+                row(
+                    "battery",
+                    battery["name"]
+                    + " · "
+                    + battery["capacity"]
+                    + "% · "
+                    + battery["status"],
+                )
+        self.query_one("#information", Static).update(text)
 
     @on(Select.Changed)
     def selection(self, event):
@@ -601,22 +814,24 @@ class Panel(App):
     @work(group="operation", exclusive=False, description="Module operation")
     async def operate(self, domain, action, **fields):
         if self.busy:
-            self.message("Another operation is in progress")
+            self.message("another operation is in progress", "yellow")
             return
         self.busy = True
-        self.message("Connecting…" if action == "connect" else "Working…")
+        self.message("connecting…" if action == "connect" else "working…")
         try:
             data = await getattr(self.client, domain)(action, **fields)
             if domain == "wifi":
                 self.show_wifi(data)
             elif domain == "devices":
                 self.show_devices(data)
-            self.message("Connected" if action == "connect" else "Operation completed")
+            self.message(
+                "connected" if action == "connect" else "operation completed", "green"
+            )
         except (BackendError, OSError) as error:
-            self.message("Failed: " + str(error))
+            self.message("failed: " + str(error), "red")
         except Exception:  # noqa: BLE001 -- sanitize errors at the credential boundary.
             # Never expose locals/credential-bearing requests in a UI traceback.
-            self.message("Operation failed; refresh state before retrying")
+            self.message("operation failed; refresh state before retrying", "red")
         finally:
             fields.pop("password", None)
             self.busy = False
@@ -647,7 +862,7 @@ class Panel(App):
     def button(self, event):
         name = event.button.id
         if self.busy:
-            self.message("Another operation is in progress")
+            self.message("another operation is in progress", "yellow")
             return
         if name == "scan":
             self.operate("wifi", "scan", interface=self.interface)
@@ -669,13 +884,15 @@ class Panel(App):
         elif name in ("wifi-connect", "hidden"):
             network = self.network() if name == "wifi-connect" else None
             if name == "wifi-connect" and not network:
-                self.message("Select a network first")
+                self.message("select a network first", "yellow")
             elif network and network["security"] not in (
                 "Open",
                 "WPA Personal",
                 "WPA3",
             ):
-                self.message("Enterprise and legacy authentication are not supported")
+                self.message(
+                    "enterprise and legacy authentication are not supported", "red"
+                )
             else:
                 self.push_screen(
                     Connect(network),
@@ -699,7 +916,7 @@ class Panel(App):
         elif name == "forget":
             network = self.network()
             if not network or not network["profiles"]:
-                self.message("Select a saved network first")
+                self.message("select a saved network first", "yellow")
             else:
                 profile = network["profiles"][0]
                 self.push_screen(
@@ -751,7 +968,7 @@ class Panel(App):
             return
         self.testing = True
         deadline = time.monotonic() + 120
-        self.query_one("#test-all", Button).label = "Stop Tests"
+        self.query_one("#test-all", Button).label = "stop tests"
         try:
             for node in nodes:
                 if not node or not self.testing or time.monotonic() > deadline:
@@ -767,7 +984,7 @@ class Panel(App):
                 await asyncio.sleep(0.1)
         finally:
             self.testing = False
-            self.query_one("#test-all", Button).label = "Test All"
+            self.query_one("#test-all", Button).label = "test all"
             self.message(
-                "Latency tests stopped. Results apply only to the configured test endpoint."
+                "latency tests stopped; results apply only to the configured test endpoint."
             )

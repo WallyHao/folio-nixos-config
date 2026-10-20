@@ -775,9 +775,11 @@ nix build --out-link modules/panel/result .#folio
 ./modules/panel/result/bin/folio panel
 ```
 
-The Python/Textual panel uses English labels and bordered pages. Wi-Fi opens
-first; Tab moves focus, arrows navigate lists or adjust sliders, Enter activates
-controls, `r` refreshes and `q` quits outside text inputs.
+The Python/Textual panel is deliberately text-first: one line of tabs, unframed
+lists and inline command hints, using the terminal's ANSI palette instead of a
+second hard-coded application theme. Wi-Fi opens first; Tab moves focus, arrows
+navigate lists or adjust sliders, Enter activates controls, `r` refreshes and `q`
+quits outside text inputs.
 
 - **Wi-Fi:** select an adapter, scan, connect to saved/new/hidden personal
   networks, disconnect, toggle radio and confirm profile deletion. Open and
