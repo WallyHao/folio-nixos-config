@@ -42,7 +42,11 @@ in { config, ... }: {
   };
   programs = {
     bat.enable = selected "bat";
-    btop.enable = selected "btop";
+    btop = {
+      enable = selected "btop";
+      settings = { color_theme = "folio"; theme_background = true; truecolor = true; };
+      themes.folio = import ./btop.nix { inherit lib palette; };
+    };
     eza = { enable = selected "eza"; enableZshIntegration = false; };
     fd.enable = selected "fd";
     ripgrep.enable = selected "ripgrep";

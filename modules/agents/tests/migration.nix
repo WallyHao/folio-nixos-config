@@ -1,4 +1,4 @@
-{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, systemModules,
+{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, applicationsHistory, systemModules,
   homeManager, runtime, prepareInput, source, inputs, switcher }:
 let
   adoptionSource = pkgs.runCommand "folio-legacy-adoption-source" {
@@ -49,6 +49,7 @@ let
     cp ${agentsHistory}/2026-10-19/folio-codex.yang $out/models/user/
     cp ${terminalHistory}/2026-10-19/folio-git.yang $out/models/user/
     cp ${terminalHistory}/2026-10-21/folio-terminal.yang $out/models/user/
+    cp ${applicationsHistory}/2026-10-18/folio-applications.yang $out/models/user/
     jq '."folio-environment:environment".modules |=
       (map(if .name=="agents" then {name:"codex",enabled:true,
          "folio-codex:codex":{theme:false,"shell-completion":false}}
@@ -59,8 +60,10 @@ let
     jq --arg codex "$(sha256sum <$out/models/user/folio-codex.yang | cut -d' ' -f1)" \
        --arg git "$(sha256sum <$out/models/user/folio-git.yang | cut -d' ' -f1)" \
        --arg terminal "$(sha256sum <$out/models/user/folio-terminal.yang | cut -d' ' -f1)" \
+       --arg applications "$(sha256sum <$out/models/user/folio-applications.yang | cut -d' ' -f1)" \
       '.models.user |= (map(select(.name!="folio-agents.yang") |
-        if .name=="folio-terminal.yang" then .sha256=$terminal else . end) +
+        if .name=="folio-terminal.yang" then .sha256=$terminal
+        elif .name=="folio-applications.yang" then .sha256=$applications else . end) +
         [{name:"folio-codex.yang",sha256:$codex},{name:"folio-git.yang",sha256:$git}] | sort_by(.name))' \
       ${bootstrap}/identities.json >$out/identities.json
   '';

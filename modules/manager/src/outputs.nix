@@ -234,6 +234,7 @@ in
       maintenance = catalogue.sysrepo.packages.maintenance;
       agentsHistory = catalogue.agents.packages.schema-history;
       terminalHistory = catalogue.terminal.packages.schema-history;
+      applicationsHistory = catalogue.applications.packages.schema-history;
       systemModules = adapters "system";
       homeManager = inputs.home-manager.lib;
       runtime = collection.packages.manager-runtime;
@@ -308,6 +309,11 @@ in
       runtime = collection.packages.manager-runtime;
       cli = collection.packages.manager-cli;
       repository = collection.packages.sysrepo-tools;
+      prepareInput = collection.packages.manager-input;
+    };
+    applications-native = import ../../applications/tests/native.nix {
+      inherit pkgs inputs bootstrap;
+      source = pkgs.folio.source;
       prepareInput = collection.packages.manager-input;
     };
     applications = lib.makeOverridable ({ cache ? null, plans ? null }: import ../../applications/tests/guest.nix {

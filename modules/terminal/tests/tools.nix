@@ -11,7 +11,9 @@ pkgs.runCommand "folio-developer-tools" {
   chmod -R u+w "$HOME"
   # Relocate the generated absolute history path for this unprivileged builder;
   # the guest gate separately exercises /home/folio without relocation.
-  substituteInPlace "$HOME/.zshrc" --replace-fail '/home/folio' "$HOME"
+  for startup in "$HOME/.zshenv" "$HOME"/.config/zsh/.zsh*; do
+    test ! -f "$startup" || substituteInPlace "$startup" --replace '/home/folio' "$HOME"
+  done
   zsh -i -c '[[ -n "$HISTFILE" ]] && (( $+functions[compdef] )) && (( $+functions[ll] ))'
   test "$(stat -c %a "$XDG_STATE_HOME/folio/zsh")" = 700
   test "$(stat -c %a "$XDG_CACHE_HOME/zsh")" = 700
@@ -28,6 +30,10 @@ pkgs.runCommand "folio-developer-tools" {
   assert plistlib.loads(theme.read_bytes())['settings']
   assert not (theme.parent.parent/'auth.json').exists()
   assert not (theme.parent.parent/'config.toml').exists()
+  btop = pathlib.Path(os.environ['XDG_CONFIG_HOME'])/'btop'
+  assert 'color_theme = "folio"' in (btop/'btop.conf').read_text()
+  assert 'theme[main_bg]="#272e33"' in (btop/'themes/folio.theme').read_text()
+  assert 'theme[title]="#dbbc7f"' in (btop/'themes/folio.theme').read_text()
   PY
   ${editor}/bin/emacs --batch --load ${../../emacs/tests/org-roam.el}
   mkdir $out

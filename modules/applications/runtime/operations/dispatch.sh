@@ -60,7 +60,19 @@ if [[ "$action" == list ]]; then
         dependencies:[$inventory[0][] | select(.ref|startswith("runtime/"))],
         unsupported:(if $desired.name=="obs" then ["OBS appearance remains application-owned"]
           else ["Workspace seeding is unavailable without a supported browser API"] end)}' >>"$work/apps.jsonl"
-  done < <(jq -c '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications".app[]?' "$work/configuration.json")
+  done < <(jq -c '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications" as $settings | $settings.app[]? | select(($settings.native[.name] // false) == false)' "$work/configuration.json")
+  generation=$(manifest || true)
+  while IFS= read -r name; do
+    native=null
+    if [[ -n "$generation" ]]; then
+      native=$(jq -c --arg name "$name" '.nativeApplications[]? | select(.name==$name)' "$generation/folio-applications.json")
+    fi
+    installed=false
+    if [[ -n "$native" && "$native" != null && -x $(jq -er .executable <<<"$native") ]]; then installed=true; fi
+    jq -cn --arg name "$name" --argjson installed "$installed" --argjson actual "${native:-null}" \
+      '{name:$name,delivery:"native",desired:{name:$name,selected:true,delivery:"native"},installed:$installed,owned:$installed,actual:$actual,
+        configurationState:(if $installed then "applied" else "configuration-pending" end),dependencies:[],unsupported:[]}' >>"$work/apps.jsonl"
+  done < <(jq -r '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications".native // {} | to_entries[] | select((.key=="zen" or .key=="obs") and .value==true) | .key' "$work/configuration.json")
   result success "$(jq -cs '{applications:.,scope:"user"}' "$work/apps.jsonl")"
 fi
 request_id=$(jq -er '."request-id"' "$work/request.json")
@@ -102,6 +114,9 @@ for pending in "$app_state/tasks/"*.json; do
 done
 configuration >"$work/configuration.json"
 configuration_digest=$(hash_file "$work/configuration.json")
+if [[ "$application" != all ]] && jq -e --arg name "$application" '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications".native[$name] == true' "$work/configuration.json" >/dev/null; then
+  result unavailable null 'Native application packages are changed with folio apply, not Flatpak lifecycle commands'
+fi
 [[ $(jq -er '."folio-environment:environment".account' "$work/configuration.json") == "$(id -un)" ]] || result invalid null 'Applications require the provisioned account'
 jq -e '."folio-environment:environment".modules[] | select(.name=="applications" and .enabled==true)' "$work/configuration.json" >/dev/null || result unavailable null 'Enable and apply the applications contribution first'
 if [[ "$action" != init ]]; then

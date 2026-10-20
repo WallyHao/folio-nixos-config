@@ -2,4 +2,5 @@ Usage: folio apps init|list|install|update|remove|reconcile|adopt|prepare [zen|o
        folio apps rollback REVISION_ID [zen|obs|all]
        folio apps resume|status TASK_ID
 Options: --offline, --adopt-files, --request-id ID.
+Native Zen Beta/OBS packages are selected in applications.native and deployed with folio apply.
 Use --no-wait before the command to stop waiting after acceptance.

@@ -56,7 +56,7 @@ if [[ "$action" == rollback ]]; then
         (if (.ref|startswith("runtime/")) then
           all($actual[0][]; .ref!=$op.ref or .commit==$op.commit) else true end))' <<<"$rollback_plan" >/dev/null ||
       fail unavailable 'Application rollback content is unavailable or would change a shared runtime' 3
-  done < <(jq -r '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications".app[]? | select(.selected) | .name' "$work/configuration.json")
+  done < <(jq -r '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications" as $settings | $settings.app[]? | select(.selected and (($settings.native[.name] // false)==false)) | .name' "$work/configuration.json")
 fi
 if [[ "$action" == init ]]; then
   [[ "$offline" != true ]] || fail unavailable 'Remote initialization requires an explicit online request' 3
@@ -199,7 +199,7 @@ else
     jq --arg state "$configuration_state" --slurpfile instances "$work/instances.json" \
       '.configurationState=$state | .restartInstances=$instances[0]' "$owned" | folio-atomic-write "$owned"
     jq --arg name "$name" --slurpfile owned "$owned" '.applications[$name]=$owned[0]' "$record" | folio-atomic-write "$record"
-  done < <(jq -c '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications".app[]?' "$work/configuration.json")
+  done < <(jq -c '."folio-environment:environment".modules[] | select(.name=="applications") | ."folio-applications:applications" as $settings | $settings.app[]? | select(($settings.native[.name] // false)==false)' "$work/configuration.json")
 fi
 inventory >"$work/after.json"
 jq --slurpfile after "$work/after.json" --arg now "$(date -u +%FT%TZ)" \

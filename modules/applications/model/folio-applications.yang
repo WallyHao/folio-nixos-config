@@ -4,7 +4,8 @@ module folio-applications {
   prefix fa;
   import folio-environment { prefix fe; revision-date 2026-10-18; }
   organization "Folio";
-  description "User-owned Flatpak application selection, permissions and regular files.";
+  description "User application packages, Flatpak selection, permissions and regular files.";
+  revision 2026-10-23 { description "Explicit native Zen Beta and OBS package selection."; }
   revision 2026-10-18 { description "Owned Zen and OBS lifecycle with frozen file manifests."; }
 
   typedef application { type enumeration { enum zen; enum obs; } description "Supported application identity."; }
@@ -12,6 +13,18 @@ module folio-applications {
     when "fe:name = 'applications'";
     container applications {
       presence "Applications settings are supplied.";
+      must "not(native/zen = 'true' and app[name = 'zen']/selected = 'true')";
+      must "not(native/obs = 'true' and app[name = 'obs']/selected = 'true')";
+      container native {
+        description "Native packages are deployed and rolled back with the user generation, independently of Flatpak lifecycle commands.";
+        leaf zen { type boolean; default false; }
+        leaf obs { type boolean; default false; }
+        leaf zen-profile {
+          when "../zen = 'true'";
+          type string { length '1..128'; pattern '[A-Za-z0-9][A-Za-z0-9._ -]*'; }
+          description "Existing profile directory under XDG_CONFIG_HOME/zen, passed directly to Zen Beta without copying application data.";
+        }
+      }
       list app {
         key name;
         leaf name { type application; }

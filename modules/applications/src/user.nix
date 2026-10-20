@@ -1,7 +1,10 @@
 { pkgs, lib, runtime }:
-context: { folioBootstrap, ... }: {
+context: { folioBootstrap, config, ... }:
+let native = import ./native.nix { inherit pkgs lib context config; };
+in {
     assertions = [{ assertion = context.capabilities.flatpak-provisioned or false; message = "Applications require system-provisioned Flatpak support"; }];
-    home.packages = [ pkgs.flatpak ];
+    home.packages = [ pkgs.flatpak ] ++ native.packages;
+    xdg.desktopEntries = native.desktopEntries;
     systemd.user.services.folio-applications = {
       Unit = {
         Description = "Folio owned applications subscriber";
@@ -21,9 +24,9 @@ context: { folioBootstrap, ... }: {
       Install.WantedBy = [ "default.target" ];
     };
     home.extraBuilderCommands = ''
-      cp ${pkgs.writeText "folio-applications.json" (builtins.toJSON (import ./flatpak.nix {
+      cp ${pkgs.writeText "folio-applications.json" (builtins.toJSON ((import ./flatpak.nix {
         inherit pkgs lib context;
         configurationDigest = context.configurationDigest or null;
-      }))} $out/folio-applications.json
+      }) // { nativeApplications = native.manifest; }))} $out/folio-applications.json
     '';
   }

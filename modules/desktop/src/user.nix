@@ -37,7 +37,9 @@ in {
     deviceControl = if builtins.elem "devices" context.enabledModules then "${pkgs.folio.cli}/bin/folio" else null;
     layout = {
       gaps = settings.gaps or 8;
-      top = if bar then -32 else -4;
+      # Waybar already reserves its exclusive height; retain the normal edge
+      # inset rather than subtracting the bar from the compositor work area.
+      top = -4;
       bottom = -4; left = -4; right = -4;
       borderWidth = settings.border-width or 3;
       cornerRadius = settings.corner-radius or 12;

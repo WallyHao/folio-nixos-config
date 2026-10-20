@@ -554,7 +554,7 @@ System and user module selections are separate. Defaults are:
 | terminal | Login shell registration | Foot, Zsh, prompt, tools, Typst and Git/GitHub CLI |
 | emacs | None | Emacs, Org, Org-roam |
 | agents | None | Codex and optional DeepSeek Harness |
-| applications | Flatpak support | Flatpak apps and their configuration |
+| applications | Flatpak support | Native Zen Beta/OBS packages and explicit Flatpak lifecycle |
 
 The concrete adapter owns the NixOS/Home Manager options. In particular, audio
 device setup and user audio services are not configured independently by two
@@ -900,6 +900,20 @@ All Flatpak applications belong to `applications`. Install as the user with
 `--user`; initialize Flathub explicitly from its official repository descriptor.
 The bootstrap app set is Zen (`app.zen_browser.zen`) and OBS
 (`com.obsproject.Studio`). Typst stays in `terminal` through Nix.
+
+For native installations, select `applications.native.zen` and/or
+`applications.native.obs`, and set the corresponding Flatpak `app.selected` to
+false. The model rejects selecting both deliveries for the same application.
+Native packages and launchers are installed and rolled back with the Home Manager
+generation through `folio apply`; `folio apps list` reports their actual delivered
+executables. Flatpak lifecycle commands operate only on Flatpak selections.
+
+Native Zen Beta uses the reviewed Sylphy upstream pin. Optionally set
+`applications.native.zen-profile` to an existing profile directory name under
+`~/.config/zen/` (for example `sylphy`). Both `zen-beta` and its desktop entry then
+open that directory directly; no browser data is copied or reset. OBS configuration
+also remains application owned. Native selections default to false when upgrading
+an existing repository; enabling them is a separate explicit desired change.
 
 The current application entry is `folio apps` in user scope. Enable/apply its
 system contribution for Flatpak infrastructure and its user contribution for the
