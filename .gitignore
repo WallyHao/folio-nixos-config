@@ -3,6 +3,8 @@
 /.codex/
 /result
 /result-*
+/modules/panel/result
+/modules/panel/result-*
 *.qcow2
 *.raw
 *.log

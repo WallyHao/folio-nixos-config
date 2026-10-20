@@ -771,8 +771,8 @@ the direct sysrepocfg path.
 Build the shared frontend and launch it as your desktop user:
 
 ```sh
-nix build .#folio
-./result/bin/folio panel
+nix build --out-link modules/panel/result .#folio
+./modules/panel/result/bin/folio panel
 ```
 
 The Python/Textual panel uses English labels and bordered pages. Wi-Fi opens
