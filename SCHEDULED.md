@@ -301,3 +301,11 @@ GC-rooted. Interactive sudo authentication still prevents running this final roo
 step from the agent environment. Repeat the same local sudo command above to
 finish; no repeat system switch is requested. Actual host archiving and transient
 hostname synchronization remain pending that invocation.
+
+The user subsequently ran the updated launcher successfully and reported archive
+completion at `/var/lib/folio/backups/legacy-j15YxzBg`. Independent read-only host
+verification confirms hostname `folio`, healthy system and user deployments, and
+active manager/proxy services. `/etc/sylphy`, `/var/lib/sylphy-mihomo`,
+`/var/lib/sylphy-mihomo-private`, `/run/sylphy-mihomo` and the old Zen profile path
+are absent. Niri remains PID 1715. Host retirement finalization is complete; keep
+the private archive for explicit recovery before selecting a legacy generation.
