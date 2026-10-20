@@ -11,6 +11,7 @@
     }];
     settings = {
       system = catalogue.system.targetSettings.folio;
+      agents = catalogue.agents.targetSettings.folio;
       network."folio-network:network".proxy = {
         enabled = true; tun = true;
         provider-file = "/var/lib/folio-mihomo-private/provider.yaml";

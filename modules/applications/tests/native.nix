@@ -10,7 +10,7 @@ let
       if .name=="applications" then
         ."folio-applications:applications".app |= map(.selected=false) |
         ."folio-applications:applications".native={zen:true,obs:true,"zen-profile":"fixture"}
-      elif .name=="agents" then ."folio-agents:agents".dsh.enabled=true
+      elif .name=="agents" then ."folio-agents:agents".pi.enabled=true
       else . end)' ${bootstrap}/user.json >configuration.json
     folio-prepare-input configuration.json ${bootstrap} >$out/folio-input.json
   '';
@@ -25,10 +25,10 @@ in pkgs.runCommand "folio-native-applications" {
   mkdir -p "$XDG_CONFIG_HOME"
   test -x ${generation}/home-path/bin/zen-beta
   test -x ${generation}/home-path/bin/obs
-  test -x ${generation}/home-path/bin/dsh
+  test -x ${generation}/home-path/bin/pi
   ${generation}/home-path/bin/zen-beta --version >zen-version
   ${generation}/home-path/bin/obs --version >obs-version
-  ${generation}/home-path/bin/dsh --version >dsh-version
+  ${generation}/home-path/bin/pi --version >pi-version
   jq -e '.nativeApplications | length==2 and all(.[]; .executable|startswith("/nix/store/"))' ${generation}/folio-applications.json
   browser=$(jq -er '.nativeApplications[] | select(.name=="zen") | .executable' ${generation}/folio-applications.json)
   grep -F '/home/folio/.config/zen/fixture' "$browser"
@@ -44,5 +44,5 @@ in pkgs.runCommand "folio-native-applications" {
   test ! -e "$profileFiles/places.sqlite"
   test ! -e "$HOME/.config/zen/fixture"
   mkdir $out
-  cp zen-version obs-version dsh-version $out/
+  cp zen-version obs-version pi-version $out/
 ''

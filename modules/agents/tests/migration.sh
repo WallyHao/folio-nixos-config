@@ -44,7 +44,7 @@ jq -e '."folio-environment:environment".modules |
   any(.[]; .name=="agents" and .enabled and
     ."folio-agents:agents".codex.theme==false and
     ."folio-agents:agents".codex."shell-completion"==false and
-    ."folio-agents:agents".dsh.enabled==false) and
+    ."folio-agents:agents".pi.enabled==false) and
   any(.[]; .name=="terminal" and (."folio-terminal:terminal".git |
     .enabled and ."user-name"=="Fixture Contributor" and
     ."user-email"=="fixture@example.invalid" and ."github-cli"==false and

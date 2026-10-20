@@ -1,0 +1,25 @@
+module folio-agents {
+  yang-version 1.1;
+  namespace "urn:folio:agents";
+  prefix fa;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned coding agent selection. Credentials and sessions remain private runtime state.";
+  revision 2026-10-22 { description "Group Codex and DeepSeek Harness in one capability."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'agents'";
+    container agents {
+      when "../../fe:scope = 'user'";
+      presence "Agent settings are supplied.";
+      container codex {
+        leaf enabled { type boolean; default true; }
+        leaf theme { type boolean; default true; }
+        leaf shell-completion { type boolean; default true; }
+      }
+      container dsh {
+        leaf enabled { type boolean; default false; }
+        description "Install the pinned official DeepSeek Harness; configure authentication and plugins natively.";
+      }
+    }
+  }
+}

@@ -590,7 +590,7 @@ System and user module selections are separate. Defaults are:
 | input | Required input infrastructure where applicable | Fcitx5/Rime configuration and session integration |
 | terminal | Login shell registration | Foot, Zsh, prompt, tools, Typst and Git/GitHub CLI |
 | emacs | None | Emacs, Org, Org-roam |
-| agents | None | Codex and optional DeepSeek Harness |
+| agents | None | Codex and optional Pi |
 | applications | Flatpak support | Native Zen Beta/OBS packages and explicit Flatpak lifecycle |
 
 The concrete adapter owns the NixOS/Home Manager options. In particular, audio
@@ -1089,22 +1089,51 @@ a selectable Folio `.tmTheme`.
 Choose it with `/theme`; theme loading follows the
 [official Codex customization interface](https://learn.chatgpt.com/docs/cli-customization).
 Mutable Codex configuration, authentication and session state remain application
-owned. `.dsh.enabled` installs the official DeepSeek Harness, pinned to
-`0.2.1-rc.2` with a complete npm dependency lock. New default configurations enable
-both clients. Run `dsh web` or `dsh headless --help`; model credentials, profiles,
-plugins and sessions remain under the harness's own runtime management. Folio
-does not write API keys or replace mutable agent settings. The Nix package builds
-node-pty and Sharp against Nix libraries, patches native-library paths for NixOS, and uses Node's
-`--expose-internals` path instead of probing the machine code of a distro-built
-Node binary. This compatibility adjustment preserves the harness's plugin loader.
+owned. `.pi.enabled` installs Pi from the root Flake's locked nixpkgs input
+(currently `1.1.0`). Fresh defaults enable both clients. dsh is retired; its
+private data is preserved but its package and compatibility patches are removed.
 
-If Platform account requests encounter CloudFront HTTP 403 or an AWS WAF
-challenge while browser login works, an optional external browser WAF session
-overlay (not included in this repository) accepts
-the browser's WAF cookie and User-Agent at launch. It requires a valid browser
-session and is a workaround pending live verification, not a change to routing.
+Pi uses its native configuration rather than a second YANG representation.
+Maintain shared settings and resources in `modules/agents/src/pi/config/` in this
+same repository. `settings.json`, optional `models.json`, `mcp.json`,
+`keybindings.json`, instruction files, and `extensions/`, `skills/`, `prompts/`,
+`themes/`, and `packages/` use Pi's own formats. Create resources only as needed.
+No separate configuration repository or Folio plugin manager is required.
 
-GitHub/Codex/DeepSeek authentication requires the target user's own setup. Disabling
+The user generation exposes this directory at `~/.config/folio/pi`. Set
+`.pi.config-directory` to an absolute writable checkout directory to edit it
+in place. The `folio` hardware target defaults to
+`/home/folio/Workspace/folio-nixos-config/modules/agents/src/pi/config`;
+existing desired data must select that path explicitly during schema migration.
+The portable target uses an immutable configuration snapshot instead. Without a
+writable directory, edit the repository and apply a new generation; Pi's native
+persistent settings/package writes cannot modify the immutable snapshot.
+
+The `pi` launcher keeps its writable agent directory at
+`$XDG_STATE_HOME/folio/pi` (default `~/.local/state/folio/pi`) and links only the
+native configuration/resource names above into it. Authentication, sessions,
+project trust, downloaded npm/Git packages and caches stay outside the checkout.
+It refuses to replace pre-existing personal configuration files or unrelated
+links. A missing configured checkout fails explicitly. `FOLIO_PI_CONFIG_DIR`
+selects a configuration directory for one invocation; an explicitly supplied
+`PI_CODING_AGENT_DIR` selects another private agent directory.
+
+With the writable checkout selected, `/settings`, model selection and
+`pi install` write native settings back into that checkout. Review and commit
+those changes normally. Put local packages under `config/packages/`; relative
+resource/package paths resolve through the private agent directory, whose named
+resource directories link back to the checkout. Absolute resource paths also
+work. For portable local declarations, use paths such as `./packages/my-tools`
+in `settings.json`; review paths written by `pi install` before sharing them.
+Writable checkout edits are live application configuration: generation rollback
+does not undo them. Review and restore those edits with Git. Project `.pi/`
+resources continue to follow Pi's native project trust and
+loading rules. Use `/reload` after manual edits. Keep keys out of tracked config;
+use Pi login or environment-based credentials. Do not commit downloaded package
+caches or dependencies. To update Pi itself, update the root nixpkgs lock and
+rebuild; runtime package installation remains independent of that lock.
+
+GitHub/Codex/Pi authentication requires the target user's own setup. Disabling
 a module removes its managed files while preserving repositories, notes, indexes
 and personal application data.
 
@@ -1113,9 +1142,11 @@ files remain only as hash-bound migration history in their new owning modules.
 Use paired schema maintenance when upgrading an existing repository; an ordinary
 configuration import cannot rename installed schemas. Migration moves Codex
 preferences to `agents.codex` and Git identity/preferences to `terminal.git`,
-preserves enabled/disabled choices and leaves dsh disabled for migrated users
-until explicitly selected. Fresh defaults enable dsh. Conflicting old/new agent
-settings, conflicting Git settings, or enabled Git with a disabled terminal fail
+preserves enabled/disabled choices and leaves Pi disabled for migrated standalone
+Codex users until explicitly selected. An additional hash-bound migration replaces
+`agents.dsh.enabled` with `agents.pi.enabled`, preserving its boolean value and
+Codex preferences. It does not migrate dsh credentials, plugins or conversations.
+Conflicting old/new agent settings, conflicting Git settings, or enabled Git with a disabled terminal fail
 explicitly rather than overriding preferences. Retained rollback restores the
 complete older model/data identity. Authentication, sessions and repository-local
 Git settings are outside these transforms.
@@ -1225,6 +1256,24 @@ introducing another test framework.
   missing subscribers, conflicts, migrations and controlled backend failures.
 - System: disposable VM boot, both scopes, passwordless updates, persistence,
   interrupted deployment, rollback, desktop/Flatpak integration and power actions.
+
+Pi replacement acceptance passed on 2026-10-20 with:
+
+```sh
+nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths \
+  path:.#checks.x86_64-linux.agents \
+  path:.#checks.x86_64-linux.agents-migration \
+  path:.#checks.x86_64-linux.applications-native \
+  path:.#checks.x86_64-linux.tools-deployment
+git diff --check
+```
+
+These checks exercised a real Pi extension, native settings writes and local
+package install/remove under temporary homes; real sysrepo schema/data upgrade
+and restore, including rejected source hashes; and disposable guest profile
+activation/disable with private data retained. The `folio` target's configuration
+link was separately built and verified to point at the writable checkout. No live
+model request, host schema migration or host activation was performed.
 
 `checks.x86_64-linux.integrated-release` requires an isolated public Flatpak cache
 and matching retained application plans as explicit overrides. It fails before

@@ -235,7 +235,7 @@ in
     };
     agents = import ../../agents/tests/runtime.nix {
       inherit pkgs bootstrap;
-      dsh = catalogue.agents.packages.dsh;
+      pi = catalogue.agents.packages.pi;
     };
     agents-migration = import ../../agents/tests/migration.nix {
       inherit pkgs bootstrap;

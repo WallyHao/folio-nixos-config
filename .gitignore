@@ -9,3 +9,6 @@
 /.nixos-test-history
 __pycache__/
 .pytest_cache/
+/modules/agents/src/pi/config/**/node_modules/
+/modules/agents/src/pi/config/auth.json
+/modules/agents/src/pi/config/*.lock

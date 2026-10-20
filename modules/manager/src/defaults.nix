@@ -44,7 +44,7 @@
           { name = "appearance"; enabled = true; }
           { name = "input"; enabled = true; }
           { name = "emacs"; enabled = true; }
-          { name = "agents"; enabled = true; "folio-agents:agents".dsh.enabled = true; }
+          { name = "agents"; enabled = true; "folio-agents:agents".pi.enabled = true; }
           { name = "desktop"; enabled = true; }
           { name = "devices"; enabled = true; }
           {

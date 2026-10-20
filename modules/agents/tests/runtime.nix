@@ -1,23 +1,33 @@
-{ pkgs, dsh, bootstrap }:
+{ pkgs, pi, bootstrap }:
 pkgs.runCommand "folio-agents-runtime" {
-  nativeBuildInputs = [ pkgs.nodejs_24 pkgs.jq pkgs.coreutils ];
+  nativeBuildInputs = [ pkgs.jq pkgs.coreutils pkgs.bash ];
 } ''
-  export HOME=$TMPDIR/home DSH_HOME=$TMPDIR/dsh
-  unset DEEPSEEK_API_KEY DEEPSEEK_BASE_URL
+  export HOME=$TMPDIR/home XDG_STATE_HOME=$TMPDIR/state XDG_CONFIG_HOME=$TMPDIR/config
   mkdir -p "$HOME" "$out"
-  ${dsh}/bin/dsh --version | tee "$out/version.txt" | grep -Fx 0.2.1-rc.2
-  timeout --kill-after=2 30 ${dsh}/bin/dsh headless --help >"$out/headless-help.txt"
-  timeout --kill-after=2 30 ${dsh}/bin/dsh plugin --profile headless --version >"$out/plugin-manager-version.txt"
-  node ${./native.cjs} ${dsh}/lib/folio-dsh/node_modules ${pkgs.bash}/bin/bash
+  ${pi}/bin/pi --version | tee "$out/version.txt" | grep -Fx '${pi.version}'
+  timeout --kill-after=2 30 ${pi}/bin/pi --offline --help >"$out/help.txt"
+  bash ${./pi.sh} ${pi} ${./fixture.ts}
   codexMigration=$(jq -r '.[] | select(.module=="folio-codex") | .transform' ${bootstrap}/migrations.json)
+  piMigration=$(jq -r '.[] | select(.module=="folio-agents") | .transform' ${bootstrap}/migrations.json)
   gitMigration=$(jq -r '.[] | select(.module=="folio-git") | .transform' ${bootstrap}/migrations.json)
-  # Disabled selections survive the move and do not silently enable another tool.
   printf '%s\n' '{"folio-environment:environment":{"modules":[{"name":"codex","enabled":false},{"name":"git","enabled":false},{"name":"terminal","enabled":true}]}}' |
-    "$codexMigration" | "$gitMigration" |
+    "$codexMigration" | "$piMigration" | "$gitMigration" |
     jq -e '."folio-environment:environment".modules |
-      any(.[]; .name=="agents" and .enabled==false) and
+      any(.[]; .name=="agents" and .enabled==false and ."folio-agents:agents".pi.enabled==false) and
       any(.[]; .name=="terminal" and ."folio-terminal:terminal".git.enabled==false)'
-  # Enabled Git without a terminal selection must not install unrelated utilities.
+  for enabled in true false; do
+    jq -cn --argjson enabled "$enabled" '{"folio-environment:environment":{modules:[{
+      name:"agents",enabled:$enabled,"folio-agents:agents":{
+        codex:{enabled:false,theme:false},dsh:{enabled:$enabled}}}]}}' |
+      "$piMigration" | jq -e --argjson enabled "$enabled" '
+        ."folio-environment:environment".modules[0] |
+        .enabled==$enabled and (."folio-agents:agents" |
+        .pi.enabled==$enabled and .codex.enabled==false and .codex.theme==false and (has("dsh")|not))'
+  done
+  printf '%s\n' '{"folio-environment:environment":{"modules":[{"name":"agents","enabled":true}]}}' |
+    "$piMigration" | jq -e '."folio-environment:environment".modules[0] | has("folio-agents:agents")|not'
+  if printf '%s\n' '{"folio-environment:environment":{"modules":[{"name":"agents","folio-agents:agents":{"dsh":{},"pi":{}}}]}}' |
+    "$piMigration" >/dev/null 2>&1; then exit 1; fi
   printf '%s\n' '{"folio-environment:environment":{"modules":[{"name":"git","enabled":true}]}}' |
     "$gitMigration" | jq -e '."folio-environment:environment".modules[0] |
       .name=="terminal" and .enabled and ."folio-terminal:terminal".git.enabled and

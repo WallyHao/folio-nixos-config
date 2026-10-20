@@ -1,6 +1,19 @@
 { pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, applicationsHistory, systemModules,
   homeManager, runtime, prepareInput, source, inputs, switcher }:
 let
+  harness = pkgs.runCommand "folio-before-pi-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
+    mkdir $out
+    cp -RL ${bootstrap}/. $out/
+    chmod -R u+w $out
+    cp ${agentsHistory}/2026-10-22/folio-agents.yang $out/models/user/folio-agents.yang
+    jq '."folio-environment:environment".modules |= map(
+      if .name=="agents" then ."folio-agents:agents"={
+        codex:{enabled:false,theme:false,"shell-completion":false},dsh:{enabled:true}}
+      else . end)' ${bootstrap}/user.json >$out/user.json
+    jq --arg hash "$(sha256sum <$out/models/user/folio-agents.yang | cut -d' ' -f1)" \
+      '.models.user |= map(if .name=="folio-agents.yang" then .sha256=$hash else . end)' \
+      ${bootstrap}/identities.json >$out/identities.json
+  '';
   adoptionSource = pkgs.runCommand "folio-legacy-adoption-source" {
     nativeBuildInputs = [ pkgs.jq pkgs.folio.normalizer prepareInput ];
   } ''
@@ -8,7 +21,7 @@ let
     cp -R ${source}/. $out/
     chmod -R u+w $out
     folio-normalize ${old}/models/user ${old}/user.json >configuration.json
-    for module in folio-codex folio-git; do
+    for module in folio-codex folio-agents folio-git; do
       transform=$(jq -er --arg module "$module" '.[] | select(.module==$module) | .transform' ${bootstrap}/migrations.json)
       "$transform" <configuration.json >next.json
       mv next.json configuration.json
@@ -79,7 +92,7 @@ in pkgs.testers.runNixOSTest {
     virtualisation.memorySize = 4096;
     virtualisation.diskSize = 12288;
     virtualisation.writableStoreUseTmpfs = false;
-    virtualisation.additionalPaths = [ bootstrap old legacyHome adoptionSource adoptedHome
+    virtualisation.additionalPaths = [ bootstrap old harness legacyHome adoptionSource adoptedHome
       inputs.nixpkgs inputs.home-manager pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ];
     environment.systemPackages = [ pkgs.jq repository maintenance runtime prepareInput ];
   };
@@ -117,5 +130,8 @@ in pkgs.testers.runNixOSTest {
     machine.succeed("${repository}/bin/folio-repository system ctl --list | grep 'folio-environment.*root:folio-operators'")
     command = "bash ${./adopt.sh} ${bootstrap} ${old} ${legacyHome} ${adoptionSource} ${switcher}"
     machine.succeed("runuser -u folio -- env -i HOME=/home/folio USER=folio PATH=/run/current-system/sw/bin XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c " + shlex.quote(command), timeout=datetime.timedelta(seconds=600))
+    with subtest("existing agents dsh selection upgrades and restores with real sysrepo"):
+        command = "bash ${./pi-migration.sh} ${bootstrap} ${harness} ${repository} ${maintenance}"
+        machine.succeed("runuser -u folio -- env HOME=/home/folio bash -c " + shlex.quote(command), timeout=datetime.timedelta(seconds=180))
   '';
 }
