@@ -31,7 +31,7 @@ let
     if builtins.isString value && builtins.match "#[0-9A-Fa-f]{6}" value != null
     then "${builtins.substring 1 6 value}ff"
     else throw "folio-desktop: theme colors must be six-digit hexadecimal values";
-  renderConfig = { lib, theme, font ? defaultFont, width ? 40, lines ? 8, borderWidth ? 2, borderRadius ? 8, horizontalPadding ? 16, verticalPadding ? 10, innerPadding ? 8 }:
+  renderConfig = { lib, theme, font ? defaultFont, width ? 40, lines ? 8, borderWidth ? 2, borderRadius ? 0, horizontalPadding ? 16, verticalPadding ? 10, innerPadding ? 8 }:
     let
       colors = theme.colors or { };
       appearance = colors.appearance or "dark";

@@ -309,3 +309,12 @@ active manager/proxy services. `/etc/sylphy`, `/var/lib/sylphy-mihomo`,
 `/var/lib/sylphy-mihomo-private`, `/run/sylphy-mihomo` and the old Zen profile path
 are absent. Niri remains PID 1715. Host retirement finalization is complete; keep
 the private archive for explicit recovery before selecting a legacy generation.
+
+## Straight launcher corners — 2026-10-20
+
+Set the Fuzzel renderer's default border radius to zero. Built and applied a frozen
+source through the normal user plan/build/apply flow; the live
+`~/.config/fuzzel/fuzzel.ini` now contains `radius=0`. User health is healthy and
+the compositor PID was unchanged. Records are in
+`~/.local/state/folio/migration/fuzzel-square-vnYgmQeu/`. The next launcher opening
+reads the updated configuration. `git diff --check` passes.
