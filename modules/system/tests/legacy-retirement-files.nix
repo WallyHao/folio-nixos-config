@@ -12,12 +12,19 @@ let
       'config export') cp /var/lib/fixture-desired.json "$3" ;;
       'config import') cp "$3" /var/lib/fixture-desired.json; echo '{"status":"success"}' ;;
       'plan --source') echo '{"status":"success","data":{"planId":"fixture"}}' ;;
-      'status '*) echo '{"status":"success","data":{"health":"healthy"}}' ;;
+      'status '*)
+        plan=fixture
+        [[ ! -e /var/lib/fixture-wrong-plan ]] || plan=other
+        ${pkgs.jq}/bin/jq -cn --arg plan "$plan" --arg artifact "$(readlink -f /run/current-system)" \
+          '{status:"success",data:{health:"healthy",applied:{planId:$plan,artifact:$artifact}}}'
+        ;;
       'build fixture') echo '{"status":"success"}' ;;
       'apply fixture')
+        echo apply >>/var/lib/fixture-apply-calls
         if [[ -e /var/lib/fixture-fail-apply ]]; then
           echo '{"status":"error"}'
         else
+          ${pkgs.systemd}/bin/systemctl start folio-mihomo.service
           echo '{"status":"success"}'
         fi
         ;;
@@ -26,8 +33,10 @@ let
   '';
   services = pkgs.writeShellScriptBin "systemctl" ''
     case "$1" in
-      is-active) exit 0 ;;
-      show) echo 'provider.yaml:/var/lib/folio-mihomo-private/provider.yaml' ;;
+      is-active)
+        if [[ $# -gt 3 ]]; then exit 0; fi
+        exec ${pkgs.systemd}/bin/systemctl "$@"
+        ;;
       *) exit 2 ;;
     esac
   '';
@@ -36,6 +45,10 @@ in pkgs.testers.runNixOSTest {
   nodes.machine = { ... }: {
     networking.hostName = "folio";
     users.users.folio = { isNormalUser = true; uid = 1000; };
+    systemd.services.folio-mihomo.serviceConfig = {
+      ExecStart = "${pkgs.coreutils}/bin/sleep infinity";
+      LoadCredential = [ "provider.yaml:/var/lib/folio-mihomo-private/provider.yaml" ];
+    };
     environment.systemPackages = [ pkgs.jq pkgs.util-linux pkgs.getent pkgs.diffutils pkgs.inetutils ];
     environment.etc."folio-test/retire-legacy.sh".source = ../runtime/retire-legacy.sh;
     virtualisation.memorySize = 1024;
@@ -53,6 +66,10 @@ in pkgs.testers.runNixOSTest {
     machine.succeed("printf %s " + shlex.quote(json.dumps(configuration)) + " >/var/lib/fixture-desired.json")
     runner = "env PATH=${pkgs.lib.makeBinPath [ client services ]}:$PATH bash /etc/folio-test/retire-legacy.sh"
 
+    with subtest("unvalidated backup paths remain untouched"):
+        machine.fail(runner + " resume /etc")
+        machine.succeed("test ! -e /etc/phase; test ! -e /etc/failed-step")
+
     with subtest("failed activation retains legacy prerequisites"):
         machine.succeed("touch /var/lib/fixture-fail-apply")
         machine.fail(runner + " apply ${source}")
@@ -60,12 +77,26 @@ in pkgs.testers.runNixOSTest {
         machine.succeed("cmp /var/lib/sylphy-mihomo-private/provider.yaml /var/lib/folio-mihomo-private/provider.yaml")
         machine.succeed("test $(stat -c %u:%a /var/lib/folio-mihomo-private/provider.yaml) = 0:600")
 
-    with subtest("retry archives only after successful activation"):
+    with subtest("interrupted finalization retains prerequisites after successful activation"):
         machine.succeed("rm /var/lib/fixture-fail-apply")
-        machine.succeed(runner + " apply ${source}")
-        machine.succeed("test ! -e /etc/sylphy; test ! -e /var/lib/sylphy-mihomo; test ! -e /var/lib/sylphy-mihomo-private")
-        backup = machine.succeed("for directory in /var/lib/folio/backups/legacy-*; do test $(cat $directory/phase) != complete || echo $directory; done").strip()
+        machine.succeed("rm /etc/hostname; printf wrong-static >/etc/hostname; hostname legacy-runtime")
+        machine.fail(runner + " apply ${source}")
+        machine.succeed("test -f /etc/sylphy/fixture; test -f /var/lib/sylphy-mihomo-private/provider.yaml")
+        backup = machine.succeed("for directory in /var/lib/folio/backups/legacy-*; do test ! -f $directory/failed-step || test $(cat $directory/failed-step) != update-transient-hostname || echo $directory; done").strip()
         assert backup.startswith("/var/lib/folio/backups/legacy-") and "\n" not in backup
+
+    with subtest("resume refuses deployment drift"):
+        machine.succeed("touch /var/lib/fixture-wrong-plan")
+        machine.fail(runner + " resume " + backup)
+        machine.succeed("test -f /etc/sylphy/fixture; rm /var/lib/fixture-wrong-plan")
+
+    with subtest("resume reads real credential properties and repairs the transient hostname"):
+        machine.succeed("printf folio >/etc/hostname")
+        machine.succeed(runner + " resume " + backup)
+        assert machine.succeed("hostname").strip() == "folio"
+        assert machine.succeed("wc -l </var/lib/fixture-apply-calls").strip() == "2"
+        machine.succeed("test ! -e /etc/sylphy; test ! -e /var/lib/sylphy-mihomo; test ! -e /var/lib/sylphy-mihomo-private")
+        machine.succeed("test $(cat " + backup + "/phase) = complete")
         machine.succeed("cmp " + backup + "/sylphy-mihomo-private/provider.yaml /var/lib/folio-mihomo-private/provider.yaml")
         machine.succeed("test $(stat -c %a " + backup + ") = 700")
 

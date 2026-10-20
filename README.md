@@ -539,6 +539,13 @@ directories under `/var/lib/folio/backups/legacy-*`. It does not reboot or stop
 the desktop. Login-service configuration changes are deferred rather than
 restarting greetd during activation.
 
+If activation succeeded but final checks or archiving were interrupted, use
+`folio-retire-legacy resume BACKUP`. It verifies the recorded plan, active artifact
+and unchanged desired data, then continues without another build/apply. Credential
+paths are read through systemd's structured D-Bus property rather than formatted
+`systemctl show` output. The transient hostname is synchronized with the checked
+static hostname. Failures record their step in the private journal.
+
 Before selecting an older generation that requires the legacy paths, run
 `folio-retire-legacy restore-files BACKUP` with sudo, then perform its explicit
 system rollback. Migration journals, snapshots and old source checkouts are
@@ -546,8 +553,10 @@ recovery/history artifacts and are not deleted by this cleanup.
 
 `checks.x86_64-linux.legacy-retirement` checks the evaluated physical target and
 unprivileged refusal. `legacy-retirement-files` exercises real root-owned file
-copy/archive/restore in a disposable guest, with mocked deployment and service
-responses. It does not establish successful system activation on the actual host.
+copy/archive/restore in a disposable guest, with mocked deployment responses and
+real systemd credential properties and transient hostname changes. It also checks
+resume after interrupted finalization and rejection of deployment drift. It does
+not establish successful system activation on the actual host.
 
 ## Ownership and scope
 

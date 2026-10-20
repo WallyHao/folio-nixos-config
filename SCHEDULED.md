@@ -253,3 +253,51 @@ After execution, verify `hostname`, `folio --json --system status`,
 `systemctl is-active folio-mihomo.service`, the root retirement journal phase,
 and absence of `/etc/sylphy` and the old proxy directories. Preserve archives
 before any deliberate rollback to an older system.
+
+## Retirement finalization recovery — 2026-10-20
+
+The user executed the launcher; journal
+`/var/lib/folio/backups/legacy-j15YxzBg` reported interruption. Read-only host
+inspection confirms that the system switch already succeeded: the active artifact
+is `/nix/store/2mhax7028n7wzg812r5qhyfakclqyjxp-nixos-system-folio-26.11.20261011.7fd4004`,
+plan `6a07d23a49970ec7d10d152418c6c32bae7bbfd27e8df7abfe77c8eede7cf032`.
+System deployment health is healthy; manager and proxy services are active. Desired
+data and the loaded service use the new Folio provider path. Legacy directories
+remain unarchived. Static `/etc/hostname` is `folio`, but the transient hostname
+is still `sylphy-portable`. Niri remains PID 1715.
+
+The formatted `systemctl show ... LoadCredential` property can return
+`[unprintable]`, making the worker's text grep unreliable. Replaced it with a
+typed D-Bus query (`busctl --json=short get-property ... LoadCredential`). Added
+`resume BACKUP`, which verifies successful apply, current plan/artifact and equal
+desired data before finalization. It synchronizes the transient hostname through
+`hostnamectl --transient`, then archives obsolete files. Resume does not call
+plan/build/apply. Failed steps are recorded explicitly; unvalidated backup paths
+are rejected without writing a journal there.
+
+The updated guest uses a real systemd unit with `LoadCredential`, exercises the
+real typed property and hostname update, injects a failure after successful apply,
+rejects a changed plan, then resumes and confirms exactly two apply attempts total
+(the injected failed apply and the successful retry). File restoration and private
+credential/archive checks still pass. Deployment itself is mocked in this guest.
+Gate: `/tmp/folio-legacy-resume-final-gate.log`.
+
+```sh
+nix build --no-link --no-update-lock-file -L .#system-legacy-cleanup \
+  .#checks.x86_64-linux.legacy-retirement \
+  .#checks.x86_64-linux.legacy-retirement-files
+git diff --check
+```
+
+Passed outputs:
+`/nix/store/q1bx6haqddagzg61fk00ch4kg8hzxv7q-folio-retire-legacy`,
+`/nix/store/ainz2gi2yl00zz1ln4kjjw5dz81yccbp-folio-legacy-retirement`, and
+`/nix/store/0lw3wba1cx00wisffzamw2qk38kq7nhm-vm-test-run-folio-legacy-retirement-files`.
+
+The same private `finish-system` launcher has been atomically updated to invoke
+the pinned new worker with `resume /var/lib/folio/backups/legacy-j15YxzBg`; its
+previous version is retained as `finish-system.before-resume`. The worker is
+GC-rooted. Interactive sudo authentication still prevents running this final root
+step from the agent environment. Repeat the same local sudo command above to
+finish; no repeat system switch is requested. Actual host archiving and transient
+hostname synchronization remain pending that invocation.
