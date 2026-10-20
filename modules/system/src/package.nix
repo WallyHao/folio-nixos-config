@@ -1,5 +1,11 @@
 { pkgs }:
 let
+  legacyCleanup = pkgs.writeShellApplication {
+    name = "folio-retire-legacy";
+    runtimeInputs = with pkgs; [ coreutils getent jq util-linux systemd gnugrep diffutils inetutils
+      pkgs.folio.cli ];
+    text = builtins.readFile ../runtime/retire-legacy.sh;
+  };
   retirementPython = pkgs.python3.withPackages (python: [ python.lz4 python.tomlkit ]);
   retirement = pkgs.writeShellApplication {
     name = "folio-retire-home";
@@ -68,5 +74,5 @@ let
   };
 in
 {
-  inherit runtime client migration keyring retirement;
+  inherit runtime client migration keyring retirement legacyCleanup;
 }

@@ -28,6 +28,7 @@ in
     migration = power.migration;
     keyring = power.keyring;
     retirement = power.retirement;
+    legacy-cleanup = power.legacyCleanup;
   };
   commands.system = {
     help = "${./cli/commands/system/help.txt}";

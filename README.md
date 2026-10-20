@@ -521,6 +521,34 @@ links, opaque application data, tty autologin shutdown/recovery, and legacy
 descriptor recovery. It does not prove
 physical boot or actual account/keyring password synchronization on the laptop.
 
+### Retiring legacy system compatibility
+
+After account and home-path migration, the `folio` target uses hostname `folio`,
+retains the existing local password, and provisions the keyring through the normal
+desktop module. It no longer selects the account migration adapter, restores
+`/etc/sylphy`, or creates the old Mihomo service/runtime aliases. Private proxy
+rules and node selection remain in `/var/lib/folio-mihomo`; provision the provider
+at `/var/lib/folio-mihomo-private/provider.yaml` outside the Nix store.
+
+Build `system-legacy-cleanup` and invoke its `folio-retire-legacy apply STORE_SOURCE`
+with sudo and a reviewed immutable source for the `folio` target. The worker
+copies and verifies the existing credential, saves configuration and recovery
+records, then performs a normal system plan/build/apply. Only after successful
+activation and health checks does it archive `/etc/sylphy` and the old proxy
+directories under `/var/lib/folio/backups/legacy-*`. It does not reboot or stop
+the desktop. Login-service configuration changes are deferred rather than
+restarting greetd during activation.
+
+Before selecting an older generation that requires the legacy paths, run
+`folio-retire-legacy restore-files BACKUP` with sudo, then perform its explicit
+system rollback. Migration journals, snapshots and old source checkouts are
+recovery/history artifacts and are not deleted by this cleanup.
+
+`checks.x86_64-linux.legacy-retirement` checks the evaluated physical target and
+unprivileged refusal. `legacy-retirement-files` exercises real root-owned file
+copy/archive/restore in a disposable guest, with mocked deployment and service
+responses. It does not establish successful system activation on the actual host.
+
 ## Ownership and scope
 
 The manager owns environment/user identity, module selection, shared preferences,
@@ -908,10 +936,15 @@ Native packages and launchers are installed and rolled back with the Home Manage
 generation through `folio apply`; `folio apps list` reports their actual delivered
 executables. Flatpak lifecycle commands operate only on Flatpak selections.
 
-Native Zen Beta uses the reviewed Sylphy upstream pin. Optionally set
+Native Zen Beta uses the reviewed upstream package pin. Optionally set
 `applications.native.zen-profile` to an existing profile directory name under
-`~/.config/zen/` (for example `sylphy`). Both `zen-beta` and its desktop entry then
-open that directory directly; no browser data is copied or reset. OBS configuration
+`~/.config/zen/` (for example `folio`). Both `zen-beta` and its desktop entry then
+open that directory directly. The selected native profile receives Folio's
+preference file and owned browser/content CSS through Home Manager, using the
+same renderer as the Flatpak delivery. The directory must already exist; unmanaged
+`user.js` or CSS entry files cause a conflict instead of being overwritten.
+Browser databases, logins, session data and `prefs.js` remain application owned.
+Restart Zen to load changed preferences and styles. OBS configuration
 also remains application owned. Native selections default to false when upgrading
 an existing repository; enabling them is a separate explicit desired change.
 

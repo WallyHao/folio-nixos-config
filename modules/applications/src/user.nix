@@ -1,10 +1,21 @@
 { pkgs, lib, runtime }:
-context: { folioBootstrap, config, ... }:
+context: { folioBootstrap, config, lib, ... }:
 let native = import ./native.nix { inherit pkgs lib context config; };
 in {
     assertions = [{ assertion = context.capabilities.flatpak-provisioned or false; message = "Applications require system-provisioned Flatpak support"; }];
     home.packages = [ pkgs.flatpak ] ++ native.packages;
     xdg.desktopEntries = native.desktopEntries;
+    # Home Manager refuses to replace unmanaged files. Existing personal CSS or
+    # user.js must be explicitly adopted; browser databases and prefs.js stay owned
+    # by the browser. Select an existing profile instead of creating one silently.
+    xdg.configFile = native.profileFiles;
+    home.activation.folioNativeZenProfile = lib.mkIf (native.profileDirectory != null)
+      (lib.hm.dag.entryBefore [ "writeBoundary" ] ''
+        if [ ! -d ${lib.escapeShellArg native.profileDirectory} ] || [ -L ${lib.escapeShellArg native.profileDirectory} ]; then
+          echo 'Folio: the selected native Zen profile must be an existing regular directory' >&2
+          exit 1
+        fi
+      '');
     systemd.user.services.folio-applications = {
       Unit = {
         Description = "Folio owned applications subscriber";

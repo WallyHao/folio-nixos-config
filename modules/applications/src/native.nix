@@ -3,8 +3,7 @@ let
   settings = context.settings."folio-applications:applications".native or { };
   zenEnabled = settings.zen or false;
   obsEnabled = settings.obs or false;
-  # Keep the reviewed Sylphy Beta revision and application identity. Import its
-  # package with this repository's Nixpkgs, without another Flake or user data.
+  # Import the reviewed upstream Beta package with this repository's Nixpkgs.
   upstream = builtins.fetchTree {
     type = "github";
     owner = "0xc000022070";
@@ -14,6 +13,11 @@ let
   };
   browser = (import (upstream.outPath + "/default.nix") { inherit pkgs; }).beta;
   profile = "${config.xdg.configHome}/zen/${settings.zen-profile or ""}";
+  managedProfile = zenEnabled && settings ? zen-profile;
+  browserFiles = (import ./apps/zen.nix {
+    inherit pkgs lib context;
+    app = { name = "zen"; selected = true; };
+  }).files;
   zen = if !(settings ? zen-profile) then browser else pkgs.symlinkJoin {
     name = "folio-zen-beta-${browser.version}";
     paths = [ browser ];
@@ -25,6 +29,11 @@ let
     '';
   };
 in {
+  profileDirectory = if managedProfile then profile else null;
+  profileFiles = lib.optionalAttrs managedProfile (lib.listToAttrs (map (file: {
+    name = "zen/${settings.zen-profile}/${file.destination}";
+    value.source = file.source;
+  }) browserFiles));
   packages = lib.optional zenEnabled zen ++ lib.optional obsEnabled pkgs.obs-studio;
   manifest = lib.optional zenEnabled {
     name = "zen"; package = toString zen; executable = "${zen}/bin/zen-beta";

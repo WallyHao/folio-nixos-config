@@ -33,6 +33,15 @@ in pkgs.runCommand "folio-native-applications" {
   browser=$(jq -er '.nativeApplications[] | select(.name=="zen") | .executable' ${generation}/folio-applications.json)
   grep -F '/home/folio/.config/zen/fixture' "$browser"
   grep -F "$browser" ${generation}/home-path/share/applications/zen-beta.desktop
+  profileFiles=${generation}/home-files/.config/zen/fixture
+  grep -F 'toolkit.legacyUserProfileCustomizations.stylesheets' "$profileFiles/user.js"
+  grep -F 'folio/ui.css' "$profileFiles/chrome/userChrome.css"
+  grep -F 'folio/content.css' "$profileFiles/chrome/userContent.css"
+  test -s "$profileFiles/chrome/folio/ui.css"
+  test -s "$profileFiles/chrome/folio/content.css"
+  test ! -e "$profileFiles/prefs.js"
+  test ! -e "$profileFiles/cookies.sqlite"
+  test ! -e "$profileFiles/places.sqlite"
   test ! -e "$HOME/.config/zen/fixture"
   mkdir $out
   cp zen-version obs-version dsh-version $out/

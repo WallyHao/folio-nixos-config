@@ -13,11 +13,10 @@
       system = catalogue.system.targetSettings.folio;
       network."folio-network:network".proxy = {
         enabled = true; tun = true;
-        provider-file = "/var/lib/sylphy-mihomo-private/provider.yaml";
+        provider-file = "/var/lib/folio-mihomo-private/provider.yaml";
       };
     };
     modules = [ catalogue.system.targetModules.folio catalogue.devices.targetModules.folio
-      catalogue.system.migrationModule
-      catalogue.desktop.migrationModule catalogue.network.migrationModule ];
+      catalogue.network.targetModules.folio ];
   };
 }

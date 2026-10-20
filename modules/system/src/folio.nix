@@ -1,5 +1,9 @@
 # The Folio USB installation boots on both supported UEFI machines.
-{ config, ... }: {
+{ config, lib, ... }: {
+  networking.hostName = lib.mkForce "folio";
+  # Keep the existing local password when retiring the account migration adapter.
+  users.mutableUsers = true;
+  users.users.folio.hashedPassword = lib.mkForce null;
   fileSystems."/".options = [ "subvol=root" "compress=zstd" "noatime" ];
   fileSystems."/home" = {
     device = config.fileSystems."/".device;

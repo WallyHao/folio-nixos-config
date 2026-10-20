@@ -163,3 +163,93 @@ unit points to that binary. The running compositor remains PID 1715 on the old
 binary: log out and back in when convenient to use the transition on the actual
 desktop. The system module selects the same patched package on the next normal
 system deployment; the installed user unit already selects it for the next login.
+
+## Retiring active Sylphy compatibility — 2026-10-20
+
+The user explicitly selected system-wide cleanup. Historical attribution, source
+checkouts, migration tools/tests, snapshots and recovery journals remain; the
+cleanup removes active compatibility dependencies rather than deleting history.
+
+Implemented:
+
+- The physical `folio` target uses hostname `folio`, preserves the existing local
+  password with mutable users, and no longer selects the account migration
+  adapter or its `/etc/sylphy` restoration activation. Keyring/PAM integration now
+  belongs to the normal desktop system contribution. Greetd is not restarted by
+  configuration changes during activation.
+- Network target composition retains the working private policy/cache under
+  `/var/lib/folio-mihomo`, removes old service/runtime aliases, and selects
+  `/var/lib/folio-mihomo-private/provider.yaml`. Evaluation never reads credentials.
+- `system-legacy-cleanup` builds `folio-retire-legacy`, a root maintenance worker.
+  It verifies/copies the provider with root ownership and mode 0600, saves desired
+  data, plans/builds/applies the immutable source, and checks deployment/service
+  health before archiving obsolete directories. Partial failures retain recovery
+  records. `restore-files BACKUP` restores prerequisites before an old-generation
+  rollback. Archives live under `/var/lib/folio/backups/legacy-*` with mode 0700.
+- Native Zen now receives the existing Folio preference/CSS renderer through
+  Home Manager. An explicit existing profile is required; unmanaged destination
+  files cause a conflict. `prefs.js`, databases, logins and session files are not
+  declared as managed files.
+
+Actual user result: the stopped browser's directory was backed up with reflink
+support and renamed from `~/.config/zen/sylphy` to `~/.config/zen/folio`; desired
+data and the wrapper/desktop entry now select `folio`. The original path is absent.
+`user.js`, browser UI CSS and content CSS are installed. Checksums for `prefs.js`,
+`cookies.sqlite`, `places.sqlite`, `key4.db` and `logins.json` are unchanged.
+User apply is healthy with artifact
+`/nix/store/inz3gz00b8hw3az699i1z3laspdxkhiv-home-manager-generation`.
+Niri remained PID 1715 with straight corners and the existing outer margins.
+Restart Zen to read the generated preferences and styles; no browser using the
+personal profile was launched as a test.
+
+Validation and evidence:
+
+```sh
+nix build --no-link --no-update-lock-file -L \
+  .#checks.x86_64-linux.applications-native .#checks.x86_64-linux.configuration
+nix build --no-link --no-update-lock-file -L .#system-legacy-cleanup \
+  .#checks.x86_64-linux.legacy-retirement \
+  .#checks.x86_64-linux.legacy-retirement-files
+git diff --check
+```
+
+Native resource delivery and real configuration subscriber checks passed:
+`/tmp/folio-legacy-cleanup-checks.log`, outputs
+`/nix/store/rlb17pdw72zb3cbwwwh16scw8rkfgldz-folio-native-applications` and
+`/nix/store/2hknw5rcn9am3ay3bay5ay835irf7l7m-folio-configuration-integration`.
+`/tmp/folio-legacy-final-gate.log` records the target/password/keyring/login-service
+checks and a real disposable guest's file lifecycle test. The guest mocks the
+deployment/service responses; it proves credential copy, failed-apply retention,
+retry, private archive and explicit file restoration, not actual host activation.
+Outputs are `/nix/store/n00nx52c2ic12j7h2bj991wwrh6h7cca-folio-legacy-retirement`
+and `/nix/store/15x1pszanp878bdh7gm1d0hjnayrlgw8-vm-test-run-folio-legacy-retirement-files`.
+The final combined gate also passed (`/tmp/folio-legacy-consolidated-gate.log`),
+with native/configuration outputs
+`/nix/store/94pmm90fdv90hd4kz2x0zivdbbqdjpfd-folio-native-applications` and
+`/nix/store/kyxbmmcqg1k018741b5n20cs4zvshy8z-folio-configuration-integration`.
+
+The actual host's root configuration was exported read-only, its provider path
+updated in a private candidate, normalized against the installed bootstrap and
+built successfully. `/tmp/folio-retired-system-final-build.log` records artifact
+`/nix/store/2mhax7028n7wzg812r5qhyfakclqyjxp-nixos-system-folio-26.11.20261011.7fd4004`.
+The reviewed immutable source is
+`/nix/store/w7w34qqq368kwfs932cxb6ppxj8qqydb-folio-retired-source`; the worker is
+`/nix/store/rdj9kz8dqrcxx99fspldq163fhjd0pp8-folio-retire-legacy`.
+Artifacts are GC-rooted under the private work directory.
+
+**Pending root step:** sudo requires interactive authentication here. The running
+system is still `sylphy-portable`; its provider path and legacy directories have
+not been changed. Both existing system and new user deployments are healthy.
+Run the prepared launcher locally:
+
+```sh
+sudo /home/folio/.local/state/folio/migration/retire-sylphy-CnO411uk/finish-system
+```
+
+It invokes the pinned worker/source above. All profile backups, immutable inputs,
+before/after desired data, plans and the launcher are in
+`~/.local/state/folio/migration/retire-sylphy-CnO411uk/`.
+After execution, verify `hostname`, `folio --json --system status`,
+`systemctl is-active folio-mihomo.service`, the root retirement journal phase,
+and absence of `/etc/sylphy` and the old proxy directories. Preserve archives
+before any deliberate rollback to an older system.

@@ -224,6 +224,11 @@ in
     ];
   };
   checks.${system} = {
+    legacy-retirement-files = import ../../system/tests/legacy-retirement-files.nix { inherit pkgs; };
+    legacy-retirement = import ../../system/tests/legacy-retirement.nix {
+      inherit pkgs inputs;
+      cleanup = catalogue.system.packages.legacy-cleanup;
+    };
     desktop-focus-fade = import ../../desktop/tests/focus-fade.nix {
       inherit pkgs;
       niri = catalogue.desktop.packages.niri;
