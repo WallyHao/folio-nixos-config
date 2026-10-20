@@ -1098,6 +1098,12 @@ node-pty and Sharp against Nix libraries, patches native-library paths for NixOS
 `--expose-internals` path instead of probing the machine code of a distro-built
 Node binary. This compatibility adjustment preserves the harness's plugin loader.
 
+If Platform account requests encounter CloudFront HTTP 403 or an AWS WAF
+challenge while browser login works, an optional external browser WAF session
+overlay (not included in this repository) accepts
+the browser's WAF cookie and User-Agent at launch. It requires a valid browser
+session and is a workaround pending live verification, not a change to routing.
+
 GitHub/Codex/DeepSeek authentication requires the target user's own setup. Disabling
 a module removes its managed files while preserving repositories, notes, indexes
 and personal application data.
