@@ -1,0 +1,30 @@
+module folio-agents {
+  yang-version 1.1;
+  namespace "urn:folio:agents";
+  prefix fa;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned coding agent selection. Credentials and sessions remain private runtime state.";
+  revision 2026-10-23 { description "Replace DeepSeek Harness with extensible Pi and a native configuration directory."; }
+  revision 2026-10-22 { description "Group Codex and DeepSeek Harness in one capability."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'agents'";
+    container agents {
+      when "../../fe:scope = 'user'";
+      presence "Agent settings are supplied.";
+      container codex {
+        leaf enabled { type boolean; default true; }
+        leaf theme { type boolean; default true; }
+        leaf shell-completion { type boolean; default true; }
+      }
+      container pi {
+        leaf enabled { type boolean; default false; }
+        leaf config-directory {
+          type string { pattern '/[^\r\n\t]+'; }
+          description "Optional absolute path to a writable native Pi configuration directory. When absent, use the configuration snapshot shipped by Folio. Credentials, sessions and package caches remain outside this directory.";
+        }
+        description "Install Pi from the locked nixpkgs input. Use native Pi configuration and packages without translating their settings into YANG.";
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ let
 in pkgs.runCommand "folio-gtk-appearance" {
   nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.pygobject3 ])) pkgs.gobject-introspection pkgs.xvfb-run ];
   buildInputs = [ pkgs.gtk3 pkgs.gtk4 pkgs.libadwaita ];
+  FOLIO_TEST_PALETTE = ../lib/everforest.json;
   FONTCONFIG_FILE = pkgs.makeFontsConf { fontDirectories = [ pkgs.maple-mono.NF-CN ]; };
   GSETTINGS_SCHEMA_DIR = "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}/glib-2.0/schemas";
 } ''

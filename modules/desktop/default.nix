@@ -5,6 +5,7 @@ in {
   requirements.user.capabilities = [ "desktop-provisioned" ];
   impacts = [ "Compositor binary changes require logging out and back in; the current session stays running." ];
   inherit packages;
+  migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.system = [ ./model/folio-desktop.yang ];
   models.user = [ ./model/folio-desktop.yang ];
   nixosModule = import ./src/system.nix { inherit pkgs lib packages; };

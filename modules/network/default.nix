@@ -3,6 +3,7 @@ let packages = import ./src/package.nix { inherit pkgs; };
 in {
   inherit packages;
   checks.proxy = import ./tests/proxy.nix { inherit pkgs; };
+  migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.system = [ ./model/folio-network.yang ./model/folio-network-panel.yang ];
   subscribers.system = [ "folio-network.service" ];
   commands.network = {

@@ -2,17 +2,7 @@
 let
   # Standalone prompt defaults stay inside this Flake; root integration supplies
   # the full user-owned theme through the Home Manager option.
-  defaultTheme = {
-    colors = {
-      appearance = "dark";
-      palettes.dark = {
-        fg = "#d3c6aa";
-        green = "#a7c080";
-        grey1 = "#859289";
-      };
-      roles = { foreground = "fg"; accent = "green"; muted = "grey1"; };
-    };
-  };
+  defaultTheme.colors = import ../../appearance/lib { };
 
   renderPrompt = lib: theme:
     let
@@ -113,10 +103,11 @@ let
       theme = settings.theme or defaultTheme;
       p = theme.colors.palettes.${theme.colors.appearance or "dark"};
       color = key: p.${key} or p.fg;
+      accent = color (theme.colors.roles.accent or "yellow");
       colors = {
         DIR_FOREGROUND = color "fg";
         DIR_PATH_SEPARATOR_FOREGROUND = color "grey1";
-        DIR_PATH_HIGHLIGHT_FOREGROUND = color "yellow";
+        DIR_PATH_HIGHLIGHT_FOREGROUND = accent;
         VCS_FOREGROUND = color "green";
         VCS_INCOMING_CHANGESFORMAT_FOREGROUND = color "aqua";
         VCS_OUTGOING_CHANGESFORMAT_FOREGROUND = color "aqua";
@@ -124,9 +115,9 @@ let
         VIRTUALENV_FOREGROUND = color "aqua";
         COMMAND_EXECUTION_TIME_FOREGROUND = color "yellow";
         CONTEXT_FOREGROUND = color "grey1";
-        PROMPT_CHAR_OK_VIINS_FOREGROUND = color "yellow";
-        PROMPT_CHAR_OK_VICMD_FOREGROUND = color "yellow";
-        PROMPT_CHAR_OK_VIVIS_FOREGROUND = color "yellow";
+        PROMPT_CHAR_OK_VIINS_FOREGROUND = accent;
+        PROMPT_CHAR_OK_VICMD_FOREGROUND = accent;
+        PROMPT_CHAR_OK_VIVIS_FOREGROUND = accent;
         PROMPT_CHAR_ERROR_VIINS_FOREGROUND = color "red";
         PROMPT_CHAR_ERROR_VICMD_FOREGROUND = color "red";
         PROMPT_CHAR_ERROR_VIVIS_FOREGROUND = color "red";

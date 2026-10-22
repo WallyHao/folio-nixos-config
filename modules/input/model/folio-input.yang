@@ -2,9 +2,10 @@ module folio-input {
   yang-version 1.1;
   namespace "urn:folio:input";
   prefix fi;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "Fcitx5 and Rime-Ice integration without owning personal dictionaries or histories.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-19 { description "Wayland input startup, candidate theme and one-time public defaults."; }
   augment '/fe:environment/fe:modules' {
     when "fe:name = 'input'";

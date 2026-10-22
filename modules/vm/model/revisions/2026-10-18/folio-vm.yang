@@ -1,0 +1,24 @@
+module folio-vm {
+  yang-version 1.1;
+  namespace "urn:folio:vm";
+  prefix fv;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned disposable UEFI virtual machines.";
+  revision 2026-10-18 { description "Initial asynchronous image and guest lifecycle."; }
+  rpc execute {
+    description "Submit or observe a VM operation through its owning subscriber.";
+    input {
+      leaf action { type enumeration { enum build; enum start; enum stop; enum status; enum cleanup; } mandatory true; }
+      leaf job-id { type fe:identifier; mandatory true; }
+      leaf source { type string { length '1..4096'; } }
+      leaf memory { type uint16 { range '512..8192'; } default 2048; }
+      leaf cores { type uint8 { range '1..8'; } default 2; }
+    }
+    output {
+      leaf status { type fe:result-status; mandatory true; }
+      leaf result-json { type string; description "Exact JSON result preserving job object shape."; }
+      leaf error { type string; }
+    }
+  }
+}

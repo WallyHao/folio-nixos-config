@@ -23,6 +23,18 @@ let
     };
   adapters = {
     config = client "folio-config" ../cli/commands/config/command.sh common;
+    theme = pkgs.writeShellApplication {
+      name = "folio-theme";
+      runtimeInputs = [ pkgs.python3 ];
+      text = ''
+        export FOLIO_CONFIG_ADAPTER=${adapters.config}/bin/folio-config
+        export FOLIO_WORKFLOW_ADAPTER=${workflow}/bin/folio-workflow
+        export FOLIO_THEME_SOURCE=${pkgs.folio.source}
+        export FOLIO_THEME_CATALOGUE=${pkgs.writeText "folio-theme-catalogue.json" (builtins.toJSON (builtins.mapAttrs (_: scheme: builtins.attrNames scheme.palettes)
+          (import ../../appearance/lib/catalogue.nix)))}
+        exec python3 ${../cli/commands/theme/command.py} "$@"
+      '';
+    };
     modules = client "folio-modules" ../cli/commands/modules/command.sh common;
     plan = client "folio-deployment" ../cli/commands/deploy/command.sh "";
     build = adapters.plan;

@@ -8,7 +8,7 @@ pkgs.runCommand "folio-agents-runtime" {
   timeout --kill-after=2 30 ${pi}/bin/pi --offline --help >"$out/help.txt"
   bash ${./pi.sh} ${pi} ${./fixture.ts}
   codexMigration=$(jq -r '.[] | select(.module=="folio-codex") | .transform' ${bootstrap}/migrations.json)
-  piMigration=$(jq -r '.[] | select(.module=="folio-agents") | .transform' ${bootstrap}/migrations.json)
+  piMigration=$(jq -r '.[] | select(.module=="folio-agents" and .from=="2026-10-22") | .transform' ${bootstrap}/migrations.json)
   gitMigration=$(jq -r '.[] | select(.module=="folio-git") | .transform' ${bootstrap}/migrations.json)
   printf '%s\n' '{"folio-environment:environment":{"modules":[{"name":"codex","enabled":false},{"name":"git","enabled":false},{"name":"terminal","enabled":true}]}}' |
     "$codexMigration" | "$piMigration" | "$gitMigration" |

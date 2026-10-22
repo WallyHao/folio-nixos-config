@@ -8,7 +8,7 @@ let
     inherit name;
     size = theme.cursor-size;
     baseColor = palette.bg0;
-    outlineColor = palette.fg;
+    outlineColor = palette.${theme.colors.roles.accent};
     successColor = palette.green;
     errorColor = palette.red;
     mutedColor = palette.grey1;
@@ -97,7 +97,7 @@ in pkgs.stdenvNoCC.mkDerivation {
     cp LICENSE $out/share/licenses/google-cursor/
     runHook postInstall
   '';
-  passthru.cursorName = name;
+  passthru = { cursorName = name; cursorSettings = colors; };
   meta = {
     description = "GoogleDot cursor assets with the selected Everforest palette";
     homepage = "https://github.com/ful1e5/Google_Cursor";

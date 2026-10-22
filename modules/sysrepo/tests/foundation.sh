@@ -49,4 +49,8 @@ folio-repository user cfg --export --module folio-environment --format json --de
 
 # Validate the system closure separately without requiring host root state.
 folio-normalize "$bootstrap/models/system" "$bootstrap/system.json" > system-normalized.json
+jq '."folio-environment:environment".preferences |= (.scheme="graphite" | .appearance="light")' \
+  "$bootstrap/system.json" >system-theme.json
+folio-normalize "$bootstrap/models/system" system-theme.json >system-theme-normalized.json
+jq -e '."folio-environment:environment".preferences | .scheme=="graphite" and .appearance=="light"' system-theme-normalized.json
 echo 'Real repositories: isolated state, schema/default validation and restart preservation passed'

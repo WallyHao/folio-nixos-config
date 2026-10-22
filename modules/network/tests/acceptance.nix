@@ -29,6 +29,9 @@ let
     mkdir $out
     cp -R ${currentSource}/. $out/
     chmod -R u+w $out
+    ${pkgs.lib.concatMapStringsSep "\n" (model: ''
+      cp ${model.path} "$out/modules/${model.owner}/model/${model.name}"
+    '') (import ../../manager/tests/previous-theme-models.nix { inherit pkgs; })}
     cp ${oldSystemModel} $out/modules/system/model/folio-system.yang
     substituteInPlace $out/modules/manager/src/defaults.nix \
       --replace-fail '{ name = "network"; enabled = true; }' '{ name = "network"; enabled = false; }'

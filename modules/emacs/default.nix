@@ -15,11 +15,11 @@ let
   };
 in {
   models.user = [ current ];
-  migrations = [{
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
     module = "folio-emacs";
     from = "2026-10-19"; to = "2026-10-20";
     fromSha256 = builtins.hashFile "sha256" previous;
-    toSha256 = builtins.hashFile "sha256" current;
+    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-20/folio-emacs.yang;
     transform = "${migration}/bin/folio-emacs-library-directory";
   }];
   packages.editor = package;

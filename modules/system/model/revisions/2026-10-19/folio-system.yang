@@ -1,0 +1,77 @@
+module folio-system {
+  yang-version 1.1;
+  namespace "urn:folio:system";
+  prefix fs;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "System-owned guest policy, independent of user deployment.";
+  revision 2026-10-19 { description "Add explicit storage, account, locale, console, journal, time, memory and Nix policy."; }
+  revision 2026-10-18 { description "Initial explicit disposable guest policy."; }
+  grouping power-request {
+    leaf request-id { type fe:identifier; mandatory true; }
+  }
+  grouping power-result {
+    leaf status { type fe:result-status; mandatory true; }
+    leaf request-id { type fe:identifier; }
+    leaf phase { type enumeration { enum accepted; } }
+    leaf error { type string; }
+  }
+  rpc reboot {
+    description "Accept a durable delayed reboot request; completion requires external observation.";
+    input { uses power-request; }
+    output { uses power-result; }
+  }
+  rpc poweroff {
+    description "Accept a durable delayed poweroff request; completion requires external observation.";
+    input { uses power-request; }
+    output { uses power-result; }
+  }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'system'";
+    container system {
+      leaf storage-profile { type enumeration { enum disposable-guest; enum physical; } default disposable-guest; }
+      leaf root-device {
+        when "../storage-profile = 'physical'";
+        type string { pattern '/dev/disk/by-(uuid|label|id)/[A-Za-z0-9][A-Za-z0-9_.:+-]*'; }
+        mandatory true;
+      }
+      leaf boot-device {
+        when "../storage-profile = 'physical'";
+        type string { pattern '/dev/disk/by-(uuid|label|id)/[A-Za-z0-9][A-Za-z0-9_.:+-]*'; }
+        mandatory true;
+      }
+      leaf root-filesystem { type enumeration { enum ext4; enum btrfs; } default ext4; }
+      leaf prototype-password {
+        type boolean; default true;
+        must ". = 'false' or ../storage-profile = 'disposable-guest'" {
+          error-message "The public prototype password is only available in disposable guests.";
+        }
+      }
+      leaf locale { type enumeration { enum en_US.UTF-8; enum en_GB.UTF-8; enum zh_CN.UTF-8; } default en_US.UTF-8; }
+      leaf console-keymap { type string { pattern '[A-Za-z0-9_-]+'; } default us; }
+      leaf console-font-size { type enumeration { enum '16'; enum '20'; enum '24'; enum '28'; enum '32'; } default '24'; }
+      container time-sync {
+        leaf enabled { type boolean; default true; }
+        leaf-list servers { type string { pattern '[A-Za-z0-9][A-Za-z0-9.:-]*'; } default ntp.aliyun.com; default ntp.tencent.com; }
+      }
+      container journal {
+        leaf storage { type enumeration { enum auto; enum persistent; enum volatile; enum none; } default auto; }
+        leaf max-disk-mib { type uint16 { range '16..4096'; } default 256; }
+        leaf max-runtime-mib { type uint16 { range '16..1024'; } default 64; }
+      }
+      container zram {
+        leaf enabled { type boolean; default true; }
+        leaf memory-percent { type uint8 { range '1..100'; } default 25; }
+      }
+      container nix {
+        leaf max-jobs { type uint8 { range '0..32'; } default 1; }
+        leaf auto-optimise { type boolean; default false; }
+      }
+      leaf time-zone {
+        type string { length '1..128'; pattern '[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*'; }
+        default 'Asia/Shanghai';
+        description "IANA zone name; the Nix adapter verifies package availability.";
+      }
+    }
+  }
+}

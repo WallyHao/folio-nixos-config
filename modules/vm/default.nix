@@ -10,6 +10,7 @@ in
     image = import ./src/image.nix { inherit pkgs lib tools; };
     inherit (runtime) subscriber;
   };
+  migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.user = [ ./model/folio-vm.yang ];
   commands.vm = {
     help = "${./cli/commands/vm/help.txt}";

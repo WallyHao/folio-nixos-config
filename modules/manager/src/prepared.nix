@@ -1,7 +1,8 @@
 { prepared, identities }:
 let
   digest = value: builtins.hashString "sha256" (builtins.toJSON value + "\n");
-  preferences = prepared.configuration."folio-environment:environment".preferences or { };
+  preferences = let values = prepared.configuration."folio-environment:environment".preferences or { };
+    in if prepared.scope == "user" then builtins.removeAttrs values [ "scheme" "appearance" ] else values;
   resolvedPreferences = {
     values = prepared.systemDescriptor.preferences // preferences;
     origins = builtins.mapAttrs (

@@ -26,7 +26,7 @@ in {
       { name = "2026-10-22/folio-agents.yang"; path = harness; }
     ];
   };
-  migrations = [{
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
     module = "folio-codex"; toModule = "folio-agents";
     from = "2026-10-19"; to = "2026-10-22";
     fromSha256 = builtins.hashFile "sha256" legacy;
@@ -36,7 +36,7 @@ in {
     module = "folio-agents";
     from = "2026-10-22"; to = "2026-10-23";
     fromSha256 = builtins.hashFile "sha256" harness;
-    toSha256 = builtins.hashFile "sha256" current;
+    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-23/folio-agents.yang;
     transform = "${replaceHarness}/bin/folio-agents-replace-dsh";
   }];
   targetSettings.folio."folio-agents:agents".pi = {

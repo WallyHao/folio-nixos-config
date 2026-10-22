@@ -2,9 +2,10 @@ module folio-emacs {
   yang-version 1.1;
   namespace "urn:folio:emacs";
   prefix fem;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "User-owned emacs preferences, independent of activation.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-20 { description "Use the shared documents library for notes."; }
   revision 2026-10-19 { description "Initial developer environment integration."; }
   augment '/fe:environment/fe:modules' {

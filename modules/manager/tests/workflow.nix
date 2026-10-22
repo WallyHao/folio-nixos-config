@@ -10,6 +10,7 @@ pkgs.runCommand "folio-cli-workflow"
   ''
     export WORKFLOW_COMMAND=${../cli/commands/workflow/command.py}
     export WORKFLOW_ADAPTER=${./fixtures/workflow_adapter.py}
+    THEME_COMMAND=${../cli/commands/theme/command.py} python3 ${./test_theme.py}
     python3 ${./test_workflow.py}
     REVIEW_COMMAND=${../runtime/snapshot/review.py} python3 ${./test_review.py}
     DEPLOY_COMMAND=${../cli/commands/deploy/command.sh} bash ${./status-fallback.sh}

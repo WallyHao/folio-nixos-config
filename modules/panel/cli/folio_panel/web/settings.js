@@ -1,9 +1,10 @@
 "use strict";
 (() => {
   let current = null, dirty = false, loading = false;
-  const fields = ["appearance", "scheme", "font-family", "font-size"];
+  const fields = ["font-family", "font-size"];
   function render() {
     if (!current) return;
+    $("system-theme").textContent = current.effective.scheme + "-" + current.effective.appearance;
     for (const key of fields) {
       $("setting-" + key).value = current.effective[key];
       $("inherit-" + key).checked = !(key in current.preferences);

@@ -28,7 +28,8 @@ jq -cnS --arg scope "$scope" \
      descriptorDigest: $descriptorDigest, models: $identities[0].models[$scope],
      tools: $identities[0].tools,
      resolvedPreferences: (
-       ($configuration[0]."folio-environment:environment".preferences // {}) as $preferences |
+       (($configuration[0]."folio-environment:environment".preferences // {}) |
+         if $scope=="user" then del(.scheme,.appearance) else . end) as $preferences |
        ($descriptor[0].preferences + $preferences) as $values |
        {values:$values, origins:($values | with_entries(.key as $key |
          .value=(if $scope=="system" then "system-configuration"

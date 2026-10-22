@@ -46,6 +46,8 @@ LABELS = {
     "Open clipboard history": "Clipboard history",
     "Open Folio panel": "Folio panel",
     "Open terminal": "Terminal",
+    "Open Yazi": "Yazi file manager",
+    "Open browser": "Web browser",
     "Close window": "Close window",
     "Show workspace overview": "Workspace overview",
     "Show all keyboard shortcuts": "Keyboard Shortcuts",

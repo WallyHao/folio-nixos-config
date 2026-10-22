@@ -5,6 +5,7 @@ module folio-environment {
 
   organization "Folio";
   description "Scoped desired configuration and separately observed state.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-18 {
     description "Initial portable environment and configuration commit contract.";
   }
@@ -56,8 +57,15 @@ module folio-environment {
     }
     container preferences {
       description "Shared preferences; identity and privileges are not overridable here.";
-      leaf scheme { type enumeration { enum everforest; } }
-      leaf appearance { type enumeration { enum dark; enum light; } }
+      leaf scheme {
+        when "../../scope = 'system'";
+        type enumeration { enum everforest; enum graphite; }
+        description "One system-wide color scheme for every managed component.";
+      }
+      leaf appearance {
+        when "../../scope = 'system'";
+        type enumeration { enum dark; enum light; }
+      }
       leaf font-family { type string { length '1..128'; pattern '[^\r\n]+'; } }
       leaf font-size { type uint8 { range '6..72'; } }
     }

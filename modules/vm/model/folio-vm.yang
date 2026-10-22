@@ -2,9 +2,10 @@ module folio-vm {
   yang-version 1.1;
   namespace "urn:folio:vm";
   prefix fv;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "User-owned disposable UEFI virtual machines.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-18 { description "Initial asynchronous image and guest lifecycle."; }
   rpc execute {
     description "Submit or observe a VM operation through its owning subscriber.";

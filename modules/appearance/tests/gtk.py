@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -50,7 +51,8 @@ assert font.get_family() == "Maple Mono NF CN", font.to_string()
 expected_size = 16 * Pango.SCALE * (96 / 72 if font.get_size_is_absolute() else 1)
 assert abs(font.get_size() - expected_size) <= 1, font.to_string()
 color = label.get_style_context().get_color() if version == "4" else label.get_style_context().get_color(Gtk.StateFlags.NORMAL)
-expected = "#d3c6aa" if appearance == "dark" else "#5c6a72"
+palette = json.load(open(os.environ["FOLIO_TEST_PALETTE"]))["palettes"][appearance]
+expected = palette["fg"]
 
 
 def rgb(value):
@@ -64,7 +66,7 @@ if version == "4":
     while context.pending():
         context.iteration(False)
     accent = rgb(label.get_style_context().get_color())
-    assert accent == ("#dbbc7f" if appearance == "dark" else "#dfa000"), accent
+    assert accent == palette["yellow"], accent
 
 print(f"GTK {version} {appearance}: font={font.to_string()} foreground={rgb(color)}; CSS valid")
 window.destroy()

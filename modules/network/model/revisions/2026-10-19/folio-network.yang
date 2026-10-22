@@ -1,0 +1,65 @@
+module folio-network {
+  yang-version 1.1;
+  namespace "urn:folio:network";
+  prefix fn;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import ietf-inet-types { prefix inet; }
+  organization "Folio";
+  description "System connectivity policy and bounded network-owned operations. Credentials stay outside desired data.";
+  revision 2026-10-19 { description "NetworkManager, local Mihomo, DNS, firewall and OpenSSH."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'network'";
+    container network {
+      when "../../fe:scope = 'system'";
+      presence "Network policy is supplied.";
+      leaf wifi-powersave { type enumeration { enum default; enum ignore; enum disable; enum enable; } default disable; }
+      leaf wait-online { type boolean; default false; }
+      leaf-list dns { type inet:ip-address-no-zone; description "Empty retains DHCP/connection DNS."; }
+      container firewall {
+        leaf enabled { type boolean; default true; }
+        leaf allow-ping { type boolean; default true; }
+        leaf-list tcp-ports { type inet:port-number { range '1..65535'; } }
+        leaf-list udp-ports { type inet:port-number { range '1..65535'; } }
+      }
+      container ssh {
+        leaf enabled { type boolean; default false; }
+        leaf port { type inet:port-number { range '1..65535'; } default 2222; }
+        leaf open-firewall { type boolean; default false; }
+      }
+      container proxy {
+        leaf enabled { type boolean; default false; }
+        leaf tun { type boolean; default false; }
+        leaf port { type inet:port-number { range '1..65535'; } default 7890; }
+        leaf-list dns { type inet:ip-address-no-zone; default 119.29.29.29; default 223.5.5.5; }
+        leaf mode { type enumeration { enum rule; enum direct; enum global; } default rule; }
+        leaf provider-file {
+          type string { pattern '/(run|var/lib)/([A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+[.]ya?ml'; }
+          description "Optional absolute runtime provider YAML, loaded as a systemd credential; never read during evaluation.";
+        }
+      }
+    }
+  }
+  rpc execute {
+    description "Observe actual connectivity or perform a bounded system action. Connection credentials are supplied out of band.";
+    input {
+      leaf action { type enumeration { enum status; enum connect; enum disconnect; enum proxy-mode; enum proxy-select; } mandatory true; }
+      leaf connection {
+        when "../action = 'connect'";
+        type string { pattern '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'; }
+        mandatory true;
+      }
+      leaf interface {
+        when "../action = 'connect' or ../action = 'disconnect'";
+        type string { length '1..15'; pattern '[A-Za-z0-9_][A-Za-z0-9_.-]*'; }
+        mandatory true;
+      }
+      leaf node { when "../action = 'proxy-select'"; type string { length '1..256'; pattern '[^\r\n]+'; } mandatory true; }
+      leaf mode { when "../action = 'proxy-mode'"; type enumeration { enum rule; enum direct; enum global; } mandatory true; }
+    }
+    output {
+      leaf status { type fe:result-status; mandatory true; }
+      leaf result-json { type string; }
+      leaf error { type string; }
+    }
+  }
+}

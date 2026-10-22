@@ -1,30 +1,8 @@
 { }:
 let
-  defaultColors = {
-    background = "#272e33";
-    surface = "#2e383c";
-    foreground = "#d3c6aa";
-    accent = "#a7c080";
-    border = "#7a8478";
-  };
-  defaultTheme = {
-    colors = {
-      appearance = "dark";
-      palettes.dark = {
-        bg0 = defaultColors.background;
-        bg1 = defaultColors.surface;
-        fg = defaultColors.foreground;
-        green = defaultColors.accent;
-        grey0 = defaultColors.border;
-      };
-      roles = {
-        background = "bg0";
-        surface = "bg1";
-        foreground = "fg";
-        accent = "green";
-        border = "grey0";
-      };
-    };
+  defaultTheme.colors = import ../../appearance/lib { };
+  defaultColors = builtins.mapAttrs (_: key: defaultTheme.colors.palettes.dark.${key}) {
+    background = "bg0"; surface = "bg1"; foreground = "fg"; accent = defaultTheme.colors.roles.accent; border = "grey0";
   };
 
   defaultLayout = { gaps = 16; top = -4; bottom = -4; left = -4; right = -4; borderWidth = 3; cornerRadius = 12; };
@@ -40,7 +18,7 @@ let
       else result;
 
   renderConfig = { colors, foot, polkitAgent, layout ? { }, launcher ? null, clipboardPicker ? null,
-    animationFile ? null, animationPicker ? null, controlCenter ? null, windowSwitcher ? null, shortcutHelp ? null, screenshotFull ? null, screenshotRegion ? null, modifier ? "Mod", deviceControl ? null, panelCommand ? null, sessionCommand ? "niri-session-confirm" }:
+    fileManager ? null, browser ? null, animationFile ? null, animationPicker ? null, controlCenter ? null, windowSwitcher ? null, shortcutHelp ? null, screenshotFull ? null, screenshotRegion ? null, modifier ? "Mod", deviceControl ? null, panelCommand ? null, sessionCommand ? "niri-session-confirm" }:
     let
       geometry = normalizeLayout layout;
       workspaceBinds = builtins.concatStringsSep "\n" (builtins.genList (index:
@@ -132,6 +110,8 @@ let
         ${if controlCenter == null then "" else ''${modifier}+C repeat=false hotkey-overlay-title="Open device controls" { spawn "${controlCenter}"; }''}
         ${if panelCommand == null then "" else ''${modifier}+P repeat=false hotkey-overlay-title="Open Folio panel" { spawn "${panelCommand}" "panel"; }''}
         ${modifier}+Return hotkey-overlay-title="Open terminal" { spawn "${foot}"; }
+        ${if fileManager == null then "" else ''${modifier}+Y hotkey-overlay-title="Open Yazi" { spawn "${foot}" "-e" "${fileManager}"; }''}
+        ${if browser == null then "" else ''${modifier}+W hotkey-overlay-title="Open browser" { spawn "${browser}"; }''}
         ${modifier}+Q hotkey-overlay-title="Close window" { close-window; }
         ${modifier}+Tab repeat=false hotkey-overlay-title="${if windowSwitcher == null then "Show workspace overview" else "Switch windows"}" { ${if windowSwitcher == null then "toggle-overview;" else ''spawn "${windowSwitcher}";''} }
         ${if windowSwitcher == null then "" else ''${modifier}+Shift+Tab repeat=false hotkey-overlay-title="Switch windows in reverse" { spawn "${windowSwitcher}" "--reverse"; }''}

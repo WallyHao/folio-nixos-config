@@ -1,4 +1,10 @@
 { }:
+let
+  palette = (import ../../appearance/lib { }).palettes.dark;
+  defaults = map (key: builtins.toJSON palette.${key}) [
+    "bg0" "bg1" "fg" "grey1" "green" "blue" "yellow" "bg_visual" "red"
+  ];
+in
 ''
   ;;; Managed Org-roam environment -*- lexical-binding: t; -*-
   (require 'org)
@@ -58,8 +64,7 @@
 
   ;; Standalone defaults use the account's existing Everforest dark colors.
   (unless (boundp 'folio-emacs-colors)
-    (setq folio-emacs-colors '("#272e33" "#2e383c" "#d3c6aa" "#859289"
-                                "#a7c080" "#7fbbb3" "#dbbc7f" "#4c3743" "#e67e80")))
+    (setq folio-emacs-colors '(${builtins.concatStringsSep " " defaults})))
   (pcase-let ((`(,bg ,surface ,fg ,muted ,green ,blue ,yellow ,selection ,red)
                 folio-emacs-colors))
     (custom-set-faces

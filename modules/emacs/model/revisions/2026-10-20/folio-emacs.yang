@@ -1,0 +1,19 @@
+module folio-emacs {
+  yang-version 1.1;
+  namespace "urn:folio:emacs";
+  prefix fem;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User-owned emacs preferences, independent of activation.";
+  revision 2026-10-20 { description "Use the shared documents library for notes."; }
+  revision 2026-10-19 { description "Initial developer environment integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'emacs'";
+    container emacs {
+      when "../../fe:scope = 'user'";
+      presence "Emacs settings are supplied.";
+      leaf notes-directory { type string { length '1..1024'; pattern '[^\r\n]+'; } default '~/Documents/documents'; }
+      leaf default-editor { type boolean; default true; }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 { pkgs, lib }:
 {
+  migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.user = [ ./model/folio-input.yang ];
   requirements.user.modules = [{ module = "appearance"; when = {
     path = [ "folio-input:input" "wayland-frontend" ]; default = true; equals = true;

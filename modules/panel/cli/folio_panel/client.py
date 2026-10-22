@@ -59,7 +59,9 @@ class Client:
 
     async def settings(self):
         data = result(await process([paths.LEGACY, "--json", "config", "show"]))
-        preferences = data["configuration"]["folio-environment:environment"].get("preferences", {})
+        preferences = {key: value for key, value in
+                       data["configuration"]["folio-environment:environment"].get("preferences", {}).items()
+                       if key not in {"scheme", "appearance"}}
         defaults = {"appearance": "dark", "scheme": "everforest", "font-family": "Maple Mono NF CN", "font-size": 16}
         origin = "bootstrap default"
         descriptor = Path("/run/folio/public/system-descriptor.json")
@@ -81,6 +83,8 @@ class Client:
         document = data["configuration"]
         target = document["folio-environment:environment"].setdefault("preferences", {})
         for key, value in preferences.items():
+            if key not in {"font-family", "font-size"}:
+                raise BackendError("Theme selection is system-wide. Use folio theme set.", "invalid", "invalid-configuration")
             if value is None:
                 target.pop(key, None)
             else:

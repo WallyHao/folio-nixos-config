@@ -7,7 +7,7 @@ let
   journal = settings.journal or { };
   zram = settings.zram or { };
   nix = settings.nix or { };
-  colors = builtins.fromJSON (builtins.readFile ./colors.json);
+  colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = colors.palettes.${context.globals.appearance};
 in {
   time.timeZone = settings.time-zone or "Asia/Shanghai";

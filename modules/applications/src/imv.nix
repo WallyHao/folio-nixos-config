@@ -2,7 +2,7 @@
 context:
 let
   enabled = context.settings."folio-applications:applications".native.imv or true;
-  colors = builtins.fromJSON (builtins.readFile ../../terminal/src/colors.json);
+  colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = colors.palettes.${context.globals.appearance};
   imageTypes = [
     "image/png" "image/jpeg" "image/gif" "image/webp" "image/avif"

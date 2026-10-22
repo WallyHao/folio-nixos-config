@@ -2,9 +2,10 @@
 context:
 let
   settings = context.settings.codex or { };
-  theme.colors = (builtins.fromJSON (builtins.readFile ./colors.json)) // { appearance = context.globals.appearance; };
+  theme.colors = context.theme or (import ../../../appearance/lib { preferences = context.globals; });
   themedPackage = import ./package.nix {
     inherit pkgs;
+    accent = theme.colors.semantic.accent;
     palette = theme.colors.palettes.${context.globals.appearance};
   };
   selectedPackage = if settings.theme or true then themedPackage else package;

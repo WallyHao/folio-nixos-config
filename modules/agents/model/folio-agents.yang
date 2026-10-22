@@ -2,9 +2,10 @@ module folio-agents {
   yang-version 1.1;
   namespace "urn:folio:agents";
   prefix fa;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "User-owned coding agent selection. Credentials and sessions remain private runtime state.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-23 { description "Replace DeepSeek Harness with extensible Pi and a native configuration directory."; }
   revision 2026-10-22 { description "Group Codex and DeepSeek Harness in one capability."; }
   augment '/fe:environment/fe:modules' {

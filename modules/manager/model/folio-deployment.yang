@@ -2,10 +2,11 @@ module folio-deployment {
   yang-version 1.1;
   namespace "urn:folio:deployment";
   prefix fd;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
 
   organization "Folio";
   description "Manager-owned immutable plans and observed durable deployment tasks.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-19 { description "Reviewed drafts, plan comments and deployment history."; }
   revision 2026-10-18 { description "Initial plan and task contract; operations are registered when implemented."; }
 

@@ -1,31 +1,7 @@
 { }:
 let
-  defaultTheme = {
-    colors = {
-      appearance = "dark";
-      roles = {
-        background = "bg0";
-        surface = "bg1";
-        foreground = "fg";
-        muted = "grey1";
-        accent = "green";
-        border = "grey0";
-        selection = "bg_visual";
-      };
-      palettes = {
-        dark = {
-          bg0 = "#202124"; bg1 = "#292a2d"; bg_visual = "#3c4043";
-          fg = "#e8eaed"; grey0 = "#5f6368"; grey1 = "#9aa0a6";
-          green = "#81c995"; yellow = "#fdd663"; red = "#f28b82"; blue = "#8ab4f8";
-        };
-        light = {
-          bg0 = "#f8f9fa"; bg1 = "#ffffff"; bg_visual = "#e8eaed";
-          fg = "#202124"; grey0 = "#dadce0"; grey1 = "#5f6368";
-          green = "#188038"; yellow = "#f9ab00"; red = "#d93025"; blue = "#1a73e8";
-        };
-      };
-    };
-  };
+  defaultTheme.colors = import ../../appearance/lib { };
+
   defaultFont = "sans-serif:size=11";
   hex = value:
     if builtins.isString value && builtins.match "#[0-9A-Fa-f]{6}" value != null

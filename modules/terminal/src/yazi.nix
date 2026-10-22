@@ -2,9 +2,19 @@
 context:
 let
   settings = context.settings."folio-terminal:terminal" or { };
-  colors = builtins.fromJSON (builtins.readFile ./colors.json);
+  colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = colors.palettes.${context.globals.appearance};
+  baseTheme = (pkgs.formats.toml { }).generate "folio-yazi-base-theme.toml"
+    (import ./yazi-theme.nix { inherit palette; });
+  iconTheme = pkgs.runCommand "folio-yazi-theme" {
+    nativeBuildInputs = [ (pkgs.python3.withPackages (p: [ p.tomli-w ])) ];
+  } ''
+    python3 ${./yazi-icons.py} \
+      ${pkgs.yazi-unwrapped.srcs.code_src}/yazi-config/preset/theme-dark.toml \
+      ${baseTheme} ${lib.escapeShellArg colors.semantic.accent} "$out"
+  '';
 in {
+  xdg.configFile."yazi/theme.toml" = lib.mkIf (settings.tools.yazi or true) { source = iconTheme; };
   programs.yazi = {
     enable = settings.tools.yazi or true;
     shellWrapperName = "y";
@@ -13,7 +23,6 @@ in {
     enableFishIntegration = false;
     enableNushellIntegration = false;
     extraPackages = [ pkgs.xdg-utils ];
-    theme = import ./yazi-theme.nix { inherit palette; };
     settings = {
       mgr = {
         sort_by = "natural";

@@ -1,6 +1,6 @@
 { pkgs, lib, context, app }:
 let
-  colors = builtins.fromJSON (builtins.readFile ./zen/colors.json);
+  colors = context.theme or (import ../../../appearance/lib { preferences = context.globals; });
   theme.colors = colors // { appearance = context.globals.appearance; };
   palette = import ./zen/palette.nix { inherit theme; };
   preferences = {

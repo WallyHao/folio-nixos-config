@@ -1,10 +1,10 @@
-{ pkgs, palette ? null }:
+{ pkgs, palette ? null, accent ? palette.green }:
 let
   lib = pkgs.lib;
   command = if palette == null then "${pkgs.codex}/bin/codex" else "${pkgs.python3}/bin/python3";
   arguments = lib.escapeShellArgs [
     "${./colors.py}"
-    "--accent" palette.green
+    "--accent" accent
     "--selection" palette.bg_visual
     "--selection-text" palette.fg
     "--" "${pkgs.codex}/bin/codex" "--config" ''tui.theme="folio"''

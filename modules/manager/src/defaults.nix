@@ -5,11 +5,12 @@
     platform = "x86_64-linux";
     inherit scope;
     preferences = {
-      scheme = "everforest";
-      appearance = "dark";
       font-family = "Maple Mono NF CN";
       font-size = 16;
-    };
+    } // (if scope == "system" then {
+      scheme = "everforest";
+      appearance = "dark";
+    } else { });
     modules = [
       {
         name = "manager";
@@ -41,7 +42,7 @@
         ]
       else
         [
-          { name = "appearance"; enabled = true; }
+          { name = "appearance"; enabled = true; "folio-appearance:appearance".cursor-size = 42; }
           { name = "input"; enabled = true; }
           { name = "emacs"; enabled = true; }
           { name = "agents"; enabled = true; "folio-agents:agents".pi.enabled = true; }

@@ -10,6 +10,7 @@ in pkgs.stdenvNoCC.mkDerivation {
   installPhase = ''
     mkdir -p $out/lib $out/bin
     cp -R folio_panel $out/lib/
+    cp ${../../appearance/lib/everforest.json} $out/lib/folio_panel/theme-default.json
     cp ${storeBackend}/lib/folio_store.py $out/lib/folio_store.py
     cat >$out/lib/folio_panel/paths.py <<'PY'
     LEGACY = "${legacyCli}/bin/folio"

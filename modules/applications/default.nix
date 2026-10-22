@@ -7,7 +7,7 @@ in
   requirements.user.capabilities = [ "flatpak-provisioned" ];
   checks.store = import ./tests/store.nix { inherit pkgs; package = implementation.store; };
   impacts = [ "Native packages follow the user generation; Flatpak revisions use the applications lifecycle. Personal app data is retained." ];
-  migrations = [{
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
     module = "folio-applications";
     from = "2026-10-18"; to = "2026-10-23";
     fromSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-18/folio-applications.yang;
@@ -41,7 +41,7 @@ in
     module = "folio-applications";
     from = "2026-10-25"; to = "2026-10-26";
     fromSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-25/folio-applications.yang;
-    toSha256 = builtins.hashFile "sha256" ./model/folio-applications.yang;
+    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-26/folio-applications.yang;
     transform = "${pkgs.writeShellApplication {
       name = "folio-applications-unified-store";
       runtimeInputs = [ pkgs.jq ];

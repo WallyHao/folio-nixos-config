@@ -6,12 +6,12 @@ context:
 let
   settings = context.settings."folio-input:input" or { };
   seed = import ./package.nix { inherit pkgs; candidateCount = settings.candidate-count or 7; };
-  colors = builtins.fromJSON (builtins.readFile ./colors.json);
+  colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = colors.palettes.${context.globals.appearance};
   panelSvg = pkgs.writeText "folio-input-panel.svg" ''
     <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
       <rect x="3" y="3" width="74" height="74" rx="12" ry="12" fill="${palette.bg0}"/>
-      <rect x="3" y="3" width="74" height="74" rx="12" ry="12" fill="none" stroke="${palette.yellow}" stroke-width="2"/>
+      <rect x="3" y="3" width="74" height="74" rx="12" ry="12" fill="none" stroke="${colors.semantic.accent}" stroke-width="2"/>
     </svg>
   '';
   panel = pkgs.runCommand "folio-input-panel.png" { nativeBuildInputs = [ pkgs.librsvg ]; }
@@ -61,8 +61,8 @@ in {
     Description=Fern candidate panel
     [InputPanel]
     NormalColor=${palette.fg}
-    HighlightCandidateColor=${palette.yellow}
-    HighlightColor=${palette.yellow}
+    HighlightCandidateColor=${colors.semantic.accent}
+    HighlightColor=${colors.semantic.accent}
     HighlightBackgroundColor=#00000000
     FullWidthHighlight=False
     [InputPanel/Background]

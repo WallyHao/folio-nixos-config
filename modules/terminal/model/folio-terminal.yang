@@ -2,10 +2,11 @@ module folio-terminal {
   yang-version 1.1;
   namespace "urn:folio:terminal";
   prefix ft;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
 
   organization "Folio";
   description "Terminal-owned settings, initially the user Foot contribution.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-24 { description "Add Yazi terminal file manager."; }
   revision 2026-10-22 { description "Move Git and GitHub CLI preferences into the terminal capability."; }
   revision 2026-10-21 { description "Add independently selectable shell and terminal utilities."; }

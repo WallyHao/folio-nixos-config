@@ -5,10 +5,14 @@ context:
 { config, lib, ... }:
 let
   settings = context.settings."folio-desktop:desktop" or { };
-  theme.colors = (builtins.fromJSON (builtins.readFile ./colors.json)) // { appearance = context.globals.appearance; };
+  theme.colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = theme.colors.palettes.${theme.colors.appearance};
   renderer = import ./niri.nix { };
   launcher = import ./fuzzel.nix { };
+  browserCommand = if config.xdg.desktopEntries ? zen-beta then "zen-beta"
+    else if builtins.elem "applications" context.enabledModules then toString (pkgs.writeShellScript "folio-browser" ''
+      exec ${pkgs.flatpak}/bin/flatpak run app.zen_browser.zen
+    '') else null;
   bar = settings.bar or true;
   borderWidth = settings.border-width or 3;
   shortcutTheme = pkgs.writeText "folio-shortcuts-theme.json" (builtins.toJSON (
@@ -56,6 +60,8 @@ in {
     panelCommand = "${pkgs.folio.frontend}/bin/folio";
     shortcutHelp = "${shortcutHelp}/bin/folio-shortcuts";
     modifier = "Super";
+    fileManager = if config.programs.yazi.enable or false then "yazi" else null;
+    browser = browserCommand;
     deviceControl = if builtins.elem "devices" context.enabledModules then "${pkgs.folio.cli}/bin/folio" else null;
     layout = {
       # Fold the existing 8px outer inset into the common gap: windows now
@@ -86,9 +92,9 @@ in {
     enable = true;
     settings = {
       font = "${context.globals.font-family} ${toString context.globals.font-size}";
-      background-color = palette.bg0;
-      text-color = palette.fg;
-      border-color = palette.grey0;
+      background-color = theme.colors.semantic.background;
+      text-color = theme.colors.semantic.foreground;
+      border-color = theme.colors.semantic.border;
       border-radius = 0;
       border-size = 1;
       max-history = 0;
@@ -119,7 +125,7 @@ in {
       window#waybar { background: transparent; color: ${palette.fg}; }
       #workspaces { margin-left: 24px; }
       #workspaces button { padding: 0 4px; margin: 0; background: transparent; color: ${palette.grey0}; font-size: 9px; }
-      #workspaces button.active { color: ${palette.green}; font-size: 14px; }
+      #workspaces button.active { color: ${theme.colors.semantic.accent}; font-size: 14px; }
       #custom-input-language { color: ${palette.green}; }
       #custom-input-language.english { color: ${palette.blue}; }
       #custom-input-language.unavailable { color: ${palette.grey0}; }

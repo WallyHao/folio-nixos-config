@@ -1,9 +1,10 @@
 { theme }:
 let
   p = theme.colors.palettes.${theme.colors.appearance};
+  accent = p.${theme.colors.roles.accent};
   css = ''
-    @define-color accent_color ${p.yellow};
-    @define-color accent_bg_color ${p.yellow};
+    @define-color accent_color ${accent};
+    @define-color accent_bg_color ${accent};
     @define-color accent_fg_color ${p.bg0};
     @define-color window_bg_color ${p.bg0};
     @define-color window_fg_color ${p.fg};
@@ -30,7 +31,7 @@ let
     @define-color theme_fg_color ${p.fg};
     @define-color theme_base_color ${p.bg0};
     @define-color theme_text_color ${p.fg};
-    @define-color theme_selected_bg_color ${p.yellow};
+    @define-color theme_selected_bg_color ${accent};
     @define-color theme_selected_fg_color ${p.bg0};
     @define-color theme_unfocused_bg_color ${p.bg0};
     @define-color theme_unfocused_fg_color ${p.grey1 or p.fg};
@@ -49,8 +50,8 @@ in {
   # Keep this separate: GTK 3 cannot parse CSS custom properties.
   gtk4 = css + ''
     :root {
-      --accent-color: ${p.yellow};
-      --accent-bg-color: ${p.yellow};
+      --accent-color: ${accent};
+      --accent-bg-color: ${accent};
       --accent-fg-color: ${p.bg0};
       --window-bg-color: ${p.bg0};
       --window-fg-color: ${p.fg};

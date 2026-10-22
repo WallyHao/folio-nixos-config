@@ -3,14 +3,14 @@ let
   settings = context.settings."folio-appearance:appearance" or { };
   override = key: builtins.hasAttr key settings && settings.${key} != "inherit";
   resolve = key: if override key then settings.${key} else context.globals.${key};
-  colors = builtins.fromJSON (builtins.readFile ./colors.json);
+  colors = context.theme or (import ../lib { preferences = context.globals; });
 in {
-  colors = colors // { appearance = resolve "appearance"; };
+  colors = colors // { appearance = context.globals.appearance; };
   font-family = resolve "font-family";
   font-size = resolve "font-size";
-  cursor-size = settings.cursor-size or 28;
+  cursor-size = settings.cursor-size or 42;
   origins = builtins.listToAttrs (map (name: {
     inherit name;
-    value = if override name then "module-configuration" else context.preferenceOrigins.${name};
-  }) [ "appearance" "font-family" "font-size" ]);
+    value = if !(builtins.elem name [ "appearance" "scheme" ]) && override name then "module-configuration" else context.preferenceOrigins.${name};
+  }) [ "scheme" "appearance" "font-family" "font-size" ]);
 }

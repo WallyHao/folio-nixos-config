@@ -2,9 +2,10 @@ module folio-applications {
   yang-version 1.1;
   namespace "urn:folio:applications";
   prefix fa;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "User application packages, Flatpak selection, permissions and regular files.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-26 { description "Manage arbitrary Flathub apps through the shared durable lifecycle."; }
   revision 2026-10-25 { description "Add imv image viewer."; }
   revision 2026-10-24 { description "Add Zathura PDF reader."; }

@@ -28,7 +28,7 @@
         machine.copy_from_machine("/home/folio/desktop.png")
         user("fc-match 'Maple Mono NF CN' | grep -i maple; test -f /home/folio/.local/share/fcitx5/themes/folio/panel.png")
         metadata = json.loads(user("cat /home/folio/.config/folio/appearance.json"))
-        assert metadata["cursor"]=="GoogleDot-Folio" and metadata["cursor-size"]==28
+        assert metadata["cursor"]=="GoogleDot-Folio" and metadata["cursor-size"]==42
         ${pkgs.lib.optionalString (!drm) ''user("DISPLAY=:1 xdotool search --name '^niri$' windowfocus --sync key --clearmodifiers Super_L+d; sleep 1; pgrep -u folio -x fuzzel; DISPLAY=:1 xdotool key Escape")''}
         if ${if drm then "True" else "False"}:
             machine.send_key("meta_l-d")

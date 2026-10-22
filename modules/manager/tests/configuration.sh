@@ -105,7 +105,7 @@ echo 'Real C subscriber: durable commits, private editing, conflicts, errors and
 folio --json config set /preferences/font-size 21 | jq -e '.status=="success"'
 folio --json config get /preferences/font-size | jq -e '.data==21'
 folio --json config show >before.json
-folio --json config set /preferences/appearance '"light"' >/dev/null
+folio --json config set /preferences/font-family '"Fixture Mono"' >/dev/null
 jq .data.configuration before.json >stale.json
 expect_code 4 folio --json config import stale.json --expected-digest "$(jq -r .data.digest before.json)"
 expect_code 2 folio --json config set /preferences/font-size 100
@@ -124,3 +124,12 @@ folio --json config show | jq -e 'any(.data.configuration."folio-environment:env
   select(.name=="applications") | ."folio-applications:applications".app[]; .name=="org.example.App" and .selected)'
 folio --json config unset /preferences/font-size | jq -e '.status=="success"'
 echo 'Field edits, stale draft protection, early prerequisites, catalogue discovery and generic Flathub schema passed'
+
+# Theme selection has exactly two actions and cannot be overridden by a user.
+folio --json theme list | jq -e '.data.themes | index("graphite-dark") != null and index("everforest-light") != null'
+expect_code 2 folio --json config set /preferences/scheme '"graphite"'
+expect_code 2 folio --json config set /preferences/appearance '"light"'
+expect_code 2 folio --json theme set unknown
+expect_code 2 folio --json theme status
+expect_code 2 folio --json theme inherit
+echo 'Global-only theme schema and two-command CLI passed'

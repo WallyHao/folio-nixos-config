@@ -26,7 +26,8 @@ let
       sharedPreferences =
         defaults.system."folio-environment:environment".preferences
         // (if scope == "user" && prepared != null then prepared.systemDescriptor.preferences else { })
-        // (environment.preferences or { });
+        // (if scope == "user" then builtins.removeAttrs (environment.preferences or { }) [ "scheme" "appearance" ]
+            else environment.preferences or { });
     in
     {
       configurationDigest = if prepared != null && prepared.scope == scope then prepared.configurationDigest else null;
@@ -54,10 +55,11 @@ let
       };
       enabledModules = map (entry: entry.name) (builtins.filter (entry: entry.enabled or false) environment.modules);
       globals = sharedPreferences;
+      theme = import ../../appearance/lib { preferences = sharedPreferences; };
       preferenceOrigins =
         if prepared != null && prepared.scope == scope then prepared.resolvedPreferences.origins
         else lib.mapAttrs (name: _: if scope == "system" then "system-configuration"
-          else if builtins.hasAttr name (environment.preferences or { }) then "user-configuration"
+          else if !(builtins.elem name [ "scheme" "appearance" ]) && builtins.hasAttr name (environment.preferences or { }) then "user-configuration"
           else "system-default") sharedPreferences;
       capabilities =
         if scope == "user" && prepared != null then

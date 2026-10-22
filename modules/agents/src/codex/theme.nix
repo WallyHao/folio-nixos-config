@@ -4,7 +4,7 @@ let
   p = supplied.theme.colors.palettes.${supplied.theme.colors.appearance or "dark"};
   theme = {
     bg = p.bg0; bg-alt = p.bg1; fg = p.fg; cursor = p.fg;
-    accent = p.green; accent-bg = p.bg_visual; accent-bright = p.aqua;
+    accent = p.${supplied.theme.colors.roles.accent}; accent-bg = p.bg_visual; accent-bright = p.aqua;
     accent-yellow = p.yellow; accent-yellow-bright = p.orange; muted-alt = p.grey1;
     ansi = { red = p.red; yellow = p.yellow; magenta = p.purple; cyan = p.aqua; };
     ansi-bright.red = p.red;

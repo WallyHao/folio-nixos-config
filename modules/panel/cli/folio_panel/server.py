@@ -52,14 +52,12 @@ def validate_settings(request):
     if not isinstance(request["digest"], str) or not re.fullmatch(r"[a-f0-9]{64}", request["digest"]):
         raise ValueError("Invalid configuration digest")
     preferences = request["preferences"]
-    if not isinstance(preferences, dict) or not set(preferences) <= {"appearance", "scheme", "font-size", "font-family"}:
+    if not isinstance(preferences, dict) or not set(preferences) <= {"font-size", "font-family"}:
         raise ValueError("Unsupported preference")
     for key, value in preferences.items():
         if value is None:
             continue
-        valid = ((key == "appearance" and value in ("dark", "light"))
-                 or (key == "scheme" and value == "everforest")
-                 or (key == "font-size" and type(value) is int and 6 <= value <= 72)
+        valid = ((key == "font-size" and type(value) is int and 6 <= value <= 72)
                  or (key == "font-family" and isinstance(value, str) and 1 <= len(value) <= 128
                      and not any(c in value for c in "\r\n\0")))
         if not valid:
@@ -92,6 +90,8 @@ def validate(request):
 
 
 def theme_css():
+    defaults = json.loads((Path(__file__).parent / "theme-default.json").read_text())
+    settings = {}
     try:
         config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
         settings = json.loads((config / "folio/appearance.json").read_text())
@@ -103,10 +103,21 @@ def theme_css():
             raise ValueError
         appearance = settings["appearance"]
     except (OSError, KeyError, ValueError, TypeError):
+        settings = {}
         family, size, appearance = "Maple Mono NF CN", 16, "dark"
-    palette = ("--bg:#fffbef;--surface:#f8f5e4;--raised:#f2efdf;--fg:#5c6a72;"
-               "--muted:#939f91;--line:#e8e5d5;--accent:#dfa000;--green:#8da101;--red:#f85552;"
-               "color-scheme:light;") if appearance == "light" else ""
+    appearance = "light" if appearance == "light" else "dark"
+    colors = settings.get("palette", defaults["palettes"][appearance])
+    roles = {"bg": "bg0", "surface": "bg1", "raised": "bg2", "fg": "fg",
+             "muted": "grey1", "line": "bg3", "accent": "yellow", "green": "green", "red": "red"}
+    if not isinstance(colors, dict) or not all(isinstance(colors.get(key), str) and
+            re.fullmatch(r"#[0-9a-fA-F]{6}", colors[key]) for key in roles.values()):
+        colors = defaults["palettes"][appearance]
+    palette = "".join(f"--{role}:{colors[key]};" for role, key in roles.items())
+    semantic = settings.get("roles", defaults["roles"])
+    accent = colors.get(semantic.get("accent")) if isinstance(semantic, dict) else None
+    if isinstance(accent, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", accent):
+        palette += f"--accent:{accent};"
+    palette += f"color-scheme:{appearance};"
     return f":root{{{palette}--font:{json.dumps(family, ensure_ascii=False)},monospace;--font-size:{size}pt;}}".encode()
 
 

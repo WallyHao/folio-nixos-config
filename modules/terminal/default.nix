@@ -29,7 +29,7 @@ in
 {
   models.user = [ current ];
   impacts = [ "Open a new terminal or shell to load changed terminal and shell settings." ];
-  migrations = [
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [
     {
       module = "folio-terminal";
       from = "2026-10-18"; to = "2026-10-19";
@@ -66,7 +66,7 @@ in
       module = "folio-terminal";
       from = "2026-10-22"; to = "2026-10-24";
       fromSha256 = builtins.hashFile "sha256" gitModel;
-      toSha256 = builtins.hashFile "sha256" current;
+      toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-24/folio-terminal.yang;
       transform = "${migration "folio-terminal-add-yazi" "."}/bin/folio-terminal-add-yazi";
     }
     {
@@ -87,7 +87,7 @@ in
     { name = "2026-10-20/folio-terminal.yang"; path = fraction; }
     { name = "2026-10-21/folio-terminal.yang"; path = tools; }
     { name = "2026-10-22/folio-terminal.yang"; path = gitModel; }
-    { name = "2026-10-24/folio-terminal.yang"; path = current; }
+    { name = "2026-10-24/folio-terminal.yang"; path = ./model/revisions/2026-10-24/folio-terminal.yang; }
     { name = "2026-10-19/folio-git.yang"; path = legacyGit; }
   ];
   homeManagerModule = import ./src/user.nix { inherit pkgs lib; };

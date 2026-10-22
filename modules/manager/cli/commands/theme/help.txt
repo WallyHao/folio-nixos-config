@@ -1,0 +1,12 @@
+Usage: folio theme list
+       folio theme set THEME
+
+List complete themes, or save and apply one theme across the system and desktop.
+Examples: folio theme set graphite-dark
+          folio theme set everforest-light
+
+Set always builds and applies using the installed source and the normal deployment
+coordinator. It also removes legacy desktop theme overrides. System writes and
+activation request administrator privileges when needed. Other pending desired
+configuration changes are included in deployment. Some open applications need
+reopening to load new resources.

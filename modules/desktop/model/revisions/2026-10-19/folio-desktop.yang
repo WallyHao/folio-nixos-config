@@ -1,0 +1,23 @@
+module folio-desktop {
+  yang-version 1.1;
+  namespace "urn:folio:desktop";
+  prefix fd;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "Niri session geometry and selected desktop components.";
+  revision 2026-10-19 { description "Niri, Waybar, notifications, launcher and clipboard integration."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'desktop'";
+    container desktop {
+      when "../../fe:scope = 'user'";
+      presence "Desktop settings are supplied.";
+      leaf bar { type boolean; default true; }
+      leaf notifications { type boolean; default true; }
+      leaf launcher { type boolean; default true; }
+      leaf clipboard { type boolean; default true; }
+      leaf gaps { type uint8 { range '0..64'; } default 8; }
+      leaf border-width { type uint8 { range '0..16'; } default 3; }
+      leaf corner-radius { type uint8 { range '0..64'; } default 12; }
+    }
+  }
+}

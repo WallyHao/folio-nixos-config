@@ -1,44 +1,8 @@
 { }:
 let
   # Adapted from Sylphy modules/foot/src/config.nix, revision 9cba023d90c4485b.
-  # Palettes are the Everforest dark/hard resources; selected preferences are
-  # supplied through the terminal adapter's public context.
-  defaultTheme = {
-    colors = {
-      appearance = "dark";
-      roles = {
-        background = "bg0";
-        foreground = "fg";
-        selection = "bg_visual";
-      };
-      palettes = {
-        dark = {
-          bg0 = "#272e33";
-          bg_visual = "#4c3743";
-          fg = "#d3c6aa";
-          red = "#e67e80";
-          green = "#a7c080";
-          yellow = "#dbbc7f";
-          blue = "#7fbbb3";
-          purple = "#d699b6";
-          aqua = "#83c092";
-          grey0 = "#7a8478";
-        };
-        light = {
-          bg0 = "#fffbef";
-          bg_visual = "#f0f2d4";
-          fg = "#5c6a72";
-          red = "#f85552";
-          green = "#8da101";
-          yellow = "#dfa000";
-          blue = "#3a94c5";
-          purple = "#df69ba";
-          aqua = "#35a77c";
-          grey0 = "#a6b0a0";
-        };
-      };
-    };
-  };
+  # Standalone rendering and managed preferences share Folio's palette catalogue.
+  defaultTheme.colors = import ../../appearance/lib { };
 
   colorHex =
     lib: value:

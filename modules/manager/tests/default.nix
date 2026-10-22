@@ -147,6 +147,11 @@ catalogueLib.exclusive "check names" [
         modules = adapters "system";
       }
     ) { };
+    theme-migration = import ./theme-migration.nix {
+      inherit pkgs bootstrap;
+      repository = catalogue.sysrepo.packages.tools;
+      maintenance = catalogue.sysrepo.packages.maintenance;
+    };
     configuration = import ./configuration.nix {
       inherit pkgs bootstrap;
       runtime = collection.packages.manager-runtime;

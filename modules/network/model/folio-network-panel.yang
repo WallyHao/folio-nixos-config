@@ -2,9 +2,10 @@ module folio-network-panel {
   yang-version 1.1;
   namespace "urn:folio:network-panel";
   prefix fnp;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "Network-owned private proxy inventory and bounded panel controls. No credentials are modeled.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-19 { description "Initial panel proxy operations."; }
   rpc control {
     input {

@@ -199,6 +199,23 @@ def test_theme_uses_installed_appearance(tmp_path, monkeypatch):
     assert b"16pt" in theme_css()
 
 
+def test_theme_uses_palette_and_roles(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    (tmp_path / "folio").mkdir()
+    path = tmp_path / "folio/appearance.json"
+    palette = {key: "#123456" for key in ["bg0", "bg1", "bg2", "bg3", "fg", "grey1", "yellow", "green", "red"]}
+    palette["green"] = "#abcdef"
+    settings = {"appearance": "dark", "font-family": "Maple Mono NF CN", "font-size": 16,
+                "palette": palette, "roles": {"accent": "green"}}
+    path.write_text(json.dumps(settings))
+    css = theme_css()
+    assert b"--bg:#123456" in css and b"--accent:#abcdef" in css
+    palette["bg0"] = "red;}body{display:none}"
+    path.write_text(json.dumps(settings))
+    css = theme_css()
+    assert b"display:none" not in css and b"--bg:#1b2521" in css
+
+
 def test_store_http_boundary(panel):
     assert request(panel, "/api/apps", token=False)[0] == 403
     assert request(panel, "/api/apps/action", {"action": "setup", "fields": {}}, token=False)[0] == 403
@@ -220,14 +237,14 @@ def test_settings_validation_conflict_and_diagnostics(panel):
     assert request(panel, "/api/settings")[0] == 200
     assert request(panel, "/api/doctor")[0] == 200
     assert request(panel, "/settings.js", token=False)[0] == 200
-    for preferences in ({"font-size": True}, {"font-size": 73}, {"account": "root"}, {"font-family": "bad\nfont"}):
+    for preferences in ({"font-size": True}, {"font-size": 73}, {"account": "root"}, {"scheme": "graphite"}, {"appearance": "light"}, {"font-family": "bad\nfont"}):
         assert request(panel, "/api/settings", {"digest": "a" * 64, "preferences": preferences})[0] == 400
     assert not panel.client.calls
     code, body, _ = request(panel, "/api/settings", {"digest": "b" * 64, "preferences": {"font-size": 18}})
     reply = json.loads(body)
     assert code == 409 and reply["code"] == "configuration-conflict" and reply["hint"]
     assert b"private backend detail" not in body
-    assert request(panel, "/api/settings", {"digest": "a" * 64, "preferences": {"font-size": 18, "appearance": None}})[0] == 200
+    assert request(panel, "/api/settings", {"digest": "a" * 64, "preferences": {"font-size": 18}})[0] == 200
 
 
 def test_settings_client_preserves_other_fields_and_binds_digest(monkeypatch):

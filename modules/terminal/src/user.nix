@@ -8,7 +8,7 @@ let
   tools = settings.tools or { };
   git = settings.git or { };
   selected = name: tools.${name} or true;
-  theme.colors = (builtins.fromJSON (builtins.readFile ./colors.json)) // { appearance = context.globals.appearance; };
+  theme.colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
   palette = theme.colors.palettes.${theme.colors.appearance};
   footRenderer = import ./foot.nix { };
   zsh = import ./zsh.nix { };

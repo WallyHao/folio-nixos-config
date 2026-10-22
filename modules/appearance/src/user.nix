@@ -43,6 +43,9 @@ in {
   xdg.configFile."folio/appearance.json".text = builtins.toJSON {
     format = 1;
     appearance = theme.colors.appearance;
+    scheme = theme.colors.scheme;
+    palette = theme.colors.palettes.${theme.colors.appearance};
+    roles = theme.colors.roles;
     inherit (theme) font-family font-size cursor-size origins;
     cursor = cursor.cursorName;
   };

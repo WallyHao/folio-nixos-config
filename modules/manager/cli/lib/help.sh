@@ -19,6 +19,7 @@ Usage: folio [--json] [--environment portable] [--user|--system] COMMAND
 Commands:
   config show|edit|import FILE|export FILE   Read or durably save desired data
   config get|set|unset /PATH [JSON]         Read or change one setting
+  theme list|set THEME                     List themes or switch system and desktop colors
   modules list|enable NAME|disable NAME     Inspect or change desired selection
   plan [--source DIRECTORY]                Review system/user changes, confirm, add a comment
   plan --yes --comment TEXT                Create a reviewed plan non-interactively

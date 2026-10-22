@@ -46,6 +46,9 @@ let
     mkdir $out
     cp -R ${currentFixtureSource}/. $out/
     chmod -R u+w $out
+    ${pkgs.lib.concatMapStringsSep "\n" (model: ''
+      cp ${model.path} "$out/modules/${model.owner}/model/${model.name}"
+    '') (import ./previous-theme-models.nix { inherit pkgs; })}
     cp $out/modules/terminal/model/revisions/2026-10-18/folio-terminal.yang $out/modules/terminal/model/folio-terminal.yang
   '' else currentFixtureSource;
   fixtureBootstrap = if recovery then

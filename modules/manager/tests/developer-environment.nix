@@ -37,15 +37,24 @@ pkgs.runCommand "folio-developer-tools"
     ${generation}/home-path/bin/codex completion zsh >$TMPDIR/codex-completion
     test -s "$TMPDIR/codex-completion"
     python3 - <<'PY'
-    import os, pathlib, plistlib
+    import json, os, pathlib, plistlib
+    appearance = json.loads((pathlib.Path(os.environ["XDG_CONFIG_HOME"])/"folio/appearance.json").read_text())
+    palette = appearance["palette"]
+    assert appearance["cursor-size"] == 42
+    accent = palette[appearance["roles"]["accent"]]
+    niri = (pathlib.Path(os.environ["XDG_CONFIG_HOME"])/"niri/config.kdl").read_text()
+    assert 'Super+Y hotkey-overlay-title="Open Yazi"' in niri
+    assert 'Super+W hotkey-overlay-title="Open browser"' in niri
+    assert '"-e" "yazi"' in niri
+    assert '-folio-browser"' in niri
     theme = pathlib.Path(os.environ['HOME'])/'.codex/themes/folio.tmTheme'
     assert plistlib.loads(theme.read_bytes())['settings']
     assert not (theme.parent.parent/'auth.json').exists()
     assert not (theme.parent.parent/'config.toml').exists()
     btop = pathlib.Path(os.environ['XDG_CONFIG_HOME'])/'btop'
     assert 'color_theme = "folio"' in (btop/'btop.conf').read_text()
-    assert 'theme[main_bg]="#272e33"' in (btop/'themes/folio.theme').read_text()
-    assert 'theme[title]="#dbbc7f"' in (btop/'themes/folio.theme').read_text()
+    assert f'theme[main_bg]="{palette["bg0"]}"' in (btop/'themes/folio.theme').read_text()
+    assert f'theme[title]="{palette["yellow"]}"' in (btop/'themes/folio.theme').read_text()
     import tomllib
     yazi = tomllib.loads((pathlib.Path(os.environ['XDG_CONFIG_HOME'])/'yazi/yazi.toml').read_text())
     assert yazi['mgr']['sort_by'] == 'natural'
@@ -56,9 +65,13 @@ pkgs.runCommand "folio-developer-tools"
     assert any(rule.get('mime') == 'image/*' and rule['use'] == 'open'
                for rule in yazi['open']['prepend_rules'])
     yazi_theme = tomllib.loads((pathlib.Path(os.environ['XDG_CONFIG_HOME'])/'yazi/theme.toml').read_text())
-    assert yazi_theme['app']['overall']['bg'] == '#272e33'
-    assert yazi_theme['indicator']['current']['bg'] == '#4c3743'
-    assert yazi_theme['tabs']['active']['bg'] == '#a7c080'
+    assert yazi_theme['app']['overall']['bg'] == palette['bg0']
+    assert yazi_theme['indicator']['current']['bg'] == palette['bg_visual']
+    assert yazi_theme['tabs']['active']['bg'] == palette['green']
+    icons = yazi_theme['icon']
+    assert all(rule['fg'] == accent for rules in icons.values() for rule in rules)
+    assert any(rule['name'] == 'Downloads' for rule in icons['dirs'])
+    assert any(rule['name'] == 'rs' for rule in icons['exts'])
     PY
     ${editor}/bin/emacs --batch --load ${../../emacs/tests/org-roam.el}
     mkdir $out

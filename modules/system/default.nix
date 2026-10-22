@@ -40,11 +40,11 @@ in
     scopes = [ "system" ];
   };
   models.system = [ currentModel ];
-  migrations = [{
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
     module = "folio-system";
     from = "2026-10-18"; to = "2026-10-19";
     fromSha256 = builtins.hashFile "sha256" oldModel;
-    toSha256 = builtins.hashFile "sha256" currentModel;
+    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-19/folio-system.yang;
     transform = "${migration}/bin/folio-system-add-policy";
   }];
   nixosModule = import ./src/system.nix { inherit power; };

@@ -1,6 +1,7 @@
 dispatch_command() {
 [[ "$environment" == portable ]] || emit_error invalid 'Unknown environment' 2
 command=${arguments[0]}
+if [[ "$command" == theme ]]; then scope=system; fi
 if "$no_wait" && [[ "$command" != build && "$command" != apply && "$command" != resume && "$command" != vm && "$command" != apps ]]; then
   emit_error invalid '--no-wait applies to deployment tasks and VM builds' 2
 fi

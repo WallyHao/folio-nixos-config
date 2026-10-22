@@ -1,10 +1,26 @@
 { pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, applicationsHistory, systemModules,
   homeManager, runtime, prepareInput, source, inputs, switcher }:
 let
+  previousModels = import ../../manager/tests/previous-theme-models.nix { inherit pkgs; };
+  previousBootstrap = pkgs.lib.concatMapStringsSep "\n" (model: ''
+    for scope in user system; do
+      if [[ -f "$out/models/$scope/${model.name}" ]]; then cp ${model.path} "$out/models/$scope/${model.name}"; fi
+    done
+  '') previousModels + ''
+    for scope in user system; do
+      for model in "$out/models/$scope/"*.yang; do
+        hash=$(sha256sum <"$model"); hash=''${hash%% *}
+        jq --arg scope "$scope" --arg name "$(basename "$model")" --arg hash "$hash" \
+          '.models[$scope] |= map(if .name==$name then .sha256=$hash else . end)' $out/identities.json >identity.json
+        mv identity.json $out/identities.json
+      done
+    done
+  '';
   harness = pkgs.runCommand "folio-before-pi-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
     mkdir $out
     cp -RL ${bootstrap}/. $out/
     chmod -R u+w $out
+    ${previousBootstrap}
     cp ${agentsHistory}/2026-10-22/folio-agents.yang $out/models/user/folio-agents.yang
     jq '."folio-environment:environment".modules |= map(
       if .name=="agents" then ."folio-agents:agents"={
@@ -12,7 +28,8 @@ let
       else . end)' ${bootstrap}/user.json >$out/user.json
     jq --arg hash "$(sha256sum <$out/models/user/folio-agents.yang | cut -d' ' -f1)" \
       '.models.user |= map(if .name=="folio-agents.yang" then .sha256=$hash else . end)' \
-      ${bootstrap}/identities.json >$out/identities.json
+      $out/identities.json >identities.json
+    mv identities.json $out/identities.json
   '';
   adoptionSource = pkgs.runCommand "folio-legacy-adoption-source" {
     nativeBuildInputs = [ pkgs.jq pkgs.folio.normalizer prepareInput ];
@@ -22,7 +39,7 @@ let
     chmod -R u+w $out
     folio-normalize ${old}/models/user ${old}/user.json >configuration.json
     for module in folio-codex folio-agents folio-git; do
-      transform=$(jq -er --arg module "$module" '.[] | select(.module==$module) | .transform' ${bootstrap}/migrations.json)
+      transform=$(jq -er --arg module "$module" '.[] | select(.module==$module and (.module!="folio-agents" or .from=="2026-10-22")) | .transform' ${bootstrap}/migrations.json)
       "$transform" <configuration.json >next.json
       mv next.json configuration.json
     done
@@ -58,6 +75,7 @@ let
     mkdir $out
     cp -RL ${bootstrap}/. $out/
     chmod -R u+w $out
+    ${previousBootstrap}
     rm $out/models/user/folio-agents.yang
     cp ${agentsHistory}/2026-10-19/folio-codex.yang $out/models/user/
     cp ${terminalHistory}/2026-10-19/folio-git.yang $out/models/user/
@@ -78,7 +96,8 @@ let
         if .name=="folio-terminal.yang" then .sha256=$terminal
         elif .name=="folio-applications.yang" then .sha256=$applications else . end) +
         [{name:"folio-codex.yang",sha256:$codex},{name:"folio-git.yang",sha256:$git}] | sort_by(.name))' \
-      ${bootstrap}/identities.json >$out/identities.json
+      $out/identities.json >identities.json
+    mv identities.json $out/identities.json
   '';
 in pkgs.testers.runNixOSTest {
   name = "folio-agents-terminal-migration";

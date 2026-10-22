@@ -4,6 +4,7 @@ in {
   requirements.user.capabilities = [ "devices-provisioned" ];
   targetModules.folio = import ./src/folio.nix;
   inherit packages;
+  migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.system = [ ./model/folio-devices.yang ];
   models.user = [ ./model/folio-devices.yang ];
   subscribers.user = [ "folio-devices.service" ];

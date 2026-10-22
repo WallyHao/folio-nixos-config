@@ -35,14 +35,12 @@ in
   commands = lib.mapAttrs (name: adapter: {
     path = "${adapter}/bin/${adapter.meta.mainProgram}";
     help = "${(
-      if name == "config" then ../cli/commands/config/help.txt
+      if name == "theme" then ../cli/commands/theme/help.txt
+      else if name == "config" then ../cli/commands/config/help.txt
       else if name == "modules" then ../cli/commands/modules/help.txt
       else if name == "rollback" || name == "cleanup" then ../cli/commands/rollback/help.txt
       else ../cli/commands/deploy/help.txt
     )}";
-    scopes = [
-      "user"
-      "system"
-    ];
+    scopes = if name == "theme" then [ "system" ] else [ "user" "system" ];
   }) client.adapters;
 }

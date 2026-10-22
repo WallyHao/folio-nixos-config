@@ -93,7 +93,8 @@ if [[ -e "$state/model-identity" ]]; then
   fi
 else
   # Do not adopt or overwrite a pre-existing repository without provenance.
-  if [[ -e "$SYSREPO_REPOSITORY_PATH/yang/folio-environment@2026-10-18.yang" ]]; then
+  existing_models=("$SYSREPO_REPOSITORY_PATH"/yang/folio-environment@*.yang)
+  if [[ -e "${existing_models[0]}" ]]; then
     echo 'Existing repository has no model identity; offline recovery is required' >&2
     exit 4
   fi

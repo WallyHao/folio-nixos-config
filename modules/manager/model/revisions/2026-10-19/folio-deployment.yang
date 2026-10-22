@@ -1,0 +1,90 @@
+module folio-deployment {
+  yang-version 1.1;
+  namespace "urn:folio:deployment";
+  prefix fd;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+
+  organization "Folio";
+  description "Manager-owned immutable plans and observed durable deployment tasks.";
+  revision 2026-10-19 { description "Reviewed drafts, plan comments and deployment history."; }
+  revision 2026-10-18 { description "Initial plan and task contract; operations are registered when implemented."; }
+
+  grouping result {
+    leaf status { type fe:result-status; mandatory true; }
+    leaf error { type string; }
+    anydata data { description "Operation-specific observed result, never desired settings."; }
+    leaf result-json { type string; description "Lossless JSON result, preserving empty arrays and nested values."; }
+  }
+  rpc plan {
+    description "Freeze an owned source and accepted user configuration into an immutable plan.";
+    input {
+      leaf source { type string; mandatory true; }
+      leaf timeout-seconds { type uint32 { range '1..86400'; } default 1800; }
+      leaf mode { type enumeration { enum create; enum preview; enum confirm; enum cancel; } default create; }
+      leaf draft-id { type fe:digest; }
+      leaf comment { type string { length '0..4096'; } default ""; }
+      leaf descriptor-json { type string { length '0..65536'; } default ""; }
+    }
+    output { uses result; leaf plan-id { type fe:digest; } }
+  }
+  rpc build {
+    description "Durably submit a build of a recorded immutable plan.";
+    input {
+      leaf plan-id { type fe:digest; mandatory true; }
+      leaf request-id { type fe:identifier; mandatory true; }
+    }
+    output { uses result; leaf task-id { type fe:identifier; } }
+  }
+  rpc apply {
+    description "Submit activation of a recorded successful build after stale-plan checks.";
+    input {
+      leaf plan-id { type fe:digest; mandatory true; }
+      leaf request-id { type fe:identifier; mandatory true; }
+    }
+    output { uses result; leaf task-id { type fe:identifier; } }
+  }
+  rpc status {
+    description "Read recorded tasks and probed profile/configuration state.";
+    input {
+      leaf task-id { type fe:identifier; }
+      leaf history { type boolean; default false; }
+    }
+    output { uses result; }
+  }
+
+  container deployment {
+    config false;
+    list plans {
+      key id;
+      leaf id { type fe:digest; }
+      leaf input-digest { type fe:digest; mandatory true; }
+      leaf configuration-digest { type fe:digest; mandatory true; }
+      leaf descriptor-digest { type fe:digest; }
+      leaf scope { type fe:scope; mandatory true; }
+      leaf environment { type fe:identifier; mandatory true; }
+      leaf owner { type string; mandatory true; }
+      leaf prior-deployment { type fe:digest; }
+      leaf timeout-seconds { type uint32 { range '1..86400'; } mandatory true; }
+      leaf artifact { type string; }
+      leaf-list findings { type string; }
+    }
+    list tasks {
+      key id;
+      leaf id { type fe:identifier; }
+      leaf request-id { type string; mandatory true; }
+      leaf input-digest { type fe:digest; mandatory true; }
+      leaf plan { type fe:digest; }
+      leaf phase {
+        type enumeration {
+          enum queued; enum validating; enum building; enum activating;
+          enum verifying; enum succeeded; enum failed; enum interrupted;
+        }
+        mandatory true;
+      }
+      leaf before-profile { type string; }
+      leaf after-profile { type string; }
+      leaf error { type string; }
+      leaf updated-at { type string; }
+    }
+  }
+}

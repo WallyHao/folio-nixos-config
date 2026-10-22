@@ -2,9 +2,10 @@ module folio-system {
   yang-version 1.1;
   namespace "urn:folio:system";
   prefix fs;
-  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
   organization "Folio";
   description "System-owned guest policy, independent of user deployment.";
+  revision 2026-10-27 { description "Unified shared theme selection and environment dependency."; }
   revision 2026-10-19 { description "Add explicit storage, account, locale, console, journal, time, memory and Nix policy."; }
   revision 2026-10-18 { description "Initial explicit disposable guest policy."; }
   grouping power-request {

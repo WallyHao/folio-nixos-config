@@ -18,11 +18,11 @@ in
     ];
   };
   inherit (implementation) packages commands;
-  migrations = [{
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
     module = "folio-deployment";
     from = "2026-10-18"; to = "2026-10-19";
     fromSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-18/folio-deployment.yang;
-    toSha256 = builtins.hashFile "sha256" ./model/folio-deployment.yang;
+    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-19/folio-deployment.yang;
     transform = "${pkgs.writeShellApplication {
       name = "folio-deployment-add-review";
       runtimeInputs = [ pkgs.jq ];

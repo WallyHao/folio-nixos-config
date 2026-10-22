@@ -1,9 +1,5 @@
 /* Tabler-inspired control surfaces, using Folio's installed theme tokens. */
 :root {
-  color-scheme: dark;
-  --bg: #272e33; --surface: #2e383c; --raised: #374145;
-  --fg: #d3c6aa; --muted: #9da9a0; --line: #414b50;
-  --accent: #dbbc7f; --green: #a7c080; --red: #e67e80;
   --control-height: 2.15rem; --action-width: 8rem; --control-gap: .5rem;
   --radius: .35rem; --card-radius: .5rem;
   --font: "Maple Mono NF CN", monospace; --font-size: 16pt;
@@ -29,7 +25,7 @@ button:disabled, input:disabled, select:disabled { opacity: .45; cursor: not-all
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 3px;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: #272e33; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 90%, var(--fg)); border-color: var(--accent); }
 button.subtle { background: var(--surface); }
 button.danger { color: var(--red); }
@@ -37,7 +33,7 @@ button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 1
 .icon { width: 1rem; height: 1rem; flex: none; stroke: currentColor; fill: none; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--border); padding: .6rem clamp(.6rem, 2vw, 1.5rem) 0; box-shadow: var(--shadow); }
 .brand { display: flex; align-items: center; gap: .5rem; width: fit-content; color: var(--fg); text-decoration: none; font-size: .95rem; font-weight: 700; letter-spacing: -.04em; margin-bottom: .65rem; }
-.brand-mark { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; background: var(--accent); color: #272e33; border-radius: .4rem; font-size: 1.25rem; font-weight: 700; }
+.brand-mark { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; background: var(--accent); color: var(--bg); border-radius: .4rem; font-size: 1.25rem; font-weight: 700; }
 .brand-note { color: var(--muted); font-size: .55rem; font-weight: 400; letter-spacing: 0; padding-left: .4rem; border-left: 1px solid var(--line); }
 .sidebar > nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .3rem; max-width: 56rem; margin-inline: auto; }
 .nav {
