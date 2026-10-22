@@ -246,3 +246,8 @@ technical procedure and recovery details.
 
 The repository's [technical reference](docs/reference.md) preserves detailed
 architecture, operation and recovery notes.
+
+## License
+
+Folio's original code and documentation are licensed under the [MIT License](LICENSE).
+Third-party code and assets retain their respective licenses and notices.
