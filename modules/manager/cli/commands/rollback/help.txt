@@ -1,3 +1,6 @@
-Usage: folio rollback REVISION_ID [--rebuild]
+Usage: folio rollback PLAN_ID [--yes]
+       folio --user|--system rollback RETAINED_ID [--yes] [--rebuild]
        folio cleanup [--apply]
-System offline maintenance requires root. Cleanup previews by default.
+Reviewed plans must have a successful apply execution before rollback.
+Rollback previews target artifacts and asks for confirmation; --yes skips it.
+System offline maintenance requests administrator authorization. Cleanup previews by default.

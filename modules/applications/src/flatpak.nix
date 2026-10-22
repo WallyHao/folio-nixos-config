@@ -4,7 +4,7 @@ let
   application = app:
     if app.name == "zen" then import ./apps/zen.nix { inherit pkgs lib context app; }
     else if app.name == "obs" then import ./apps/obs.nix { inherit app; }
-    else throw "Folio: unsupported application identity";
+    else { inherit (app) name ref; files = [ ]; };
 in
 {
   format = 1;

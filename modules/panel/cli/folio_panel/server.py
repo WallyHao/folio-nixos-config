@@ -5,6 +5,7 @@ import fcntl
 import hmac
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import subprocess
@@ -12,10 +13,12 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.error import URLError
+from urllib.parse import urlsplit, parse_qs
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .client import BackendError, Client
+from folio_store import Store, StoreError
 
 ASSETS = Path(__file__).parent / "web"
 FIELDS = {
@@ -32,6 +35,36 @@ FIELDS = {
     ("proxy", "proxy-group-select"): {"group", "node"},
     ("proxy", "proxy-delay"): {"node"},
 }
+
+ERRORS = {
+    "backend-unavailable": ("Service unavailable or access denied.", "Run folio doctor for service and permission checks."),
+    "configuration-conflict": ("Configuration changed while you were editing.", "Reload settings and review your changes before saving again."),
+    "invalid-configuration": ("Settings did not pass configuration validation.", "Check the values and module prerequisites with folio doctor."),
+    "backend-timeout": ("The service did not respond in time.", "Refresh current state before retrying the operation."),
+    "permission-denied": ("Your account cannot perform this operation.", "Run folio doctor to check the required services and permissions."),
+    "model-upgrade-required": ("Installed models do not match this client.", "Complete the paired model upgrade described in the Folio maintenance guide."),
+}
+
+
+def validate_settings(request):
+    if not isinstance(request, dict) or set(request) != {"digest", "preferences"}:
+        raise ValueError("Invalid settings request")
+    if not isinstance(request["digest"], str) or not re.fullmatch(r"[a-f0-9]{64}", request["digest"]):
+        raise ValueError("Invalid configuration digest")
+    preferences = request["preferences"]
+    if not isinstance(preferences, dict) or not set(preferences) <= {"appearance", "scheme", "font-size", "font-family"}:
+        raise ValueError("Unsupported preference")
+    for key, value in preferences.items():
+        if value is None:
+            continue
+        valid = ((key == "appearance" and value in ("dark", "light"))
+                 or (key == "scheme" and value == "everforest")
+                 or (key == "font-size" and type(value) is int and 6 <= value <= 72)
+                 or (key == "font-family" and isinstance(value, str) and 1 <= len(value) <= 128
+                     and not any(c in value for c in "\r\n\0")))
+        if not valid:
+            raise ValueError("Invalid preference value")
+    return request["digest"], preferences
 
 
 def validate(request):
@@ -80,15 +113,31 @@ def theme_css():
 class PanelServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, store=None):
         self.token = secrets.token_urlsafe(32)
         self.client = client or Client()
+        self._store = store
         self.operation = threading.Lock()
         super().__init__(("127.0.0.1", 0), Handler)
         self.origin = f"http://127.0.0.1:{self.server_port}"
 
 
+    @property
+    def store(self):
+        with self.operation:
+            if self._store is None:
+                from .paths import FLATPAK, LEGACY
+                self._store = Store(FLATPAK, LEGACY)
+            return self._store
+
+
 class Handler(BaseHTTPRequestHandler):
+    def backend_error(self, error):
+        code = getattr(error, "code", "backend-unavailable")
+        message, hint = ERRORS.get(code, ERRORS["backend-unavailable"])
+        self.send(409 if code == "configuration-conflict" else 503,
+                  {"error": message, "code": code, "hint": hint})
+
     def setup(self):
         super().setup()
         self.connection.settimeout(10)
@@ -133,6 +182,14 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 async def read():
                     client = self.server.client
+                    if self.path == "/api/doctor":
+                        return await client.doctor()
+                    if self.path == "/api/settings":
+                        return await client.settings()
+                    if self.path == "/api/apps":
+                        return self.server.store.status()
+                    if urlsplit(self.path).path == "/api/apps/search":
+                        return self.server.store.search(parse_qs(urlsplit(self.path).query).get("q", [""])[0])
                     if self.path == "/api/ping":
                         return {"source": str(Path(__file__).resolve())}
                     if self.path == "/api/wifi":
@@ -150,8 +207,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"data": asyncio.run(read())})
             except ValueError:
                 self.send(404, {"error": "Unknown endpoint"})
-            except (BackendError, OSError):
-                self.send(503, {"error": "Service unavailable. Check the installed backend and your desktop permissions."})
+            except StoreError as error:
+                self.send(503, {"error": str(error)})
+            except (BackendError, OSError) as error:
+                self.backend_error(error)
             except Exception:
                 self.send(500, {"error": "Unable to read current state"})
             return
@@ -162,6 +221,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, theme_css(), "text/css")
             return
         assets = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"), "/style.css": ("style.css", "text/css")}
+        assets.update({"/store.js": ("store.js", "text/javascript"), "/store.css": ("store.css", "text/css"), "/settings.js": ("settings.js", "text/javascript")})
         if self.path not in assets:
             self.send(404, {"error": "Not found"})
             return
@@ -172,8 +232,18 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():
             return
         if self.path == "/api/shutdown":
+            store = self.server._store
+            if store is not None and store.task and store.task["phase"] == "running":
+                self.send(409, {"error": "A Flatpak operation is still running"})
+                return
             self.send(200, {"data": {"stopped": True}})
             threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
+        if self.path == "/api/apps/action":
+            self.store_action()
+            return
+        if self.path == "/api/settings":
+            self.settings_action()
             return
         if self.path != "/api/action":
             self.send(404, {"error": "Unknown endpoint"})
@@ -195,12 +265,59 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = asyncio.run(getattr(self.server.client, domain)(action, **fields))
             self.send(200, {"data": data})
+        except (BackendError, OSError) as error:
+            self.backend_error(error)
         except Exception:
             # A backend diagnostic must never echo a credential-bearing request.
             self.send(503, {"error": "Operation failed. Refresh state and check service availability or permissions."})
         finally:
             fields.pop("password", None)
             self.server.operation.release()
+
+    def settings_action(self):
+        if self.headers.get("Content-Type") != "application/json":
+            self.send(415, {"error": "Expected JSON"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4096:
+                raise ValueError("Invalid request size")
+            digest, preferences = validate_settings(json.loads(self.rfile.read(length)))
+        except (ValueError, TypeError) as error:
+            self.send(400, {"error": str(error)})
+            return
+        if not self.server.operation.acquire(blocking=False):
+            self.send(409, {"error": "Another operation is running"})
+            return
+        try:
+            self.send(200, {"data": asyncio.run(self.server.client.save_settings(digest, preferences))})
+        except (BackendError, OSError) as error:
+            self.backend_error(error)
+        except Exception:
+            self.send(500, {"error": "Unable to save settings", "code": "backend-invalid-response",
+                            "hint": "Run folio doctor before retrying."})
+        finally:
+            self.server.operation.release()
+
+
+    def store_action(self):
+        if self.headers.get("Content-Type") != "application/json":
+            self.send(415, {"error": "Expected JSON"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4096:
+                raise ValueError("Invalid request size")
+            request = json.loads(self.rfile.read(length))
+            if not isinstance(request, dict) or set(request) != {"action", "fields"} or not isinstance(request["action"], str) or not isinstance(request["fields"], dict):
+                raise ValueError("Invalid operation")
+            self.send(202, {"data": self.server.store.start(request["action"], request["fields"])})
+        except (ValueError, TypeError) as error:
+            self.send(400, {"error": str(error)})
+        except StoreError as error:
+            self.send(409, {"error": str(error)})
+        except OSError:
+            self.send(503, {"error": "Flatpak is unavailable"})
 
 
 def runtime():
@@ -247,7 +364,7 @@ def session(directory):
     return None
 
 
-def launch():
+def launch(page="/"):
     from .paths import OPENER
 
     directory = runtime()
@@ -255,10 +372,15 @@ def launch():
     if record and record.get("source") != str(Path(__file__).resolve()):
         request = Request(record["origin"] + "/api/shutdown", data=b"",
                           headers={"Authorization": "Bearer " + record["token"]})
-        with urlopen(request, timeout=2):
-            pass
-        time.sleep(0.7)
-        record = None
+        try:
+            with urlopen(request, timeout=2):
+                pass
+        except HTTPError as error:
+            if error.code != 409:
+                raise
+        else:
+            time.sleep(0.7)
+            record = None
     if record is None:
         subprocess.Popen([sys.executable, "-m", "folio_panel", "--serve"],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -271,7 +393,7 @@ def launch():
     if record is None:
         print("Unable to start the local panel service", file=sys.stderr)
         return 1
-    url = record["origin"] + "/#" + record["token"]
+    url = record["origin"] + page + "#" + record["token"]
     subprocess.Popen([OPENER, url], stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)

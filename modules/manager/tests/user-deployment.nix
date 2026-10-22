@@ -91,6 +91,10 @@ pkgs.testers.runNixOSTest {
         inputs.home-manager
         enabled
         disabled
+        # Reviewed snapshots can change source-bound wrapper identities. Keep
+        # native build tools in the offline guest for those small rebuilds.
+        pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl
+        pkgs.python3 pkgs.makeWrapper pkgs.makeBinaryWrapper
       ];
     };
     system.stateVersion = "26.05";
@@ -120,11 +124,11 @@ pkgs.testers.runNixOSTest {
     assert folio("config import /home/folio/draft.json")["status"] == "success"
 
     with subtest("real CLI, subscriber, plan, build and standalone activation"):
-        plan = folio("plan --source /home/folio/source")["data"]["planId"]
+        plan = folio("--user plan --source /home/folio/source")["data"]["planId"]
         record = json.loads(user("cat /home/folio/.local/state/folio/deployments/plans/" + plan + ".json"))
         assert json.loads(user("cat " + record["source"] + "/folio-target.json")) == {"name": "portable"}
         user("printf '%s' '{\"name\":\"laptop\"}' >/home/folio/source/folio-target.json")
-        conflict = json.loads(user("folio --json plan --source /home/folio/source; test $? -ne 0"))
+        conflict = json.loads(user("folio --json --user plan --source /home/folio/source; test $? -ne 0"))
         assert conflict["status"] == "invalid", conflict
         user("rm /home/folio/source/folio-target.json")
         assert folio("build " + plan)["status"] == "success"
@@ -142,8 +146,24 @@ pkgs.testers.runNixOSTest {
         assert user("cat /home/folio/.config/foot/foot.ini.folio-backup-*").strip() == "first-adoption"
         assert user("test -L /home/folio/.local/state/folio/deployments/roots/build-" + plan) == ""
 
+    with subtest("reviewed drafts bind immutable inputs and reject stale confirmation"):
+        draft = folio("--user plan --source /home/folio/source --mode preview")["data"]
+        assert draft["plan"]["review"]["changed"] is False, draft
+        draft_id = draft["planId"]
+        user("test -f /home/folio/.local/state/folio/deployments/drafts/" + draft_id + ".json")
+        user("test ! -e /home/folio/.local/state/folio/deployments/plans/" + draft_id + ".json")
+        confirmed = folio("--user plan --source /home/folio/source --mode confirm --draft-id " + draft_id + " --comment reviewed-fixture")["data"]
+        assert confirmed["plan"]["comment"] == "reviewed-fixture"
+        assert folio("--user history")["data"]["plans"]
+        draft = folio("--user plan --source /home/folio/source --mode preview")["data"]
+        assert folio("modules disable terminal")["status"] == "success"
+        conflict = json.loads(user("folio --json --user plan --source /home/folio/source --mode confirm --draft-id " + draft["planId"] + "; test $? -eq 4"))
+        assert conflict["status"] == "conflict", conflict
+        assert folio("--user plan --source /home/folio/source --mode cancel --draft-id " + draft["planId"])["status"] == "success"
+        assert folio("modules enable terminal")["status"] == "success"
+
     with subtest("later unmanaged changes conflict without replacing user data"):
-        plan = folio("plan --source /home/folio/source")["data"]["planId"]
+        plan = folio("--user plan --source /home/folio/source")["data"]["planId"]
         assert folio("build " + plan)["status"] == "success"
         user("mv /home/folio/.config/foot/foot.ini /home/folio/managed-foot; printf user-edit > /home/folio/.config/foot/foot.ini")
         result = json.loads(user("folio --json apply " + plan + "; test $? -eq 4"))
@@ -154,7 +174,7 @@ pkgs.testers.runNixOSTest {
 
     with subtest("disabling removes contribution and preserves application data"):
         assert folio("modules disable terminal")["status"] == "success"
-        plan = folio("plan --source /home/folio/source")["data"]["planId"]
+        plan = folio("--user plan --source /home/folio/source")["data"]["planId"]
         assert folio("build " + plan)["status"] == "success"
         assert folio("apply " + plan)["status"] == "success"
         user("test ! -e /home/folio/.config/foot/foot.ini")

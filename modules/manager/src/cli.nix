@@ -16,8 +16,10 @@ let
         repository
         pkgs.coreutils
         pkgs.jq
+        pkgs.python3
       ];
-      text = builtins.readFile ../cli/lib/output.sh + "\n" + shared + "\n" + builtins.readFile source;
+      text = builtins.replaceStrings [ "@fields@" ] [ "${../cli/commands/config/fields.py}" ]
+        ("export FOLIO_CATALOGUE=${pkgs.folio.catalogue}\n" + builtins.readFile ../cli/lib/output.sh + "\n" + shared + "\n" + builtins.readFile source);
     };
   adapters = {
     config = client "folio-config" ../cli/commands/config/command.sh common;
@@ -26,6 +28,7 @@ let
     build = adapters.plan;
     apply = adapters.plan;
     status = adapters.plan;
+    history = adapters.plan;
     rollback = pkgs.writeShellApplication {
       name = "folio-maintenance";
       runtimeInputs = [ runtime pkgs.coreutils pkgs.jq ];
@@ -33,14 +36,29 @@ let
     };
     cleanup = adapters.rollback;
   };
+  workflow = pkgs.writeShellApplication {
+    name = "folio-workflow";
+    runtimeInputs = [ pkgs.python3 pkgs.nix pkgs.gnutar pkgs.coreutils pkgs.systemd ];
+    text = ''
+      export FOLIO_DEPLOY_ADAPTER=${adapters.plan}/bin/folio-deployment
+      export FOLIO_MAINTENANCE_ADAPTER=${adapters.rollback}/bin/folio-maintenance
+      export FOLIO_REVIEW_COMMAND=${../runtime/snapshot/review.py}
+      export FOLIO_WORKFLOW_EXECUTABLE="$0"
+      export FOLIO_CATALOGUE=${pkgs.folio.catalogue}
+      export FOLIO_CONFIG_ADAPTER=${adapters.config}/bin/folio-config
+      export FOLIO_REQUIREMENTS_COMMAND=${../runtime/snapshot/requirements.py}
+      exec python3 ${../cli/commands/workflow/command.py} "$@"
+    '';
+  };
   cli = pkgs.writeShellApplication {
     name = "folio";
     runtimeInputs = [ pkgs.jq ];
     text =
       builtins.replaceStrings
-        [ "@commands@" ]
+        [ "@commands@" "@workflow@" ]
         [
           (toString (pkgs.writeText "folio-commands.json" (builtins.toJSON cliCommands)))
+          "${workflow}/bin/folio-workflow"
         ]
         (builtins.readFile ../cli/lib/arguments.sh + "\n"
           + builtins.readFile ../cli/lib/help.sh + "\n"

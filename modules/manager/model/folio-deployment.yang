@@ -6,18 +6,24 @@ module folio-deployment {
 
   organization "Folio";
   description "Manager-owned immutable plans and observed durable deployment tasks.";
+  revision 2026-10-19 { description "Reviewed drafts, plan comments and deployment history."; }
   revision 2026-10-18 { description "Initial plan and task contract; operations are registered when implemented."; }
 
   grouping result {
     leaf status { type fe:result-status; mandatory true; }
     leaf error { type string; }
     anydata data { description "Operation-specific observed result, never desired settings."; }
+    leaf result-json { type string; description "Lossless JSON result, preserving empty arrays and nested values."; }
   }
   rpc plan {
     description "Freeze an owned source and accepted user configuration into an immutable plan.";
     input {
       leaf source { type string; mandatory true; }
       leaf timeout-seconds { type uint32 { range '1..86400'; } default 1800; }
+      leaf mode { type enumeration { enum create; enum preview; enum confirm; enum cancel; } default create; }
+      leaf draft-id { type fe:digest; }
+      leaf comment { type string { length '0..4096'; } default ""; }
+      leaf descriptor-json { type string { length '0..65536'; } default ""; }
     }
     output { uses result; leaf plan-id { type fe:digest; } }
   }
@@ -39,7 +45,10 @@ module folio-deployment {
   }
   rpc status {
     description "Read recorded tasks and probed profile/configuration state.";
-    input { leaf task-id { type fe:identifier; } }
+    input {
+      leaf task-id { type fe:identifier; }
+      leaf history { type boolean; default false; }
+    }
     output { uses result; }
   }
 

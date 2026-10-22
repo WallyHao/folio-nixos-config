@@ -1,9 +1,10 @@
 command_main() (
 action=$FOLIO_COMMAND
 rpc() {
-  local tolerate_unavailable=${1:-false}
-  if ! timeout --kill-after=2 32 folio-repository "$FOLIO_SCOPE" cfg --rpc="$work/rpc.json" \
-      --format json --timeout 30 >"$work/reply.json" 2>"$work/error"; then
+  local tolerate_unavailable=${1:-false} rpc_timeout=30
+  [[ "$action" != plan ]] || rpc_timeout=130
+  if ! timeout --kill-after=2 "$((rpc_timeout + 2))" folio-repository "$FOLIO_SCOPE" cfg --rpc="$work/rpc.json" \
+      --format json --timeout "$rpc_timeout" >"$work/reply.json" 2>"$work/error"; then
     if [[ $(cat "$work/error") == *'no matching subscribers'* ]]; then
       if "$tolerate_unavailable"; then return 1; fi
       cat "$work/error" >&2
@@ -17,7 +18,8 @@ rpc() {
   response_status=$(jq -er .status <<<"$response")
   if "$tolerate_unavailable" && [[ "$response_status" == unavailable ]]; then return 1; fi
   response_error=$(jq -r '.error // ""' <<<"$response")
-  response_data=$(jq -c '.data["folio-deployment:result"] // .data.result // null' <<<"$response")
+  response_data=$(jq -c '(if has("result-json") then (."result-json"|fromjson) else (.data // {}) end)
+    | .["folio-deployment:result"] // .result // null' <<<"$response")
 }
 read_task() {
   jq -cn --arg id "$task_id" '{"folio-deployment:status":{"task-id":$id}}' >"$work/rpc.json"
@@ -28,17 +30,26 @@ case "$action" in
   plan)
     source_path=$PWD
     timeout_seconds=1800
+    mode=create
+    draft_id=
+    comment=
+    descriptor_json=
     while (( $# )); do
       case "$1" in
         --source) (( $# >= 2 )) || finish invalid null 'Missing source directory'; source_path=$2; shift 2 ;;
         --timeout-seconds) (( $# >= 2 )) || finish invalid null 'Missing timeout'; timeout_seconds=$2; shift 2 ;;
+        --mode) (( $# >= 2 )) || finish invalid null 'Missing planning mode'; mode=$2; shift 2 ;;
+        --draft-id) (( $# >= 2 )) || finish invalid null 'Missing draft ID'; draft_id=$2; shift 2 ;;
+        --comment) (( $# >= 2 )) || finish invalid null 'Missing comment'; comment=$2; shift 2 ;;
+        --descriptor-json) (( $# >= 2 )) || finish invalid null 'Missing target descriptor'; descriptor_json=$2; shift 2 ;;
         *) finish invalid null 'Usage: folio plan [--source DIRECTORY] [--timeout-seconds N]' ;;
       esac
     done
     [[ "$timeout_seconds" =~ ^[1-9][0-9]{0,4}$ && "$timeout_seconds" -le 86400 ]] || finish invalid null 'Timeout must be 1..86400 seconds'
     source_path=$(realpath -e -- "$source_path") || finish invalid null 'Source directory is unavailable'
-    jq -cn --arg source "$source_path" --argjson timeout "$timeout_seconds" \
-      '{"folio-deployment:plan":{source:$source,"timeout-seconds":$timeout}}' >"$work/rpc.json"
+    jq -cn --arg source "$source_path" --argjson timeout "$timeout_seconds" --arg mode "$mode" --arg draft "$draft_id" --arg comment "$comment" --arg descriptor "$descriptor_json" \
+      '{"folio-deployment:plan":({source:$source,"timeout-seconds":$timeout,mode:$mode,comment:$comment,"descriptor-json":$descriptor}
+        + if $draft=="" then {} else {"draft-id":$draft} end)}' >"$work/rpc.json"
     rpc
     plan_id=$(jq -r '."plan-id" // ""' <<<"$response")
     finish "$response_status" "$(jq -cn --arg id "$plan_id" --argjson plan "$response_data" '{planId:$id,plan:$plan}')" "$response_error" ;;
@@ -72,6 +83,11 @@ case "$action" in
       sleep 0.2
     done
     finish unavailable "$response_data" 'Stopped waiting at the task timeout; the task remains recorded' "$task_id" ;;
+  history)
+    [[ $# == 0 ]] || finish invalid null 'Usage: folio history'
+    jq -cn '{"folio-deployment:status":{history:true}}' >"$work/rpc.json"
+    rpc
+    finish "$response_status" "$response_data" "$response_error" ;;
   status)
     (( $# <= 1 )) || finish invalid null 'Usage: folio status [TASK_ID]'
     task_id=${1:-}
@@ -86,8 +102,14 @@ case "$action" in
       shopt -s nullglob
       journals=("$state"/offline-coordinator-*.json)
       if (( ${#journals[@]} )); then
+        # System maintenance journals stay private to root. During subscriber
+        # restart, report unavailability so task callers can keep waiting.
+        for journal in "${journals[@]}"; do
+          [[ -r "$journal" ]] || finish unavailable null 'Manager subscriber is unavailable'
+        done
         maintenance=$(jq -cs '[.[] | select(.phase!="complete" and .phase!="restored" and .phase!="aborted") |
-          {key:.id,value:{phase,scope}}] | from_entries' "${journals[@]}")
+          {key:.id,value:{phase,scope}}] | from_entries' "${journals[@]}") ||
+          finish unavailable null 'Manager subscriber is unavailable'
         if [[ "$maintenance" != '{}' ]]; then
           finish success "$(jq -cn --argjson maintenance "$maintenance" '{offline:true,health:"degraded",maintenance:$maintenance}')"
         fi

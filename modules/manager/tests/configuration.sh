@@ -32,6 +32,8 @@ expect_code() {
 }
 
 folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
+folio doctor --help >/dev/null
+folio resume --help >/dev/null
 start_subscriber
 folio-repository user cfg --export --datastore operational --module folio-environment --format json |
   jq -e '."folio-environment:environment".state.health=="unavailable" and
@@ -61,6 +63,9 @@ EDITOR
 export EDITOR="bash $PWD/editor.sh"
 expect_code 4 folio --json config edit
 jq -e '.status=="conflict"' result.json
+drafts=("$XDG_STATE_HOME/folio/drafts/"user-*.json)
+[[ ${#drafts[@]} == 1 && $(stat -c %a "${drafts[0]}") == 600 ]]
+jq -e '."folio-environment:environment".preferences."font-size"==19' "${drafts[0]}"
 folio --json config show | jq -e '.data.configuration."folio-environment:environment".preferences."font-size"==20'
 expect_code 2 folio --json modules enable unknown
 jq -e '.status=="invalid"' result.json
@@ -95,3 +100,27 @@ cat prepared.json >"$journal"
 start_subscriber
 folio --json config show | jq -e '.data.configuration."folio-environment:environment".preferences."font-size"==18'
 echo 'Real C subscriber: durable commits, private editing, conflicts, errors and restart recovery passed'
+
+# Field edits retain the same optimistic commit and server-side validation.
+folio --json config set /preferences/font-size 21 | jq -e '.status=="success"'
+folio --json config get /preferences/font-size | jq -e '.data==21'
+folio --json config show >before.json
+folio --json config set /preferences/appearance '"light"' >/dev/null
+jq .data.configuration before.json >stale.json
+expect_code 4 folio --json config import stale.json --expected-digest "$(jq -r .data.digest before.json)"
+expect_code 2 folio --json config set /preferences/font-size 100
+expect_code 2 folio --json config set /modules/terminal/name '"other"'
+expect_code 2 folio --json modules disable appearance
+folio --json modules list | jq -e 'any(.data[]; .name=="isaac" and .enabled==false and .selected==false)'
+
+# Generic Flathub selections survive real libyang normalization and persistence.
+folio --json config show | jq '.data.configuration |
+  ."folio-environment:environment".modules |= map(if .name=="applications" then
+    ."folio-applications:applications".app += [{name:"org.example.App",ref:"app/org.example.App/x86_64/stable",branch:"stable",selected:true}]
+    else . end)' >generic.json
+folio --json config import generic.json | jq -e '.status=="success"'
+expect_code 4 folio --json apps install org.example.App --ref app/org.example.App/x86_64/beta
+folio --json config show | jq -e 'any(.data.configuration."folio-environment:environment".modules[] |
+  select(.name=="applications") | ."folio-applications:applications".app[]; .name=="org.example.App" and .selected)'
+folio --json config unset /preferences/font-size | jq -e '.status=="success"'
+echo 'Field edits, stale draft protection, early prerequisites, catalogue discovery and generic Flathub schema passed'

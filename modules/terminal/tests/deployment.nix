@@ -61,7 +61,7 @@ in pkgs.testers.runNixOSTest {
         return json.loads(user("${cli}/bin/folio --json " + arguments, 600))
 
     def apply(seed):
-        result = folio("plan --source " + seed)
+        result = folio("--user plan --source " + seed)
         assert result["status"]=="success", result
         identity = result["data"]["planId"]
         assert folio("build " + identity)["status"]=="success"
@@ -88,7 +88,7 @@ in pkgs.testers.runNixOSTest {
         user("command -v fzf; git init /home/folio/test-repository; git -C /home/folio/test-repository symbolic-ref HEAD | grep refs/heads/main; codex --version; pi --version")
         user("test -s /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.codex/auth.json")
         user("emacs --batch --load ${../../emacs/tests/org-roam.el}")
-        user("printf keep > /home/folio/Documents/Notes/keep; printf keep > /home/folio/.codex/personal-state; git -C /home/folio/test-repository config user.email disposable@example.invalid")
+        user("printf keep > /home/folio/Documents/documents/keep; printf keep > /home/folio/.codex/personal-state; git -C /home/folio/test-repository config user.email disposable@example.invalid")
         user("mkdir -p /home/folio/.dsh; printf keep >/home/folio/.dsh/personal-state; printf keep >/home/folio/.local/state/folio/pi/personal-state")
     configure("${disabledConfig}")
     apply("${disabled}")
@@ -96,7 +96,7 @@ in pkgs.testers.runNixOSTest {
         user("test ! -e /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.config/folio/emacs/settings.el; test ! -e /home/folio/.config/git/config")
         user("test -z \"$(command -v fzf || true)\"; test -n \"$(command -v jq)\"")
         user("test -z \"$(command -v dsh || true)\"; test -z \"$(command -v pi || true)\"; grep keep /home/folio/.dsh/personal-state; grep keep /home/folio/.local/state/folio/pi/personal-state; test ! -e /home/folio/.config/folio/pi")
-        user("grep keep /home/folio/Documents/Notes/keep; grep keep /home/folio/.codex/personal-state; ${pkgs.gitMinimal}/bin/git -C /home/folio/test-repository config --local user.email | grep disposable@example.invalid")
+        user("grep keep /home/folio/Documents/documents/keep; grep keep /home/folio/.codex/personal-state; ${pkgs.gitMinimal}/bin/git -C /home/folio/test-repository config --local user.email | grep disposable@example.invalid")
         user("test -s /home/folio/.local/state/folio/emacs/org-roam.db")
         assert folio("status")["data"]["health"]=="healthy"
     with subtest("offline snapshot resumes the larger profile within its readiness budget"):

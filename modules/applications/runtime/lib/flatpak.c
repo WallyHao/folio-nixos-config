@@ -106,10 +106,12 @@ int main(int argc, char **argv)
     if (geteuid() == 0 || (argc != 5 && argc != 6)) return 2;
     int deploy = !strcmp(argv[1], "deploy");
     if ((!deploy && strcmp(argv[1], "prepare")) || (deploy && argc != 6) || (!deploy && argc != 5) ||
-            (strcmp(argv[2], "app/app.zen_browser.zen/x86_64/stable") && strcmp(argv[2], "app/com.obsproject.Studio/x86_64/stable")) ||
             strlen(argv[3]) != 64 || strspn(argv[3], "0123456789abcdef") != 64 ||
             (strcmp(argv[4], "offline") && strcmp(argv[4], "online"))) return 2;
     g_autoptr(GError) error = NULL;
+    g_autoptr(FlatpakRef) requested = flatpak_ref_parse(argv[2], &error);
+    if (!requested || flatpak_ref_get_kind(requested) != FLATPAK_REF_KIND_APP ||
+            strcmp(flatpak_ref_get_arch(requested), "x86_64")) return 2;
     g_autoptr(FlatpakInstallation) installation = flatpak_installation_new_user(NULL, &error);
     g_autoptr(FlatpakTransaction) transaction = NULL;
     g_autoptr(FlatpakRemote) remote = NULL;

@@ -41,7 +41,8 @@ publish_deployment() {
       bootstrap:$bootstrap,source:$plan[0].source,inputDigest:$plan[0].inputDigest,
       configurationDigest:$plan[0].configurationDigest,footDigest:$footDigest,
       configuration:$input[0].configuration,models:$input[0].models,tools:$input[0].tools,
-      beforeProfile:$task[0].beforeProfile,beforeDeployment:$task[0].beforeDeployment}' |
+      beforeProfile:$task[0].beforeProfile,beforeDeployment:$task[0].beforeDeployment,
+      comment:($plan[0].comment // "")}' |
     folio-atomic-write "$state/deployments/revisions/$plan_identifier.json" || return 1
   jq '{format,artifact,planId,taskId,source,inputDigest,configurationDigest,footDigest} + {revisionId:.planId}' \
     "$state/deployments/revisions/$plan_identifier.json" | folio-atomic-write "$state/deployments/current.json"

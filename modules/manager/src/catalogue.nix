@@ -26,6 +26,7 @@ rec {
     let
       definitions = lib.mapAttrs (_: entry: {
         packages = entry.packages or { };
+        checks = entry.checks or { };
         models = {
           system = [ ];
           user = [ ];
@@ -33,6 +34,8 @@ rec {
         // (entry.models or { });
         commands = entry.commands or { };
         migrations = entry.migrations or [ ];
+        requirements = entry.requirements or { };
+        impacts = entry.impacts or [ ];
         subscribers = {
           system = [ ];
           user = [ ];
@@ -66,6 +69,8 @@ rec {
           lib.mapAttrs' (component: package: lib.nameValuePair "${name}-${component}" package) d.packages
         ) definitions
       );
+      checks = exclusive "check names" (lib.mapAttrsToList (name: d:
+        lib.mapAttrs' (component: check: lib.nameValuePair "${name}-${component}" check) d.checks) definitions);
     in
     if !validCommands then
       throw "Folio: invalid command scope or missing command path"
@@ -76,6 +81,7 @@ rec {
           commands
           models
           packages
+          checks
           ;
         migrations = lib.concatMap (definition: definition.migrations) (builtins.attrValues definitions);
         subscribers = lib.genAttrs scopes (

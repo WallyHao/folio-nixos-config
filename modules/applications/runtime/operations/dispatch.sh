@@ -83,7 +83,7 @@ if [[ "$action" == status ]]; then
   result success "$(jq -c . "$app_state/tasks/$task_id.json")" '' "$task_id"
 fi
 application=$(jq -er '.application // "all"' "$work/request.json")
-[[ "$application" == all || "$application" == zen || "$application" == obs ]] || result invalid null 'Unknown supported application'
+[[ "$application" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || result invalid null 'Invalid application identity'
 if [[ "$action" == resume ]]; then
   task_id=$(jq -er .revision "$work/request.json")
   [[ "$task_id" =~ ^a-[a-f0-9]{32}$ && -f "$app_state/tasks/$task_id.json" ]] || result invalid null 'Unknown application task'
@@ -97,7 +97,7 @@ if [[ "$action" == resume ]]; then
   start_task "$task_id" || result unavailable null 'Task remains durably queued' "$task_id"
   result success "$(jq -c . "$record")" '' "$task_id"
 fi
-case "$action" in init|install|update|remove|reconcile|adopt|rollback|prepare) ;; *) result invalid null 'Unknown applications operation' ;; esac
+case "$action" in init|refresh|install|update|remove|reconcile|adopt|rollback|prepare) ;; *) result invalid null 'Unknown applications operation' ;; esac
 request_hash=$(printf '%s' "$request_id" | sha256sum)
 task_id=a-${request_hash:0:32}
 record=$app_state/tasks/$task_id.json

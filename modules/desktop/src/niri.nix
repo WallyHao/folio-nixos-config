@@ -40,7 +40,7 @@ let
       else result;
 
   renderConfig = { colors, foot, polkitAgent, layout ? { }, launcher ? null, clipboardPicker ? null,
-    animationFile ? null, animationPicker ? null, controlCenter ? null, windowSwitcher ? null, shortcutHelp ? null, screenshotFull ? null, screenshotRegion ? null, modifier ? "Mod", deviceControl ? null, sessionCommand ? "niri-session-confirm" }:
+    animationFile ? null, animationPicker ? null, controlCenter ? null, windowSwitcher ? null, shortcutHelp ? null, screenshotFull ? null, screenshotRegion ? null, modifier ? "Mod", deviceControl ? null, panelCommand ? null, sessionCommand ? "niri-session-confirm" }:
     let
       geometry = normalizeLayout layout;
       workspaceBinds = builtins.concatStringsSep "\n" (builtins.genList (index:
@@ -104,6 +104,14 @@ let
         clip-to-geometry true
     }
 
+    ${if shortcutHelp == null then "" else ''
+    window-rule {
+        match app-id=r#"^org\.folio\.Shortcuts$"#
+        open-floating true
+        default-column-width { proportion 0.48; }
+    }
+    ''}
+
     overview {
         backdrop-color "${colors.background}"
     }
@@ -122,6 +130,7 @@ let
         ${if clipboardPicker == null then "" else ''${modifier}+V hotkey-overlay-title="Open clipboard history" { spawn "${clipboardPicker}"; }''}
         ${if animationPicker == null then "" else ''${modifier}+A repeat=false hotkey-overlay-title="Choose window animations" { spawn "${animationPicker}"; }''}
         ${if controlCenter == null then "" else ''${modifier}+C repeat=false hotkey-overlay-title="Open device controls" { spawn "${controlCenter}"; }''}
+        ${if panelCommand == null then "" else ''${modifier}+P repeat=false hotkey-overlay-title="Open Folio panel" { spawn "${panelCommand}" "panel"; }''}
         ${modifier}+Return hotkey-overlay-title="Open terminal" { spawn "${foot}"; }
         ${modifier}+Q hotkey-overlay-title="Close window" { close-window; }
         ${modifier}+Tab repeat=false hotkey-overlay-title="${if windowSwitcher == null then "Show workspace overview" else "Switch windows"}" { ${if windowSwitcher == null then "toggle-overview;" else ''spawn "${windowSwitcher}";''} }

@@ -6,6 +6,7 @@ module folio-terminal {
 
   organization "Folio";
   description "Terminal-owned settings, initially the user Foot contribution.";
+  revision 2026-10-24 { description "Add Yazi terminal file manager."; }
   revision 2026-10-22 { description "Move Git and GitHub CLI preferences into the terminal capability."; }
   revision 2026-10-21 { description "Add independently selectable shell and terminal utilities."; }
   revision 2026-10-20 { description "Express background opacity as a unit fraction instead of a percentage."; }
@@ -34,6 +35,7 @@ module folio-terminal {
         leaf syntax-highlighting { type boolean; default true; }
       }
       container tools {
+        leaf yazi { type boolean; default true; }
         leaf bat { type boolean; default true; }
         leaf btop { type boolean; default true; }
         leaf eza { type boolean; default true; }

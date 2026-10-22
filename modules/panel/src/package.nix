@@ -1,4 +1,4 @@
-{ pkgs, legacyCli, wifi, devices, repository }:
+{ pkgs, legacyCli, wifi, devices, repository, storeBackend }:
 let
   python = pkgs.python3;
 in pkgs.stdenvNoCC.mkDerivation {
@@ -10,11 +10,13 @@ in pkgs.stdenvNoCC.mkDerivation {
   installPhase = ''
     mkdir -p $out/lib $out/bin
     cp -R folio_panel $out/lib/
+    cp ${storeBackend}/lib/folio_store.py $out/lib/folio_store.py
     cat >$out/lib/folio_panel/paths.py <<'PY'
     LEGACY = "${legacyCli}/bin/folio"
     WIFI = "${wifi}/bin/folio-network-wifi"
     DEVICES = "${devices}/bin/folio-devices-panel"
     REPOSITORY = "${repository}/bin/folio-repository"
+    FLATPAK = "${pkgs.flatpak}/bin/flatpak"
     OPENER = "${pkgs.xdg-utils}/bin/xdg-open"
     PY
     makeWrapper ${python}/bin/python3 $out/bin/folio \
@@ -24,7 +26,7 @@ in pkgs.stdenvNoCC.mkDerivation {
     [Desktop Entry]
     Type=Application
     Name=Folio Panel
-    Comment=Wi-Fi, proxy, sound and display controls
+    Comment=Wi-Fi, proxy, applications, sound and display controls
     Exec=$out/bin/folio panel
     Icon=preferences-system
     Terminal=false

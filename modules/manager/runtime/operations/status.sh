@@ -1,4 +1,38 @@
 task_id=$(jq -r '."folio-deployment:status"."task-id" // ""' "$work/request.json")
+if [[ $(jq -r '."folio-deployment:status".history // false' "$work/request.json") == true ]]; then
+  shopt -s nullglob
+  plans=("$state/deployments/plans/"*.json)
+  : >"$work/history.jsonl"
+  for plan in "${plans[@]}"; do
+    id=$(basename "$plan" .json)
+    [[ "$id" =~ ^[a-f0-9]{64}$ ]] || continue
+    phase=planned
+    [[ ! -f "$state/deployments/builds/$id.json" ]] || phase=built
+    [[ ! -f "$state/deployments/revisions/$id.json" ]] || phase=applied
+    jq -c --arg id "$id" --arg phase "$phase" \
+      '{planId:$id,status:$phase,comment,createdAt,scope,inputDigest,configurationDigest,source,owner,
+        artifact:.review.targetArtifact}' "$plan" >>"$work/history.jsonl"
+  done
+  current=null
+  [[ ! -f "$state/deployments/current.json" ]] || current=$(jq -c . "$state/deployments/current.json")
+  current_configuration >"$work/desired.json"
+  selected=$(selected_profile)
+  effects_match=false
+  if [[ -n "$selected" ]] && applied_artifact_matches "$selected"; then effects_match=true; fi
+  saved=false
+  if configuration_is_saved "$(digest_file "$work/desired.json")"; then saved=true; fi
+  recovery_required=false
+  if has_pending_recovery; then recovery_required=true; fi
+  revisions=("$state/deployments/revisions/"*.json)
+  jq -cs '[.[] | {revisionId:(.revisionId // .planId),artifact,configurationDigest}]' "${revisions[@]}" </dev/null >"$work/revisions.json"
+  jq -cn --argjson current "$current" --slurpfile plans "$work/history.jsonl" \
+    --arg selected "$selected" --arg desiredDigest "$(digest_file "$work/desired.json")" --slurpfile revisions "$work/revisions.json" \
+    --argjson effectsMatch "$effects_match" --argjson saved "$saved" --argjson recoveryRequired "$recovery_required" \
+    '{status:"success",data:{"folio-deployment:result":{plans:$plans,current:$current,
+      selectedProfile:$selected,desiredDigest:$desiredDigest,revisions:$revisions[0],effectsMatch:$effectsMatch,
+      configurationSaved:$saved,recoveryRequired:$recoveryRequired}}}'
+  exit 0
+fi
 if [[ -n "$task_id" ]]; then
   record=$state/deployments/tasks/$task_id.json
   if [[ ! -f "$record" ]]; then reply invalid 'Unknown task'; exit 0; fi

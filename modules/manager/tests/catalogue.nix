@@ -6,8 +6,28 @@ let
     };
   };
   collection = catalogueLib.collect valid;
+  ownedChecks =
+    (catalogueLib.collect {
+      first.checks.unit = pkgs.writeText "first-check" "first";
+      second.checks.unit = pkgs.writeText "second-check" "second";
+    }).checks;
   rejected = value: !(builtins.tryEval (builtins.deepSeq value true)).success;
   cases = [
+    (
+      builtins.attrNames ownedChecks == [
+        "first-unit"
+        "second-unit"
+      ]
+    )
+    (collection.checks == { })
+    (rejected (
+      catalogueLib.exclusive "check names" [
+        ownedChecks
+        {
+          first-unit = pkgs.writeText "conflicting-check" "conflict";
+        }
+      ]
+    ))
     (rejected (
       catalogueLib.select {
         inherit collection;
@@ -69,5 +89,5 @@ let
 in
 assert builtins.all (value: value) cases;
 pkgs.runCommand "folio-catalogue-contract" { } ''
-  echo 'Unknown modules, unsupported scopes, duplicate commands/models rejected' > $out
+  echo 'Module check namespaces preserved; conflicting checks, unknown modules, unsupported scopes and duplicate commands/models rejected' > $out
 ''

@@ -12,10 +12,34 @@ from folio_panel.client import BackendError
 from folio_panel.server import PanelServer, session, theme_css
 
 
+class Store:
+    def __init__(self):
+        self.applications = []
+        self.task = None
+
+    def status(self):
+        return {"applications": self.applications, "remotes": ["flathub"], "task": self.task}
+
+    def search(self, query):
+        return {"applications": [{"id": "com.valvesoftware.Steam", "name": "Steam", "description": "Games <script>", "version": "1.0", "branch": "stable", "remote": "flathub"}]}
+
+    def start(self, action, fields):
+        if action not in {"install", "remove", "setup", "refresh"}:
+            raise ValueError("Invalid operation")
+        if action == "install":
+            self.applications = [{"id": "com.valvesoftware.Steam", "name": "Steam", "ref": "app/com.valvesoftware.Steam/x86_64/stable", "version": "1.0", "remote": "flathub", "scope": "user", "removable": True}]
+        elif action == "remove":
+            self.applications = []
+        self.task = {"id": "fixture", "action": action, "fields": fields, "phase": "succeeded", "log": "Complete", "error": None}
+        return self.task
+
+
 class Client:
     def __init__(self):
         self.calls = []
         self.fail = False
+        self.proxy_mode = "global"
+        self.proxy_groups = [{"name": "GLOBAL", "selected": "DIRECT", "type": "Selector", "nodes": ["DIRECT", "REJECT", "PROXY"]}, {"name": "PROXY", "selected": "Hong Kong · 01", "type": "Selector", "nodes": ["Hong Kong · 01", "Tokyo · 02", "Singapore · 03", "DIRECT"]}]
         self.wireless = {
             "enabled": True, "hardwareEnabled": True,
             "adapters": [{"interface": "wlan0", "state": "connected", "addresses": ["192.168.1.24"],
@@ -23,6 +47,23 @@ class Client:
                               {"path": "/ap/1", "ssid": "Everforest", "signal": 92, "security": "WPA Personal", "active": True, "profiles": ["saved-uuid"]},
                               {"path": "/ap/2", "ssid": "Studio guest", "signal": 68, "security": "Open", "active": False, "profiles": []},
                               {"path": "/ap/3", "ssid": "<img src=x onerror=alert(1)>", "signal": 30, "security": "WPA Personal", "active": False, "profiles": []}]}]}
+
+    async def doctor(self):
+        return {"health": "degraded", "findings": [{"scope": "user", "code": "deployment-pending", "message": "Settings await deployment.", "nextCommand": "folio plan"}]}
+
+    async def settings(self):
+        values = {"appearance": "dark", "scheme": "everforest", "font-family": "Maple Mono NF CN", "font-size": 16}
+        preferences = getattr(self, "preferences", values)
+        return {"digest": "a" * 64, "preferences": preferences, "defaults": values,
+                "effective": {**values, **preferences},
+                "origins": {key: "user override" if key in preferences else "system default" for key in values}}
+
+    async def save_settings(self, digest, preferences):
+        self.calls.append(("settings", "save", preferences))
+        if digest != "a" * 64:
+            raise BackendError("private backend detail", "conflict", "configuration-conflict")
+        self.preferences = {k: v for k, v in preferences.items() if v is not None}
+        return {"digest": "a" * 64}
 
     async def wifi(self, action="status", **fields):
         self.calls.append(("wifi", action, copy.deepcopy(fields)))
@@ -43,15 +84,21 @@ class Client:
         if self.fail:
             raise BackendError("Stopped")
         if action == "status":
-            return {"proxy": {"available": True, "mode": "rule"}}
+            return {"proxy": {"available": True, "mode": self.proxy_mode}}
         if action == "proxy-groups":
-            return {"groups": [{"name": "PROXY", "selected": "Hong Kong · 01", "type": "Selector", "nodes": ["Hong Kong · 01", "Tokyo · 02", "Singapore · 03", "DIRECT"]}]}
+            return {"groups": copy.deepcopy(self.proxy_groups)}
+        if action == "proxy-mode":
+            self.proxy_mode = fields["mode"]
+            return {}
+        if action == "proxy-group-select":
+            next(group for group in self.proxy_groups if group["name"] == fields["group"])["selected"] = fields["node"]
+            return {}
         return {"delay": 24}
 
 
 @pytest.fixture
 def panel():
-    server = PanelServer(Client())
+    server = PanelServer(Client(), Store())
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server
@@ -150,3 +197,81 @@ def test_theme_uses_installed_appearance(tmp_path, monkeypatch):
     assert b"--bg:#fffbef" in css and b"18pt" in css and b"Maple Mono NF CN" in css
     path.write_text("invalid json")
     assert b"16pt" in theme_css()
+
+
+def test_store_http_boundary(panel):
+    assert request(panel, "/api/apps", token=False)[0] == 403
+    assert request(panel, "/api/apps/action", {"action": "setup", "fields": {}}, token=False)[0] == 403
+    assert request(panel, "/api/apps")[0] == 200
+    assert request(panel, "/api/apps/search?q=Steam")[0] == 200
+    assert request(panel, "/api/apps/action", {"action": "setup", "fields": {}})[0] == 202
+    assert request(panel, "/api/apps/action", {"action": [], "fields": {}})[0] == 400
+    for path in ("/store.js", "/store.css"):
+        assert request(panel, path, token=False)[0] == 200
+
+
+def test_no_standalone_store_page(panel):
+    assert request(panel, "/apps", token=False)[0] == 404
+
+
+def test_settings_validation_conflict_and_diagnostics(panel):
+    assert request(panel, "/api/settings", token=False)[0] == 403
+    assert request(panel, "/api/doctor", token=False)[0] == 403
+    assert request(panel, "/api/settings")[0] == 200
+    assert request(panel, "/api/doctor")[0] == 200
+    assert request(panel, "/settings.js", token=False)[0] == 200
+    for preferences in ({"font-size": True}, {"font-size": 73}, {"account": "root"}, {"font-family": "bad\nfont"}):
+        assert request(panel, "/api/settings", {"digest": "a" * 64, "preferences": preferences})[0] == 400
+    assert not panel.client.calls
+    code, body, _ = request(panel, "/api/settings", {"digest": "b" * 64, "preferences": {"font-size": 18}})
+    reply = json.loads(body)
+    assert code == 409 and reply["code"] == "configuration-conflict" and reply["hint"]
+    assert b"private backend detail" not in body
+    assert request(panel, "/api/settings", {"digest": "a" * 64, "preferences": {"font-size": 18, "appearance": None}})[0] == 200
+
+
+def test_settings_client_preserves_other_fields_and_binds_digest(monkeypatch):
+    import asyncio
+    from pathlib import Path
+    from folio_panel import client
+    original = {"folio-environment:environment": {"account": "folio", "modules": [], "preferences": {"font-size": 16}}}
+    calls = []
+
+    async def process(arguments, **kwargs):
+        calls.append(arguments)
+        if arguments[-1] == "show":
+            return {"status": "success", "data": {"configuration": copy.deepcopy(original), "digest": "a" * 64}}
+        path = Path(arguments[arguments.index("import") + 1])
+        saved = json.loads(path.read_text())["folio-environment:environment"]
+        assert saved["account"] == "folio" and saved["modules"] == []
+        assert saved["preferences"]["font-size"] == 18
+        assert arguments[-2:] == ["--expected-digest", "a" * 64]
+        return {"status": "success", "data": {"digest": "c" * 64}}
+
+    monkeypatch.setattr(client, "process", process)
+    monkeypatch.setattr(client.paths, "LEGACY", "/fake/folio")
+    assert asyncio.run(client.Client().save_settings("a" * 64, {"font-size": 18}))["digest"] == "c" * 64
+    with pytest.raises(BackendError):
+        asyncio.run(client.Client().save_settings("b" * 64, {"font-size": 19}))
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize("action,fields", [
+    ("proxy-group-select", {"group": "PROXY", "node": "🇯🇵 日本Y01 | IEPL"}),
+    ("proxy-delay", {"node": "🇺🇲 美国Y01 | IEPL | x1.5"}),
+])
+def test_proxy_rpc_keeps_emoji_names_as_utf8(monkeypatch, action, fields):
+    import asyncio
+    from pathlib import Path
+    from folio_panel import client
+
+    async def process(arguments, **kwargs):
+        path = next(argument.removeprefix("--rpc=") for argument in arguments if argument.startswith("--rpc="))
+        raw = Path(path).read_bytes()
+        assert fields["node"].encode("utf-8") in raw
+        assert b"\\ud83c" not in raw
+        assert json.loads(raw)["folio-network-panel:control"] == {"action": action, **fields}
+        return {"output": {"result-json": json.dumps({"status": "success", "data": {"accepted": True}})}}
+
+    monkeypatch.setattr(client, "process", process)
+    assert asyncio.run(client.Client().proxy(action, **fields)) == {"accepted": True}

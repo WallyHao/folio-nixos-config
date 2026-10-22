@@ -29,7 +29,7 @@ static void omit_absent_values(json_t *value)
         void *next;
         json_t *child;
         json_object_foreach_safe(value, next, key, child) {
-            if (json_is_null(child)) json_object_del(value, key);
+            if (json_is_null(child) || (json_is_array(child) && !json_array_size(child))) json_object_del(value, key);
             else omit_absent_values(child);
         }
     } else if (json_is_array(value)) {
@@ -81,7 +81,8 @@ static int execute(const char *program, const char *input, json_t **result)
         if (dup2(in, STDIN_FILENO) < 0 || dup2(out, STDOUT_FILENO) < 0) _exit(126);
         close(in);
         close(out);
-        execl(TIMEOUT_PROGRAM, "timeout", "--kill-after=2", "25", program, (char *)NULL);
+        const char *budget = !strcmp(program, PLAN_OPERATION) ? "120" : "25";
+        execl(TIMEOUT_PROGRAM, "timeout", "--kill-after=2", budget, program, (char *)NULL);
         _exit(126);
     }
     if (pid < 0) goto cleanup;
@@ -143,6 +144,13 @@ static int callback(sr_session_ctx_t *session, uint32_t sub_id, const char *xpat
     json_object_foreach(result, key, value) {
         if (json_is_null(value)) continue;
         if (!strcmp(key, "data") && json_is_object(value)) {
+            if (!strncmp(operation->xpath, "/folio-deployment:", strlen("/folio-deployment:"))) {
+                char *exact = json_dumps(value, JSON_COMPACT);
+                LY_ERR exact_error = exact ? lyd_new_term(output, NULL, "result-json", exact,
+                    LYD_NEW_VAL_OUTPUT, NULL) : LY_EMEM;
+                free(exact);
+                if (exact_error != LY_SUCCESS) { code = SR_ERR_CALLBACK_FAILED; break; }
+            }
             omit_absent_values(value);
             char *data = json_dumps(value, JSON_COMPACT);
             LY_ERR error = data ? lyd_new_any(output, NULL, key, data, LYD_ANYDATA_JSON,

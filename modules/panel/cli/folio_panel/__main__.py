@@ -22,7 +22,7 @@ def main():
             "  folio panel                 Open the local web control panel in your browser",
             flush=True,
         )
-    # Compatibility bridge: unified apply/change history is a separate milestone.
+    # The manager CLI owns configuration, planning, deployment and history.
     os.execv(LEGACY, [LEGACY, *sys.argv[1:]])
 
 

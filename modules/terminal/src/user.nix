@@ -29,7 +29,7 @@ let
     header = palette.grey1; border = palette.grey0; };
   colorFlags = lib.concatStringsSep "," (lib.mapAttrsToList (key: value: "${key}:${value}") colors);
 in { config, ... }: {
-  imports = lib.optional (git.enabled or true)
+  imports = [ ((import ./yazi.nix { inherit pkgs lib; }) context) ] ++ lib.optional (git.enabled or true)
     ((import ./git.nix { inherit pkgs lib; }) context);
   home.packages = lib.optionals (foot.enabled or true) [ pkgs.foot pkgs.maple-mono.NF-CN ]
     ++ lib.mapAttrsToList (_: value: value) (lib.filterAttrs (name: _: selected name) toolPackages);

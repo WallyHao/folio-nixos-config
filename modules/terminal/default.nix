@@ -5,6 +5,7 @@ let
   fraction = ./model/revisions/2026-10-20/folio-terminal.yang;
   tools = ./model/revisions/2026-10-21/folio-terminal.yang;
   legacyGit = ./model/revisions/2026-10-19/folio-git.yang;
+  gitModel = ./model/revisions/2026-10-22/folio-terminal.yang;
   current = ./model/folio-terminal.yang;
   migration = name: filter: pkgs.writeShellApplication {
     inherit name;
@@ -27,6 +28,7 @@ let
 in
 {
   models.user = [ current ];
+  impacts = [ "Open a new terminal or shell to load changed terminal and shell settings." ];
   migrations = [
     {
       module = "folio-terminal";
@@ -53,7 +55,7 @@ in
       module = "folio-terminal";
       from = "2026-10-21"; to = "2026-10-22";
       fromSha256 = builtins.hashFile "sha256" tools;
-      toSha256 = builtins.hashFile "sha256" current;
+      toSha256 = builtins.hashFile "sha256" gitModel;
       transform = "${migration "folio-terminal-add-git" ''
         ."folio-environment:environment".modules |= map(
           if .name=="terminal" then ."folio-terminal:terminal".git //= {enabled:false}
@@ -61,10 +63,17 @@ in
       ''}/bin/folio-terminal-add-git";
     }
     {
+      module = "folio-terminal";
+      from = "2026-10-22"; to = "2026-10-24";
+      fromSha256 = builtins.hashFile "sha256" gitModel;
+      toSha256 = builtins.hashFile "sha256" current;
+      transform = "${migration "folio-terminal-add-yazi" "."}/bin/folio-terminal-add-yazi";
+    }
+    {
       module = "folio-git"; toModule = "folio-terminal";
       from = "2026-10-19"; to = "2026-10-22";
       fromSha256 = builtins.hashFile "sha256" legacyGit;
-      toSha256 = builtins.hashFile "sha256" current;
+      toSha256 = builtins.hashFile "sha256" gitModel;
       transform = "${pkgs.writeShellApplication {
         name = "folio-terminal-migrate-git";
         runtimeInputs = [ pkgs.jq ];
@@ -77,7 +86,8 @@ in
     { name = "2026-10-19/folio-terminal.yang"; path = additive; }
     { name = "2026-10-20/folio-terminal.yang"; path = fraction; }
     { name = "2026-10-21/folio-terminal.yang"; path = tools; }
-    { name = "2026-10-22/folio-terminal.yang"; path = current; }
+    { name = "2026-10-22/folio-terminal.yang"; path = gitModel; }
+    { name = "2026-10-24/folio-terminal.yang"; path = current; }
     { name = "2026-10-19/folio-git.yang"; path = legacyGit; }
   ];
   homeManagerModule = import ./src/user.nix { inherit pkgs lib; };

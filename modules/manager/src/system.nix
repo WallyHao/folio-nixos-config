@@ -56,6 +56,7 @@ context:
     {
       # Raw module composition (including guest fixtures) has no frozen input.
       _module.args.folioInput = lib.mkDefault null;
+      system.build.folioDescriptor = descriptor;
       users.groups.folio-operators = { };
       users.users.folio-builder = {
         isSystemUser = true;

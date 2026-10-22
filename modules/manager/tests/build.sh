@@ -58,10 +58,10 @@ jq . "$test_root/status.json"
 jq -e '.data.health=="unavailable" and .data.applied==null' "$test_root/status.json"
 ln -s /etc/passwd "$test_root/source/modules/escape"
 code=0
-folio --json plan --source "$test_root/source" >"$test_root/escape.json" || code=$?
+folio --json --user plan --source "$test_root/source" >"$test_root/escape.json" || code=$?
 [[ "$code" == 2 ]]
 rm "$test_root/source/modules/escape"
-folio --json plan --source "$test_root/source" >"$test_root/plan.json"
+folio --json --user plan --source "$test_root/source" >"$test_root/plan.json"
 plan_id=$(jq -er .data.planId "$test_root/plan.json")
 snapshot=$(jq -er .data.plan.source "$test_root/plan.json")
 test -f "$snapshot/flake.lock"

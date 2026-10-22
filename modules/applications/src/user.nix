@@ -2,6 +2,10 @@
 context: { folioBootstrap, config, lib, ... }:
 let native = import ./native.nix { inherit pkgs lib context config; };
 in {
+    imports = [
+      ((import ./zathura.nix { inherit pkgs lib; }) context)
+      ((import ./imv.nix { inherit pkgs lib; }) context)
+    ];
     assertions = [{ assertion = context.capabilities.flatpak-provisioned or false; message = "Applications require system-provisioned Flatpak support"; }];
     home.packages = [ pkgs.flatpak ] ++ native.packages;
     xdg.desktopEntries = native.desktopEntries;

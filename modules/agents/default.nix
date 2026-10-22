@@ -17,6 +17,7 @@ let
   };
 in {
   models.user = [ current ];
+  checks.colors = import ./tests/colors.nix { inherit pkgs; };
   packages = {
     inherit codex pi;
     migration = migrate;

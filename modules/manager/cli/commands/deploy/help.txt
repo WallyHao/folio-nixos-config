@@ -1,4 +1,13 @@
 Usage: folio plan [--source DIRECTORY]
+       folio plan [--source DIRECTORY] --yes --comment TEXT
        folio build|apply PLAN_ID [--request-id ID]
+       folio history
        folio status [TASK_ID]
-Use --no-wait to return after durable task acceptance.
+       folio doctor
+       folio resume WORKFLOW_ID
+Unscoped plan reviews system/user changes before confirmation and comment entry.
+No plan is created when both generated environments already match.
+Use --user/--system for the existing scoped interfaces.
+JSON changes output format only. Use --user plan for legacy scoped creation.
+Build/apply run independently of the client. --no-wait returns a w- workflow ID.
+Use status to inspect it and resume after interruption. Resume revalidates inputs.

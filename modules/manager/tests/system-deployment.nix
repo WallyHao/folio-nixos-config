@@ -142,6 +142,16 @@ pkgs.testers.runNixOSTest {
       inputs.home-manager
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
+      pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl
+      pkgs.python3 pkgs.makeWrapper pkgs.makeBinaryWrapper
+      pkgs.stdenv pkgs.stdenv.cc pkgs.pkg-config pkgs.curl
+      pkgs.libxslt.bin pkgs.libxml2.bin pkgs.libcap-text-verifier
+      pkgs.curl.bin pkgs.curl.dev pkgs.libssh2.dev
+      pkgs.libxslt.dev pkgs.libxml2.dev pkgs.texinfo pkgs.python3Minimal
+      pkgs.jansson.dev pkgs.libyang.dev
+      # Font changes rebuild the GTK shortcut helper. Its build requires the
+      # development outputs, which are absent from an activated runtime closure.
+      pkgs.gtk3.dev pkgs.gobject-introspection.dev pkgs.wrapGAppsHook3
     ]
     ++ pkgs.lib.optionals integrated [ laterUser testPython pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ]
     ++ pkgs.lib.optional (cache != null) cache
@@ -160,8 +170,7 @@ pkgs.testers.runNixOSTest {
     import datetime
     import json
     import shlex
-    import time
-    from typing import Any, cast
+    ${if integrated then "import time\nfrom typing import Any, cast" else "from typing import Any"}
 
     session_env = {}
 
@@ -172,8 +181,8 @@ pkgs.testers.runNixOSTest {
         prefix = "runuser -u folio -- env " + " ".join(shlex.quote(key+"="+value) for key,value in environment.items())
         return machine.succeed(prefix + " bash -c " + shlex.quote("set -euo pipefail; " + command), timeout=datetime.timedelta(seconds=timeout))
 
-    def folio(arguments):
-        return json.loads(user("folio --json " + arguments))
+    def folio(arguments, timeout=240):
+        return json.loads(user("folio --json " + arguments, timeout))
 
     def save(configuration, system=False):
         user("printf %s " + shlex.quote(json.dumps(configuration)) + " >/home/folio/draft.json")
@@ -190,7 +199,7 @@ pkgs.testers.runNixOSTest {
     configuration = folio("config show")["data"]["configuration"]
     configuration["folio-environment:environment"]["preferences"]["font-size"] = 18
     save(configuration)
-    plan = folio("plan --source /home/folio/source")["data"]["planId"]
+    plan = folio("--user plan --source /home/folio/source")["data"]["planId"]
     assert folio("build " + plan)["status"] == "success"
     assert folio("apply " + plan)["status"] == "success"
     user_plan = plan
@@ -273,6 +282,33 @@ pkgs.testers.runNixOSTest {
             machine.copy_from_machine("/home/folio/release-status.json")
             user("printf %s " + shlex.quote(json.dumps({"beforeBootId":before_boot,"afterBootId":after_boot,"userProfile":user_profile,"systemProfile":status["applied"]["artifact"]})) + " >/home/folio/release-boot.json")
             machine.copy_from_machine("/home/folio/release-boot.json")
+        if ${if !integrated && !recovery then "True" else "False"}:
+            with subtest("reviewed cross-scope plan builds and applies its frozen targets"):
+                configuration = folio("config show")["data"]["configuration"]
+                configuration["folio-environment:environment"]["preferences"]["font-size"] = 19
+                save(configuration)
+                configuration = folio("--system config show")["data"]["configuration"]
+                configuration["folio-environment:environment"]["preferences"]["font-size"] = 21
+                save(configuration, True)
+                bundle = folio("plan --source /home/folio/source --yes --comment cross-scope-fixture", 300)["data"]
+                assert bundle["planId"], bundle
+                bundle_id = bundle["planId"]
+                assert set(bundle["plan"]["components"]) == {"system", "user"}
+                assert all(c["plan"]["comment"]=="cross-scope-fixture" for c in bundle["plan"]["components"].values())
+                assert folio("build " + bundle_id, 600)["status"] == "success"
+                submitted = folio("--no-wait apply " + bundle_id)
+                workflow_id = submitted["taskId"]
+                assert workflow_id.startswith("w-"), submitted
+                machine.wait_until_succeeds("runuser -u folio -- env HOME=/home/folio XDG_STATE_HOME=/home/folio/.local/state XDG_RUNTIME_DIR=/run/user/1000 bash -c " + shlex.quote("folio --json status " + workflow_id + " | ${pkgs.jq}/bin/jq -e '.data.phase | IN(\"succeeded\",\"failed\",\"interrupted\")'"), timeout=datetime.timedelta(seconds=600))
+                assert folio("status " + workflow_id)["data"]["phase"] == "succeeded"
+                history = folio("history")["data"]["plans"]
+                assert any(p["planId"]==bundle_id and p["status"]=="apply:succeeded" for p in history), history
+                configuration = folio("config show")["data"]["configuration"]
+                configuration["folio-environment:environment"]["preferences"]["font-size"] = 24
+                save(configuration)
+                assert folio("rollback " + bundle_id + " --yes", 300)["status"] == "success"
+                restored = folio("config show")["data"]["configuration"]
+                assert restored["folio-environment:environment"]["preferences"]["font-size"] == 19
         accepted = folio("--system system poweroff --request-id observed-poweroff")
         assert accepted["data"]["phase"] == "accepted"
         machine.wait_for_qmp_event(lambda event: event["event"]=="SHUTDOWN", timeout=datetime.timedelta(seconds=60))

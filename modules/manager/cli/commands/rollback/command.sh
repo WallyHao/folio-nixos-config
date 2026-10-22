@@ -6,6 +6,12 @@ case "$FOLIO_COMMAND" in
     folio-manager-cleanup "$FOLIO_SCOPE" "$@" >"$work/result.json" 2>"$work/error" || code=$?
     ;;
   rollback)
+    confirmed=false
+    arguments=()
+    for argument in "$@"; do
+      if [[ "$argument" == --yes ]]; then confirmed=true; else arguments+=("$argument"); fi
+    done
+    set -- "${arguments[@]}"
     [[ $# == 1 || ( $# == 2 && $2 == --rebuild ) ]] || finish invalid null 'Usage: folio rollback REVISION_ID [--rebuild]'
     [[ "$1" =~ ^([a-f0-9]{64}|maintenance-[a-z][a-z0-9-]{0,63})$ ]] || finish invalid null 'Invalid retained revision ID'
     profile=${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager
@@ -14,6 +20,12 @@ case "$FOLIO_COMMAND" in
     metadata=$artifact/folio-home.json
     [[ "$FOLIO_SCOPE" != system ]] || metadata=$artifact/folio-system.json
     bootstrap=$(jq -er .bootstrap "$metadata") || finish unavailable null 'Selected closure has no bootstrap identity'
+    if ! "$confirmed" && ! "$FOLIO_JSON"; then
+      [[ -t 0 ]] || finish invalid null 'Rollback requires confirmation; use --yes'
+      printf 'Restore retained plan %s in %s scope? [y/N] ' "$1" "$FOLIO_SCOPE"
+      read -r answer
+      [[ "$answer" == y || "$answer" == Y || "$answer" == yes ]] || finish success '{"cancelled":true}'
+    fi
     transaction=rollback-$(tr -d '-' </proc/sys/kernel/random/uuid)
     code=0
     folio-manager-maintain "$FOLIO_SCOPE" "$bootstrap" rollback "$transaction" "$@" >"$work/result.json" 2>"$work/error" || code=$?

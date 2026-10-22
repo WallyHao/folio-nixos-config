@@ -66,6 +66,9 @@ if [[ "$action" == init ]]; then
     flatpak remote-add --user --noninteractive flathub https://dl.flathub.org/repo/flathub.flatpakrepo
   fi
   folio-applications-transaction verify-remote || fail conflict 'Existing Flathub remote is disabled, unverified or has a different origin' 4
+  flatpak update --user --appstream --noninteractive
+elif [[ "$action" == refresh ]]; then
+  flatpak update --user --appstream --noninteractive
 else
   while IFS= read -r desired; do
     name=$(jq -er .name <<<"$desired")
@@ -168,6 +171,7 @@ else
       --argjson plan "$plan" '{format:1,name:$name,ref:$ref,commit:$commit,plan:$plan,configurationDigest:$digest,configurationState:"configuration-pending"}' |
       folio-atomic-write "$owned"
     checkpoint permissions
+    if [[ "$name" == zen || "$name" == obs ]]; then
     jq '.installationStarted=true' "$record" | folio-atomic-write "$record"
     permission_args=()
     for permission in network audio wayland x11 downloads videos; do
@@ -188,6 +192,7 @@ else
       esac
     done
     flatpak override --user "${permission_args[@]}" "$id"
+    fi
     flatpak info --user --show-permissions "$ref" >"$work/permissions.txt"
     jq --rawfile permissions "$work/permissions.txt" '.actualPermissions=$permissions' "$owned" | folio-atomic-write "$owned"
     jq '.filesStarted=true' "$record" | folio-atomic-write "$record"
@@ -205,7 +210,7 @@ inventory >"$work/after.json"
 jq --slurpfile after "$work/after.json" --arg now "$(date -u +%FT%TZ)" \
   '.after=$after[0] | .phase="succeeded" | .resultStatus="success" | .error=null | .recoveryRequired=false | .updatedAt=$now' "$record" |
   folio-atomic-write "$record"
-if [[ "$action" != prepare && "$action" != init ]]; then
+if [[ "$action" != prepare && "$action" != init && "$action" != refresh ]]; then
   jq '{format:1,id,configurationDigest,generation,applications,before,after}' "$record" | folio-atomic-write "$app_state/revisions/$task_id.json"
 fi
 finished=true

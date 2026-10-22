@@ -1,0 +1,15 @@
+.store-tabs { display: inline-flex; flex-wrap: wrap; gap: .25rem; margin: 0 0 1.1rem; padding: .25rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--surface); }
+.store-tabs button { border-color: transparent; background: transparent; box-shadow: none; }
+.store-tabs button.primary { background: var(--tint); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 25%, var(--surface)); }
+.search { padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: var(--card-radius); background: var(--surface); box-shadow: var(--shadow); margin-bottom: 1.2rem; }
+.search > div { display: flex; gap: var(--control-gap); margin-top: .5rem; }.search button { flex: none; }.search input { flex: 1; min-width: 0; }
+.results-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .7rem; margin-bottom: .75rem; }.results-heading h2 { margin: 0; }
+.app-grid { display: grid; gap: .8rem; grid-template-columns: minmax(0, 1fr); }
+.app-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }.app-summary { display: flex; align-items: flex-start; gap: .8rem; padding: 1rem 1.1rem; }.app-summary > div { min-width: 0; }.app-summary h2 { margin: 0 0 .2rem; }.app-avatar { display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem; border: 1px solid var(--border); border-radius: .5rem; color: var(--accent); background: var(--tint); font-size: 1.1rem; font-weight: 600; }
+.app-card .app-id { font-size: .5rem; overflow-wrap: anywhere; color: var(--muted); }.app-card p { overflow-wrap: anywhere; margin: .5rem 0 0; font-size: .6rem; }
+.app-card .app-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; padding: .7rem 1.1rem; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 25%, var(--surface)); }.app-actions .badge { margin-right: auto; }
+#transaction { margin-top: 1rem; }#transaction .results-heading { padding-bottom: .8rem; border-bottom: 1px solid var(--border); }
+#transaction pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14rem; overflow-y: auto; font: .55rem/1.7 var(--font); padding: .75rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+#transaction summary { font-size: .63rem; cursor: pointer; margin-top: .7rem; }#task-error { color: var(--red); overflow-wrap: anywhere; }progress { width: 100%; accent-color: var(--green); }
+#setup { margin-bottom: 1rem; }#installed > .footnote { margin: .5rem 0 1rem; }
+@media (max-width: 560px) { .search { padding: .8rem; }.app-summary, .app-card .app-actions { padding-inline: .8rem; }.app-avatar { width: 2rem; height: 2rem; font-size: .85rem; } }

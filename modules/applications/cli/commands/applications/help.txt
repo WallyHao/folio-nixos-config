@@ -1,6 +1,9 @@
-Usage: folio apps init|list|install|update|remove|reconcile|adopt|prepare [zen|obs|all]
+Usage: folio apps init|refresh|list|install|update|remove|reconcile|adopt|prepare [zen|obs|APP_ID|all]
        folio apps rollback REVISION_ID [zen|obs|all]
        folio apps resume|status TASK_ID
 Options: --offline, --adopt-files, --request-id ID.
+Install or explicitly adopt another Flathub app with:
+  folio apps install org.example.App --ref app/org.example.App/x86_64/stable
+Arbitrary apps keep their upstream permissions. Zen/OBS retain their modeled policy.
 Native Zen Beta/OBS packages are selected in applications.native and deployed with folio apply.
 Use --no-wait before the command to stop waiting after acceptance.

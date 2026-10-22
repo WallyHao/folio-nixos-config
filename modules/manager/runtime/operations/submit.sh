@@ -33,7 +33,7 @@ jq -cnS --arg id "$task_id" --arg kind "$operation_kind" --arg planId "$plan_id"
   --slurpfile plan "$plan" --argjson timeoutSeconds "$timeout_seconds" \
   '{format:1,id:$id,kind:$kind,planId:$planId,requestId:$requestId,worker:$worker,
     inputDigest:$plan[0].inputDigest,timeoutSeconds:$timeoutSeconds,phase:"queued",
-    updatedAt:$now,error:null,resultStatus:null}' | folio-atomic-write "$record"
+    updatedAt:$now,error:null,resultStatus:null,comment:($plan[0].comment // "")}' | folio-atomic-write "$record"
 if ! start_task "$task_id"; then
   jq -cn --arg id "$task_id" '{status:"unavailable","task-id":$id,error:"Task is durably queued; user service dispatch is unavailable"}'
   exit 0

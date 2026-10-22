@@ -21,7 +21,7 @@ with subtest("retained rollback restores desired data, files and the rooted clos
     changed["folio-environment:environment"]["preferences"]["font-size"] = 24
     save(changed)
     assert folio("status")["data"]["health"] != "healthy"
-    later = folio("plan --source /home/folio/source")["data"]["planId"]
+    later = folio("--user plan --source /home/folio/source")["data"]["planId"]
     assert folio("build " + later)["status"] == "success"
     assert folio("apply " + later)["status"] == "success"
     assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() != user_profile

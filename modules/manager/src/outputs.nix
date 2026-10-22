@@ -26,6 +26,11 @@ let
       inputLanguage = catalogue.input.packages.indicator;
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
+      catalogue = pkgs.writeText "folio-catalogue.json" (builtins.toJSON (
+        lib.mapAttrs (_: d: {
+          inherit (d) requirements impacts;
+          scopes = lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
+        }) collection.definitions));
       systemConfiguration = portableSystem;
       source = pkgs.runCommand "folio-${selectedTarget}-source" { } ''
         mkdir $out
@@ -66,10 +71,12 @@ let
     input = import ../../input/default.nix { inherit pkgs lib; };
     emacs = import ../../emacs/default.nix { inherit pkgs lib; };
     agents = import ../../agents/default.nix { inherit pkgs lib; };
+    isaac = import ../../isaac/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };
     panel = import ../../panel/default.nix {
       inherit pkgs;
       legacyCli = catalogue.manager.packages.cli;
+      storeBackend = catalogue.applications.packages.store;
       wifi = catalogue.network.packages.wifi;
       devices = catalogue.devices.packages.panel;
       repository = catalogue.sysrepo.packages.tools;
@@ -129,6 +136,7 @@ let
       pkgs.writeText "catalogue.json" (
         builtins.toJSON (
           lib.mapAttrs (_: d: {
+            inherit (d) requirements impacts;
             scopes =
               lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
           }) collection.definitions
@@ -198,6 +206,7 @@ in
   nixosConfigurations.portable = portableSystem;
   nixosConfigurations.folio = if selectedTarget == "folio" then portableSystem
     else (import ./outputs.nix { inherit inputs; targetName = "folio"; }).nixosConfigurations.portable;
+  lib.folio.identities = identities;
   lib.folio.targets = {
     portable = "Disposable UEFI guest";
     folio = "Existing migrated USB system shared by the Intel/NVIDIA laptop and AMD/NVIDIA desktop";
@@ -223,162 +232,7 @@ in
       collection.packages.manager-normalizer
     ];
   };
-  checks.${system} = {
-    legacy-retirement-files = import ../../system/tests/legacy-retirement-files.nix { inherit pkgs; };
-    legacy-retirement = import ../../system/tests/legacy-retirement.nix {
-      inherit pkgs inputs;
-      cleanup = catalogue.system.packages.legacy-cleanup;
-    };
-    desktop-focus-fade = import ../../desktop/tests/focus-fade.nix {
-      inherit pkgs;
-      niri = catalogue.desktop.packages.niri;
-    };
-    agents = import ../../agents/tests/runtime.nix {
-      inherit pkgs bootstrap;
-      pi = catalogue.agents.packages.pi;
-    };
-    agents-migration = import ../../agents/tests/migration.nix {
-      inherit pkgs bootstrap;
-      repository = catalogue.sysrepo.packages.tools;
-      maintenance = catalogue.sysrepo.packages.maintenance;
-      agentsHistory = catalogue.agents.packages.schema-history;
-      terminalHistory = catalogue.terminal.packages.schema-history;
-      applicationsHistory = catalogue.applications.packages.schema-history;
-      systemModules = adapters "system";
-      homeManager = inputs.home-manager.lib;
-      runtime = collection.packages.manager-runtime;
-      prepareInput = collection.packages.manager-input;
-      source = pkgs.folio.source;
-      inherit inputs;
-      switcher = userPackages.sd-switch;
-    };
-    appearance = import ../../appearance/tests/gtk.nix { inherit pkgs; };
-    panel = import ../../panel/tests/default.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
-    panel-browser = import ../../panel/tests/browser.nix { inherit pkgs; package = catalogue.panel.packages.cli; };
-    browser-windows = import ../../applications/tests/browser-windows.nix { inherit pkgs; browser = catalogue.applications.packages.zen; };
-    panel-network = import ../../network/tests/panel.nix {
-      inherit pkgs bootstrap;
-      repository = catalogue.sysrepo.packages.tools;
-      subscriber = catalogue.network.packages.subscriber;
-      wifi = catalogue.network.packages.wifi;
-      devices = catalogue.devices.packages.panel;
-      panel = catalogue.panel.packages.cli;
-    };
-    account-migration = import ../../system/tests/account-migration.nix {
-      inherit pkgs;
-      migration = catalogue.system.packages.migration;
-    };
-    integrated-release = lib.makeOverridable ({ cache ? null, plans ? null }:
-      import ../tests/system-deployment.nix {
-        inherit pkgs inputs bootstrap cache plans;
-        integrated = true;
-        source = pkgs.folio.source;
-        modules = adapters "system";
-        prepareInput = collection.packages.manager-input;
-      }) { };
-    recovery = import ../tests/system-deployment.nix {
-      inherit pkgs inputs bootstrap;
-      recovery = true;
-      source = pkgs.folio.source;
-      modules = adapters "system";
-      prepareInput = collection.packages.manager-input;
-    };
-    system-deployment = import ../tests/system-deployment.nix {
-      inherit pkgs inputs bootstrap;
-      source = lib.fileset.toSource {
-        root = ../../..;
-        fileset = lib.fileset.unions [
-          ../../../flake.nix
-          ../../../flake.lock
-          ../../../modules
-        ];
-      };
-      modules = adapters "system";
-      prepareInput = collection.packages.manager-input;
-    };
-    system-scope = import ../tests/system-scope.nix {
-      inherit pkgs inputs bootstrap;
-      source = lib.fileset.toSource {
-        root = ../../..;
-        fileset = lib.fileset.unions [
-          ../../../flake.nix
-          ../../../flake.lock
-          ../../../modules
-        ];
-      };
-      modules = adapters "system";
-    };
-    user-deployment = import ../tests/user-deployment.nix {
-      inherit pkgs inputs bootstrap;
-      source = lib.fileset.toSource {
-        root = ../../..;
-        fileset = lib.fileset.unions [
-          ../../../flake.nix
-          ../../../flake.lock
-          ../../../modules
-        ];
-      };
-      runtime = collection.packages.manager-runtime;
-      cli = collection.packages.manager-cli;
-      repository = collection.packages.sysrepo-tools;
-      prepareInput = collection.packages.manager-input;
-    };
-    applications-native = import ../../applications/tests/native.nix {
-      inherit pkgs inputs bootstrap;
-      source = pkgs.folio.source;
-      prepareInput = collection.packages.manager-input;
-    };
-    applications = lib.makeOverridable ({ cache ? null, plans ? null }: import ../../applications/tests/guest.nix {
-      inherit pkgs inputs bootstrap cache plans;
-      source = pkgs.folio.source;
-      prepareInput = collection.packages.manager-input;
-      modules = adapters "system";
-    }) { };
-    desktop = lib.makeOverridable ({ legacySource ? null, cache ? null, plans ? null, drm ? true }: import ../../desktop/tests/session.nix {
-      inherit pkgs inputs bootstrap legacySource cache plans drm;
-      source = pkgs.folio.source;
-      prepareInput = collection.packages.manager-input;
-      runtime = collection.packages.manager-runtime;
-      cli = collection.packages.manager-cli;
-      modules = adapters "system";
-    }) { };
-    configuration = import ../tests/configuration.nix {
-      inherit pkgs bootstrap;
-      runtime = collection.packages.manager-runtime;
-      cli = collection.packages.manager-cli;
-      repository = collection.packages.sysrepo-tools;
-    };
-    network = import ../../network/tests/acceptance.nix {
-      inherit pkgs inputs bootstrap;
-      source = pkgs.folio.source;
-      runtime = collection.packages.manager-runtime;
-      cli = collection.packages.manager-cli;
-      prepareInput = collection.packages.manager-input;
-      guestInstrumentation = ../tests/system-guest.nix;
-      oldSystemModel = ../../system/model/revisions/2026-10-18/folio-system.yang;
-    };
-    tools-deployment = lib.makeOverridable ({ legacySource ? null }: import ../../terminal/tests/deployment.nix {
-      inherit pkgs inputs bootstrap legacySource;
-      source = pkgs.folio.source;
-      prepareInput = collection.packages.manager-input;
-      runtime = collection.packages.manager-runtime;
-      cli = collection.packages.manager-cli;
-      editor = catalogue.emacs.packages.editor;
-      modules = adapters "system";
-    }) { };
-    tools = import ../../terminal/tests/tools.nix {
-      inherit pkgs inputs bootstrap;
-      generation = userHome.activationPackage;
-      editor = catalogue.emacs.packages.editor;
-      codex = catalogue.agents.packages.codex;
-    };
-    catalogue = import ../tests/catalogue.nix { inherit pkgs catalogueLib; };
-    foundation = import ../../sysrepo/tests/foundation.nix {
-      inherit pkgs bootstrap;
-      tools = collection.packages.sysrepo-tools;
-      normalizer = collection.packages.manager-normalizer;
-      sysrepo = collection.packages.sysrepo-library;
-      prepareInput = collection.packages.manager-input;
-    };
+  checks.${system} = import ../tests/default.nix {
+    inherit pkgs inputs bootstrap catalogue collection adapters userPackages userHome catalogueLib;
   };
 }

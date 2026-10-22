@@ -1,0 +1,3 @@
+# NixOS x86_64 / CPython 3.12 compatibility overlay; base uv.lock remains unchanged.
+numpy @ https://files.pythonhosted.org/packages/6e/45/c51cb248e679a6c6ab14b7a8e3ead3f4a3fe7425fc7a6f98b3f147bec532/numpy-2.3.1-cp312-cp312-manylinux_2_28_x86_64.whl --hash=sha256:e7cbf5a5eafd8d230a3ce356d892512185230e4781a361229bd902ff403bc660
+onnxruntime-gpu @ https://files.pythonhosted.org/packages/94/fd/59bee7cffaa435da44fefdeb63e29c61de4dbfa4b279852f59cd02c042ae/onnxruntime_gpu-1.26.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl --hash=sha256:3c01119ed4d9449d60367fa8ccffcd02bd3fe736754284e4b198d131f54edad6

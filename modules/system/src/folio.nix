@@ -18,7 +18,7 @@
   fileSystems."/boot".options = [ "fmask=0077" "dmask=0077" ];
   boot.initrd.availableKernelModules = [ "uas" "sd_mod" "usbhid" "ehci_pci" "uhci_hcd" ];
   boot.loader.efi.canTouchEfiVariables = false;
-  boot.loader.timeout = 0;
+  boot.loader.timeout = 3;
   boot.loader.systemd-boot.configurationLimit = 10;
   assertions = [{
     assertion = config.fileSystems."/".fsType == "btrfs";

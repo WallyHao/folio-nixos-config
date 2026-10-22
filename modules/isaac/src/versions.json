@@ -1,0 +1,12 @@
+{
+  "profile": "lab3-sim6.2",
+  "isaaclab": "3.0.0",
+  "isaacsim": "6.2.0.0",
+  "commit": "e3f7d9ff1f5d7f8280de3ece9000b7117f66bcf4",
+  "lockSha256": "2d39902630e1424ce00093d0576a2689b3606572f8b9a531330a8d8abeb1eb60",
+  "compatibilitySha256": "9428c7240d71d1ecdd78c6ea6b71f2732b2e4bd3a580a3eb2f3598136c932ff3",
+  "compatibilityPins": {"numpy": "2.3.1", "onnxruntime-gpu": "1.26.0"},
+  "kitWheelSha256": "8f14f7673aeb073d7917494c7b7ae3a2ca0b83ea70e478b46390a352ccbdc88c",
+  "extras": ["isaacsim", "rsl-rl"],
+  "repository": "https://github.com/isaac-sim/IsaacLab.git"
+}

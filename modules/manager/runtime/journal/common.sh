@@ -75,6 +75,8 @@ plan_current() {
   current_configuration >"$work/current.json"
   [[ $(digest_file "$work/current.json") == "$(jq -er .configurationDigest "$plan")" ]] || return 1
   jq -cS . "$descriptor_path" >"$work/descriptor.json"
-  [[ $(digest_file "$work/descriptor.json") == "$(jq -er .descriptorDigest "$plan")" ]] || return 1
+  local descriptor_field=descriptorDigest
+  [[ ${1:-} != review ]] || descriptor_field=beforeDescriptorDigest
+  [[ $(digest_file "$work/descriptor.json") == "$(jq -er --arg field "$descriptor_field" '.[$field] // .descriptorDigest' "$plan")" ]] || return 1
   [[ $(selected_profile) == "$(jq -r .beforeProfile "$plan")" ]] || return 1
 }

@@ -28,6 +28,9 @@ if ! jq -e --arg scope "$scope" --slurpfile catalogue "$FOLIO_BOOTSTRAP/catalogu
   reply invalid 'Unknown module or unsupported scope'; exit 0
 fi
 after_digest=$(digest_file "$work/after.json")
+if ! requirement_error=$(python3 @requirements@ "$work/after.json" "$FOLIO_BOOTSTRAP/catalogue.json"); then
+  reply invalid "$requirement_error"; exit 0
+fi
 journal=$state/configuration/transaction.json
 jq -cnS --slurpfile before "$work/before.json" --slurpfile after "$work/after.json" \
   --arg beforeDigest "$before_digest" --arg afterDigest "$after_digest" \

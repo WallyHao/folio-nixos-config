@@ -22,5 +22,9 @@ let
     '';
     installPhase = "mkdir -p $out/bin; cp folio-applications-transaction $out/bin/";
   };
+  store = pkgs.runCommand "folio-applications-store" { } ''
+    mkdir -p $out/lib
+    cp ${../runtime/store.py} $out/lib/folio_store.py
+  '';
   runtime = import ./runtime.nix { inherit pkgs files transaction; };
-in { inherit files transaction; inherit (runtime) worker tools subscriber client; }
+in { inherit files transaction store; inherit (runtime) worker tools subscriber client; }

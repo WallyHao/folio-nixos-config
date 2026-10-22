@@ -170,7 +170,7 @@ with subtest("module-owned schema migration activates a matching closure and rol
     published = user_record(user_state + "/current.json")
     revision = user_record(user_state + "/revisions/" + published["revisionId"] + ".json")
     assert revision["workerProtocol"] == 1 and revision["models"] == retained["models"]
-    orphan = folio("plan --source /home/folio/source")["data"]["planId"]
+    orphan = folio("--user plan --source /home/folio/source")["data"]["planId"]
     preview = folio("cleanup")["data"]
     assert orphan in preview["plans"] and retained_id not in preview["plans"]
     assert folio("cleanup --apply")["status"] == "success"

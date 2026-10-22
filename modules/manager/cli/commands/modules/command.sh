@@ -8,7 +8,11 @@ case "$action" in
 esac
 load_configuration
 if [[ "$action" == list ]]; then
-  finish success "$(jq -c '."folio-environment:environment".modules' "$work/normalized.json")"
+  finish success "$(jq -cn --arg scope "$FOLIO_SCOPE" --slurpfile catalogue "$FOLIO_CATALOGUE" --slurpfile config "$work/normalized.json" '
+    ($config[0]."folio-environment:environment".modules | map({key:.name,value:.}) | from_entries) as $selected |
+    [$catalogue[0] | to_entries[] | select(.value.scopes | index($scope)) | .key as $name |
+      {name:$name,enabled:($selected[$name].enabled // false),selected:($selected | has($name)),
+       scopes:.value.scopes,requirements:(.value.requirements[$scope] // {})}]')"
 fi
 enabled=false
 [[ "$action" != enable ]] || enabled=true

@@ -51,6 +51,24 @@ def execute(request):
             raise ValueError("Unsupported proxy query")
         response = connection.getresponse()
         body = response.read(1024 * 1024 + 1)
+        if request["action"] == "proxy-delay" and response.status == 404:
+            # Provider nodes are absent from Mihomo's top-level /proxies map.
+            # Resolve the provider internally; callers still supply only a node name.
+            connection.request("GET", "/providers/proxies")
+            provider_response = connection.getresponse()
+            provider_body = provider_response.read(1024 * 1024 + 1)
+            if provider_response.status != 200 or len(provider_body) > 1024 * 1024:
+                raise OSError("Proxy provider inventory unavailable")
+            providers = json.loads(provider_body).get("providers", {})
+            provider = next((name for name, entry in providers.items()
+                             if any(proxy.get("name") == node for proxy in entry.get("proxies", []))), None)
+            if provider is None:
+                raise ValueError("Unknown provider node")
+            connection.request("GET", "/providers/proxies/" + quote(provider, safe="")
+                               + "/" + quote(node, safe="") + "/healthcheck?timeout=2000&url="
+                               + quote("https://www.gstatic.com/generate_204", safe=""))
+            response = connection.getresponse()
+            body = response.read(1024 * 1024 + 1)
         if response.status not in (200, 204) or len(body) > 1024 * 1024:
             raise OSError("Proxy query failed or timed out")
         if request["action"] == "proxy-group-select":

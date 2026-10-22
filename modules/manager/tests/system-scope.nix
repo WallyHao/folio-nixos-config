@@ -10,6 +10,8 @@ pkgs.testers.runNixOSTest {
   nodes.machine = { lib, ... }: {
     imports = modules;
     _module.args.folioBootstrap = bootstrap;
+    # QEMU provides the test clock; this access-policy fixture does not test NTP.
+    services.timesyncd.enable = lib.mkForce false;
     fileSystems."/".device = lib.mkForce "/dev/disk/by-label/nixos";
     users.users.visitor = {
       isNormalUser = true;
@@ -61,10 +63,12 @@ pkgs.testers.runNixOSTest {
         descriptor = json.loads(user("cat /run/folio/public/system-descriptor.json", "visitor"))
         assert descriptor["origin"] == "system-generation"
         assert descriptor["preferences"]["font-size"] == 16
-        assert descriptor["users"][0]["groups"] == ["folio-operators"]
+        compiled = json.loads(machine.succeed("cat ${bootstrap}/system-descriptor.json"))
+        assert descriptor["users"] == compiled["users"]
+        assert "folio-operators" in descriptor["users"][0]["groups"]
         user("test ! -w /run/folio/public/system-descriptor.json")
         user("mkdir -p /home/folio/source; cp -R ${source}/. /home/folio/source/; chmod -R u+w /home/folio/source")
-        plan = json.loads(user("folio --json plan --source /home/folio/source"))
+        plan = json.loads(user("folio --json --user plan --source /home/folio/source"))
         snapshot = plan["data"]["plan"]["source"]
         frozen = json.loads(user("cat " + shlex.quote(snapshot + "/folio-input.json")))
         assert frozen["systemDescriptor"] == descriptor
@@ -74,7 +78,7 @@ pkgs.testers.runNixOSTest {
         assert json.loads(user("folio --json --system config show"))["data"]["configuration"]["folio-environment:environment"]["preferences"]["font-size"] == 20
         observed = json.loads(user("folio-repository system cfg --export --datastore operational --module folio-environment --format json"))
         assert observed["folio-environment:environment"]["configuration"]["saved"] is True
-        result = json.loads(user("folio --json --system modules enable terminal; test $? -eq 2"))
+        result = json.loads(user("folio --json --system modules enable emacs; test $? -eq 2"))
         assert result["status"] == "invalid"
         assert machine.succeed("cat /proc/sys/kernel/random/boot_id").strip() == boot
   '';

@@ -1,0 +1,97 @@
+module folio-applications {
+  yang-version 1.1;
+  namespace "urn:folio:applications";
+  prefix fa;
+  import folio-environment { prefix fe; revision-date 2026-10-18; }
+  organization "Folio";
+  description "User application packages, Flatpak selection, permissions and regular files.";
+  revision 2026-10-24 { description "Add Zathura PDF reader."; }
+  revision 2026-10-23 { description "Explicit native Zen Beta and OBS package selection."; }
+  revision 2026-10-18 { description "Owned Zen and OBS lifecycle with frozen file manifests."; }
+
+  typedef application { type enumeration { enum zen; enum obs; } description "Supported application identity."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'applications'";
+    container applications {
+      presence "Applications settings are supplied.";
+      must "not(native/zen = 'true' and app[name = 'zen']/selected = 'true')";
+      must "not(native/obs = 'true' and app[name = 'obs']/selected = 'true')";
+      container native {
+        leaf zathura { type boolean; default true; }
+        description "Native packages are deployed and rolled back with the user generation, independently of Flatpak lifecycle commands.";
+        leaf zen { type boolean; default false; }
+        leaf obs { type boolean; default false; }
+        leaf zen-profile {
+          when "../zen = 'true'";
+          type string { length '1..128'; pattern '[A-Za-z0-9][A-Za-z0-9._ -]*'; }
+          description "Existing profile directory under XDG_CONFIG_HOME/zen, passed directly to Zen Beta without copying application data.";
+        }
+      }
+      list app {
+        key name;
+        leaf name { type application; }
+        leaf selected { type boolean; default true; }
+        leaf remote { type enumeration { enum flathub; } default flathub; }
+        leaf branch { type enumeration { enum stable; } default stable; }
+        leaf architecture { type enumeration { enum x86_64; } default x86_64; }
+        leaf ref {
+          type string { pattern 'app/(app\.zen_browser\.zen|com\.obsproject\.Studio)/x86_64/stable'; }
+          mandatory true;
+        }
+        must "(name = 'zen' and ref = 'app/app.zen_browser.zen/x86_64/stable') or (name = 'obs' and ref = 'app/com.obsproject.Studio/x86_64/stable')";
+        leaf policy { type enumeration { enum stable; enum pinned; } default stable; }
+        leaf commit { when "../policy = 'pinned'"; type fe:digest; mandatory true; }
+        leaf zen-profile {
+          when "../name = 'zen'";
+          type string { length '1..128'; pattern '[A-Za-z0-9][A-Za-z0-9._ -]*'; }
+          description "An existing relative profile directory explicitly listed in the sandbox's profiles.ini.";
+        }
+        container permissions {
+          leaf network { type boolean; default true; }
+          leaf audio { type boolean; default true; }
+          leaf wayland { type boolean; default true; }
+          leaf x11 { type boolean; default false; }
+          leaf downloads { type boolean; default true; }
+          leaf videos { type boolean; default true; }
+        }
+        container state {
+          config false;
+          leaf installed { type boolean; }
+          leaf owned { type boolean; }
+          leaf actual-commit { type fe:digest; }
+          leaf runtime-ref { type string; }
+          leaf runtime-commit { type fe:digest; }
+          list extension {
+            key ref;
+            leaf ref { type string; }
+            leaf commit { type fe:digest; mandatory true; }
+          }
+          leaf configuration-state {
+            type enumeration { enum applied; enum configuration-pending; enum restart-required; enum conflict; enum unavailable; }
+          }
+          leaf error { type string; }
+        }
+      }
+    }
+  }
+  rpc execute {
+    description "Submit application-owned work or inspect its actual state. Configuration selection is committed before submission.";
+    input {
+      leaf action {
+        type enumeration { enum init; enum list; enum install; enum update; enum remove; enum reconcile; enum adopt; enum rollback; enum prepare; enum resume; enum status; }
+        mandatory true;
+      }
+      leaf application { type enumeration { enum zen; enum obs; enum all; } default all; }
+      leaf request-id { type fe:identifier; mandatory true; }
+      leaf configuration-digest { type fe:digest; }
+      leaf revision { type fe:identifier; }
+      leaf adopt-files { type boolean; default false; }
+      leaf offline { type boolean; default false; description "Require prepared local content; never resolve a newer remote version."; }
+    }
+    output {
+      leaf status { type fe:result-status; mandatory true; }
+      leaf result-json { type string; description "Exact result JSON, including dependency arrays and task state."; }
+      leaf error { type string; }
+    }
+  }
+}

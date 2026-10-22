@@ -35,10 +35,12 @@ let
         pkgs.gnutar
         pkgs.findutils
         pkgs.diffutils
+        pkgs.python3
         prepareInput
       ];
       text =
-        builtins.readFile ../runtime/lib/common.sh
+        "export FOLIO_CATALOGUE=${pkgs.folio.catalogue}\n"
+        + builtins.readFile ../runtime/lib/common.sh
         + "\n"
         + builtins.readFile ../runtime/journal/common.sh
         + "\n"
@@ -46,7 +48,9 @@ let
         + "\n"
         + text;
     };
-  configuration = operation "folio-manager-configuration" (builtins.readFile ../runtime/operations/configuration.sh);
+  configuration = operation "folio-manager-configuration" (
+    builtins.replaceStrings [ "@requirements@" ] [ "${../runtime/snapshot/requirements.py}" ]
+      (builtins.readFile ../runtime/operations/configuration.sh));
   maintenance = pkgs.writeShellApplication {
     name = "folio-manager-maintain";
     runtimeInputs = [
@@ -62,7 +66,10 @@ let
     text = builtins.readFile ../runtime/operations/cleanup.sh;
   };
   recovery = operation "folio-manager-recover" (builtins.readFile ../runtime/journal/recover.sh);
-  plan = operation "folio-manager-plan" (builtins.readFile ../runtime/operations/plan.sh);
+  plan = operation "folio-manager-plan" (
+    builtins.replaceStrings [ "@review@" ] [ "${../runtime/snapshot/review.py}" ]
+      (builtins.readFile ../runtime/operations/plan.sh)
+  );
   worker = operation "folio-manager-worker" (builtins.readFile ../runtime/operations/deploy.sh);
   status = operation "folio-manager-status" (builtins.readFile ../runtime/operations/status.sh);
   observed = operation "folio-manager-observed" (builtins.readFile ../runtime/callbacks/operational-data.sh);

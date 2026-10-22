@@ -11,7 +11,7 @@
         org-startup-indented t
         org-hide-emphasis-markers t
         org-return-follows-link t
-        org-roam-directory (expand-file-name "~/Documents/Notes")
+        org-roam-directory (expand-file-name "~/Documents/documents")
         org-roam-completion-everywhere t)
   (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
   (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))

@@ -39,7 +39,7 @@ lock_mutation() {
 # Shared with the worker; the RPC dispatcher does not resolve IDs itself.
 # shellcheck disable=SC2329
 app_id() {
-  case "$1" in zen) printf '%s\n' app.zen_browser.zen ;; obs) printf '%s\n' com.obsproject.Studio ;; *) return 2 ;; esac
+  case "$1" in zen) printf '%s\n' app.zen_browser.zen ;; obs) printf '%s\n' com.obsproject.Studio ;; *) printf '%s\n' "$1" ;; esac
 }
 inventory() {
   local kind ref remote runtime commit

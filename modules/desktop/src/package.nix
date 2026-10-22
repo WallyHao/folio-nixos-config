@@ -8,7 +8,7 @@
   };
   session = pkgs.writeShellApplication {
     name = "folio-session-confirm";
-    runtimeInputs = [ pkgs.fuzzel pkgs.folio.cli ];
+    runtimeInputs = [ pkgs.fuzzel pkgs.systemd ];
     text = builtins.readFile ../runtime/operations/session.sh;
   };
 }

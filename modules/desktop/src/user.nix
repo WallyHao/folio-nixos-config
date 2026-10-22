@@ -11,6 +11,25 @@ let
   launcher = import ./fuzzel.nix { };
   bar = settings.bar or true;
   borderWidth = settings.border-width or 3;
+  shortcutTheme = pkgs.writeText "folio-shortcuts-theme.json" (builtins.toJSON (
+    renderer.themeColors theme // {
+      muted = palette.grey1;
+      font = context.globals.font-family;
+      size = context.globals.font-size;
+    }
+  ));
+  shortcutPython = pkgs.python3.withPackages (p: [ p.pygobject3 ]);
+  shortcutHelp = pkgs.stdenvNoCC.mkDerivation {
+    name = "folio-shortcuts";
+    dontUnpack = true;
+    nativeBuildInputs = [ pkgs.gobject-introspection pkgs.wrapGAppsHook3 ];
+    buildInputs = [ pkgs.gtk3 ];
+    installPhase = ''
+      install -Dm755 ${pkgs.writeShellScript "folio-shortcuts" ''
+        exec ${shortcutPython}/bin/python3 ${../runtime/operations/shortcuts.py} ${shortcutTheme}
+      ''} $out/bin/folio-shortcuts
+    '';
+  };
 in {
   assertions = [{
     assertion = context.capabilities.desktop-provisioned or false;
@@ -34,17 +53,20 @@ in {
     launcher = if settings.launcher or true then "${pkgs.fuzzel}/bin/fuzzel" else null;
     clipboardPicker = if settings.clipboard or true then "${packages.clipboard}/bin/folio-clipboard-pick" else null;
     sessionCommand = "${packages.session}/bin/folio-session-confirm";
+    panelCommand = "${pkgs.folio.frontend}/bin/folio";
+    shortcutHelp = "${shortcutHelp}/bin/folio-shortcuts";
     modifier = "Super";
     deviceControl = if builtins.elem "devices" context.enabledModules then "${pkgs.folio.cli}/bin/folio" else null;
     layout = {
-      gaps = settings.gaps or 16;
+      # Fold the existing 8px outer inset into the common gap: windows now
+      # have the same spacing between them as at the left and right edges.
+      gaps = (settings.gaps or 16) + 8;
       # Waybar already reserves its exclusive height; retain the normal edge
       # inset rather than subtracting the bar from the compositor work area.
-      top = -4;
-      # Add to the window gaps for a 24px outer inset at the default gap size.
-      bottom = 8;
-      left = 8;
-      right = 8;
+      top = -12;
+      bottom = 0;
+      left = 0;
+      right = 0;
       inherit borderWidth;
       cornerRadius = settings.corner-radius or 12;
     };
@@ -115,7 +137,18 @@ in {
     clipboardType = "regular";
     systemdTargets = [ "graphical-session.target" ];
   };
-  xdg.userDirs = { enable = true; createDirectories = true; };
+  xdg.userDirs = {
+    enable = true;
+    createDirectories = true;
+    # The home directory disables unused XDG locations without allowing
+    # applications to fall back to recreating their conventional folders.
+    desktop = config.home.homeDirectory;
+    music = config.home.homeDirectory;
+    publicShare = config.home.homeDirectory;
+    templates = config.home.homeDirectory;
+    videos = config.home.homeDirectory;
+    projects = "${config.home.homeDirectory}/Workspace";
+  };
   home.activation.folioScreenshots = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     run install -d -m 0700 ${lib.escapeShellArg "${config.xdg.userDirs.pictures}/Screenshots"}
   '';

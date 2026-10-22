@@ -4,40 +4,66 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Folio · Control panel</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/theme.css">
-  <script defer src="/app.js"></script>
+  <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/store.css">
+  <script defer src="/app.js"></script><script defer src="/store.js"></script><script defer src="/settings.js"></script>
 </head>
 <body>
   <aside class="sidebar">
     <a class="brand" href="/"><span class="brand-mark">f</span>folio<span class="brand-note">control panel</span></a>
     <nav aria-label="Panel pages">
-      <button data-page="wifi" class="nav active" aria-current="page"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-label">Wi-Fi</span></button>
-      <button data-page="proxy" class="nav"><span class="nav-icon" aria-hidden="true">⇄</span><span class="nav-label">Proxy</span></button>
-      <button data-page="devices" class="nav"><span class="nav-icon" aria-hidden="true">◐</span><span class="nav-label">Sound &amp; display</span></button>
-      <button data-page="information" class="nav"><span class="nav-icon" aria-hidden="true">▤</span><span class="nav-label">Device</span></button>
+      <button data-page="wifi" class="nav active" aria-current="page"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8a15 15 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".8"/></svg></span><span class="nav-label">Wi-Fi</span></button>
+      <button data-page="proxy" class="nav"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-8 9-8 9s-8-4-8-9V7z"/><path d="M8 12h8m-3-3 3 3-3 3"/></svg></span><span class="nav-label">Proxy</span></button>
+      <button data-page="devices" class="nav"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></span><span class="nav-label">Controls</span></button>
+      <button data-page="information" class="nav"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></svg></span><span class="nav-label">Device</span></button>
+      <button data-page="apps" class="nav"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8zM3 8l9 5 9-5m-9 5v9M7 5.8l9 5"/></svg></span><span class="nav-label">Software</span></button>
+      <button data-page="settings" class="nav"><span class="nav-icon" aria-hidden="true">⚙</span><span class="nav-label">Settings</span></button>
+      <button data-page="health" class="nav"><span class="nav-icon" aria-hidden="true">✓</span><span class="nav-label">Diagnostics</span></button>
     </nav>
-    <div class="sidebar-bottom"><span class="status-dot"></span>On this computer<p>Small controls.<br>A quieter workspace.</p></div>
+    <div class="sidebar-bottom"><span class="status-dot"></span>Local workspace<p>Settings are saved before deployment. Device controls act immediately.</p></div>
   </aside>
   <main>
-    <header><div><div class="eyebrow">YOUR WORKSPACE</div><h1 id="page-title">Wi-Fi</h1><p id="page-description">Find your network. Stay connected.</p></div><button id="refresh" class="subtle">↻ Refresh</button></header>
+    <header><div><div class="eyebrow">CONTROL PANEL</div><h1 id="page-title">Wi-Fi</h1><p id="page-description">Manage wireless networks and connections.</p></div><button id="refresh" class="subtle"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 18 17"/></svg>Refresh</button></header>
     <div id="notice" role="status" aria-live="polite" hidden></div>
     <section id="wifi" class="page">
       <div class="toolbar"><label>Adapter <select id="adapter" aria-label="Wi-Fi adapter"></select></label><span id="wifi-status" class="badge">Loading…</span><button id="radio" class="subtle" disabled>Turn off Wi-Fi</button></div>
       <div class="split">
         <section class="card"><div class="card-heading"><h2>Nearby networks</h2><button id="scan" class="subtle" disabled>Scan</button></div><div id="networks" class="list" aria-label="Nearby networks"></div><button id="hidden-network" class="full subtle" disabled>+ Join a hidden network</button></section>
-        <section class="card detail"><div class="eyebrow">CONNECTION</div><h2 id="network-name">Select a network</h2><p id="network-description" class="muted">Available networks will appear on the left.</p><dl id="network-details"></dl><div class="stack"><button id="connect" class="primary" disabled>Connect</button><button id="disconnect" class="subtle" disabled>Disconnect</button><button id="forget" class="danger subtle" disabled>Forget saved network</button></div><p class="footnote">Passwords are saved by NetworkManager for your user.</p></section>
+        <section class="card detail"><div class="eyebrow">CONNECTION</div><h2 id="network-name">Select a network</h2><p id="network-description" class="muted">Choose a nearby network to view its connection details.</p><dl id="network-details"></dl><div class="stack"><button id="connect" class="primary" disabled>Connect</button><button id="disconnect" class="subtle" disabled>Disconnect</button><button id="forget" class="danger subtle" disabled>Forget network</button></div><p class="footnote">Passwords are saved by NetworkManager for your user.</p></section>
       </div>
     </section>
     <section id="proxy" class="page" hidden>
-      <div class="toolbar"><span id="proxy-status" class="badge">Loading…</span><label>Mode <select id="mode"><option>rule</option><option>global</option><option>direct</option></select></label><button id="set-mode" class="subtle" disabled>Apply mode</button></div>
-      <section class="card"><div class="card-heading"><label>Group <select id="group" aria-label="Proxy group"></select></label><button id="test-all" class="subtle" disabled>Test all</button></div><div id="nodes" class="list"></div><p class="footnote">Latency is measured against the configured test endpoint.</p></section>
+      <div class="toolbar"><label>Proxy mode <select id="mode"><option value="direct">Direct</option><option value="rule">Rule</option><option value="global">Global</option></select></label><span id="proxy-status" class="badge">Loading…</span></div>
+      <section class="card"><div class="card-heading"><h2>Proxy nodes</h2><button id="test-all" class="subtle" disabled>Test all</button></div><p id="proxy-description" class="footnote"></p><div id="nodes" class="list"></div><p class="footnote">Latency tests do not change your selected node.</p></section>
     </section>
     <section id="devices" class="page" hidden>
-      <div class="two-columns"><section class="card"><div class="eyebrow">AUDIO</div><h2>Make yourself comfortable</h2><p class="muted">Choose where your sound goes.</p><label class="field">Output<select id="output" aria-label="Audio output"></select></label><button id="set-output" class="subtle" disabled>Use this output</button><div class="range-label"><label for="volume">Volume</label><output id="volume-value">Unavailable</output></div><input id="volume" type="range" min="0" max="100" disabled><button id="mute" class="subtle" disabled>Mute</button></section>
-      <section class="card"><div class="eyebrow">DISPLAY</div><h2>A little more light</h2><p class="muted">Adjust supported built-in backlights.</p><label class="field">Backlight<select id="backlight" aria-label="Backlight device"></select></label><div class="range-label"><label for="brightness">Brightness</label><output id="brightness-value">Unavailable</output></div><input id="brightness" type="range" min="0" max="100" disabled><p id="backlight-note" class="footnote">No supported backlight.</p></section></div>
+      <div class="two-columns"><section class="card"><div class="card-titlebar"><span class="section-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></span><div><div class="eyebrow">AUDIO</div><h2>Sound output</h2></div></div><p class="muted">Select an output and adjust its volume.</p><label class="field">Output<select id="output" aria-label="Audio output"></select></label><button id="set-output" class="subtle" disabled>Use this output</button><div class="range-label"><label for="volume">Volume</label><output id="volume-value">Unavailable</output></div><input id="volume" type="range" min="0" max="100" disabled><button id="mute" class="subtle" disabled>Mute</button></section>
+      <section class="card"><div class="card-titlebar"><span class="section-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span><div><div class="eyebrow">DISPLAY</div><h2>Display brightness</h2></div></div><p class="muted">Adjust supported built-in backlights.</p><label class="field">Backlight<select id="backlight" aria-label="Backlight device"></select></label><div class="range-label"><label for="brightness">Brightness</label><output id="brightness-value">Unavailable</output></div><input id="brightness" type="range" min="0" max="100" disabled><p id="backlight-note" class="footnote">No supported backlight.</p></section></div>
       <p class="page-note">These controls take effect immediately.</p>
     </section>
     <section id="information" class="page" hidden><div id="information-content" class="two-columns"></div></section>
+    <section id="apps" class="page" hidden>
+<section id="setup" class="card" hidden><h2>Get started with Flathub</h2><p>Add the Flathub repository to search for and install applications.</p><button id="add-source" class="primary">Enable Flathub</button></section>
+<nav class="store-tabs" aria-label="Application views"><button id="discover-tab" class="primary" aria-pressed="true">Discover</button><button id="installed-tab" class="subtle" aria-pressed="false">Installed</button></nav>
+<section id="discover">
+<form id="search-form" class="search"><label for="query" class="muted">Search applications</label><div><input id="query" type="search" placeholder="Name or application ID, e.g. Steam" maxlength="200" required><button id="search-button" type="submit" class="primary">Search</button></div></form>
+<div class="results-heading"><h2 id="results-title">Find an application</h2><button id="update-catalog" class="subtle">Update catalogue</button></div>
+<div id="results" class="app-grid" aria-live="polite"></div>
+</section>
+<section id="installed" hidden><h2 id="installed-title">Installed applications</h2><p class="footnote">Uninstalling keeps app data for later use. System applications are listed for reference.</p><div id="installed-apps" class="app-grid"></div></section>
+<section id="transaction" class="card" hidden aria-live="polite"><div class="results-heading"><h2 id="task-title">Task progress</h2><span id="task-phase" class="badge"></span></div><progress id="task-progress" aria-label="Processing" hidden></progress><p id="task-error" class="danger" hidden></p><details open><summary>Task state</summary><pre id="task-log"></pre></details><button id="resume-app" class="subtle" hidden>Resume task</button><p class="footnote">Tasks continue after closing the panel. Interrupted tasks require explicit recovery; personal app data is retained.</p></section>
+
+    </section>
+    <section id="settings" class="page" hidden>
+      <form id="settings-form" class="card">
+        <h2>Appearance preferences</h2><p class="footnote">Choose a personal override or inherit the system default. Saved changes require deployment.</p>
+        <label class="field">Appearance<select id="setting-appearance"><option value="dark">Dark</option><option value="light">Light</option></select></label><label class="checkbox"><input id="inherit-appearance" type="checkbox">Use system default</label><p id="origin-appearance" class="footnote"></p>
+        <label class="field">Colour scheme<select id="setting-scheme"><option value="everforest">Everforest</option></select></label><label class="checkbox"><input id="inherit-scheme" type="checkbox">Use system default</label><p id="origin-scheme" class="footnote"></p>
+        <label class="field">Font family<input id="setting-font-family" maxlength="128" required></label><label class="checkbox"><input id="inherit-font-family" type="checkbox">Use system default</label><p id="origin-font-family" class="footnote"></p>
+        <label class="field">Font size<input id="setting-font-size" type="number" min="6" max="72" step="1" required></label><label class="checkbox"><input id="inherit-font-size" type="checkbox">Use system default</label><p id="origin-font-size" class="footnote"></p>
+        <div class="dialog-actions"><button id="reload-settings" type="button" class="subtle">Reload settings</button><button id="save-settings" type="submit" class="primary" disabled>Save settings</button></div>
+      </form>
+    </section>
+    <section id="health" class="page" hidden><p>Deployment health: <span id="health-state" class="badge">Loading…</span></p><div id="health-findings" class="stack"></div><p class="footnote">Diagnostics only inspect state. Review the suggested command before running it.</p></section>
     <footer><span>FOLIO</span><span id="updated">Waiting for current state</span></footer>
   </main>
   <dialog id="connect-dialog"><form id="connect-form"><div class="eyebrow">WI-FI</div><h2 id="dialog-title">Join network</h2><p id="dialog-description" class="muted"></p><div id="hidden-fields" hidden><label class="field">Network name<input id="ssid" maxlength="32" autocomplete="off"></label><label class="field">Security<select id="security"><option>WPA Personal</option><option>WPA3</option><option>Open</option></select></label></div><label class="field">Password<input id="password" type="password" autocomplete="off" maxlength="2048"></label><label class="checkbox"><input id="show-password" type="checkbox">Show password</label><p class="footnote">Leave the password empty to reuse a saved connection.</p><div class="dialog-actions"><button type="button" id="cancel-connect" class="subtle">Cancel</button><button type="submit" class="primary">Connect</button></div></form></dialog>

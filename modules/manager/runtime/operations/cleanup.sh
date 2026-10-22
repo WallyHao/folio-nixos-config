@@ -25,6 +25,9 @@ references+=("$state"/offline-coordinator-*.json)
 # Retain all explicit backup/recovery references. Cleanup never deletes backup
 # repositories, adoption backups, conflict evidence or application data.
 references+=("$state/backups/repositories/"*/transaction.json "$state/backups/repositories/"*/deployment.json)
+for retained in "$state/deployments/plans/"*.json; do
+  if jq -e '.retained == true' "$retained" >/dev/null; then references+=("$retained"); fi
+done
 for task in "$state/deployments/tasks/"*.json; do
   if ! jq -e '(.recoveryRequired != true) and (.phase=="succeeded" or .phase=="failed" or .phase=="interrupted")' "$task" >/dev/null; then
     references+=("$task")
@@ -44,6 +47,9 @@ jq '[.. | strings] | unique' "$work/references.json" >"$work/protected.json"
 for plan in "$state/deployments/plans/"*.json; do
   id=$(basename "$plan" .json)
   [[ "$id" =~ ^[a-f0-9]{64}$ && ! -L "$plan" ]] || exit 4
+  # Reviewed plans are referenced by cross-scope history. Keep their snapshots
+  # and successful revisions available for explicit rollback.
+  if jq -e '.retained == true' "$plan" >/dev/null; then continue; fi
   paths=("$plan")
   [[ ! -f "$state/deployments/builds/$id.json" ]] || paths+=("$state/deployments/builds/$id.json")
   [[ ! -f "$state/deployments/revisions/$id.json" ]] || paths+=("$state/deployments/revisions/$id.json")

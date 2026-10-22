@@ -10,6 +10,8 @@ profile_ready() {
 }
 deploy_files() {
   local name=$1 generation=$2 entry profile relative source expected policy key owned before after temporary file prior_backup
+  configuration_state=applied
+  [[ "$name" == zen || "$name" == obs ]] || return 0
   configuration_state=configuration-pending
   [[ -n "$generation" ]] || return 0
   entry=$(jq -ce --arg name "$name" '.applications[] | select(.name==$name)' "$generation/folio-applications.json") || return 0

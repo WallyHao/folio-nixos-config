@@ -71,7 +71,7 @@ in pkgs.testers.runNixOSTest {
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("folio-manager.service", user="folio")
     ${pkgs.lib.optionalString (!drm) ''machine.wait_for_file("/tmp/.X11-unix/X1")''}
-    plan = folio("plan --source ${oldSeed}")["data"]["planId"]
+    plan = folio("--user plan --source ${oldSeed}")["data"]["planId"]
     assert folio("build " + plan)["status"]=="success"
     assert folio("apply " + plan)["status"]=="success"
 
@@ -85,7 +85,7 @@ in pkgs.testers.runNixOSTest {
     ''}
 
     save(json.loads(user("jq .configuration ${userSeed}/folio-input.json")))
-    plan = folio("plan --source ${userSeed}")["data"]["planId"]
+    plan = folio("--user plan --source ${userSeed}")["data"]["planId"]
     assert folio("build " + plan)["status"]=="success"
     assert folio("apply " + plan)["status"]=="success"
     machine.wait_for_unit("folio-devices.service", user="folio")

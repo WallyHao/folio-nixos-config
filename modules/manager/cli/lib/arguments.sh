@@ -1,4 +1,5 @@
 scope=user
+scope_explicit=false
 json=false
 environment=portable
 no_wait=false
@@ -18,7 +19,8 @@ while (( $# )); do
   case "$1" in
     --json) json=true; shift ;;
     --no-wait) no_wait=true; shift ;;
-    --system) scope=system; shift ;;
+    --system) scope=system; scope_explicit=true; shift ;;
+    --user) scope=user; scope_explicit=true; shift ;;
     --environment)
       if (( $# < 2 )); then emit_error invalid 'Missing environment name' 2; fi
       environment=$2; shift 2 ;;

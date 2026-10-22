@@ -3,12 +3,12 @@ const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1) || sessionStorage.getItem("folio-panel-token") || "";
 if (location.hash) { sessionStorage.setItem("folio-panel-token", token); history.replaceState(null, "", "/"); }
 const state = {page: "wifi", wifi: null, devices: null, proxy: null, network: "", delays: new Map(), busy: false, testing: false, stopTesting: false};
-const descriptions = {wifi: ["Wi-Fi", "Find your network. Stay connected."], proxy: ["Proxy", "A clear view of your connections."], devices: ["Sound & display", "Set the room for the way you work."], information: ["Device", "Get to know your workspace."]};
+const descriptions = {wifi: ["Wi-Fi", "Manage wireless networks and connections."], proxy: ["Proxy", "Choose a routing mode and manage proxy nodes."], devices: ["Sound & display", "Manage sound outputs and display brightness."], information: ["Device", "Hardware, operating system and connection details."], apps: ["Software", "Find, install and manage Flatpak applications."], settings: ["Settings", "Save personal preferences and review their inherited defaults."], health: ["Diagnostics", "Inspect deployment state and find the next recovery step."]};
 function element(tag, cls, text) { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = String(text); return node; }
 function message(text, error = false) { $("notice").hidden = !text; $("notice").textContent = text; $("notice").className = error ? "error" : ""; }
 async function api(path, body) {
   const response = await fetch("/api/" + path, {method: body ? "POST" : "GET", headers: {Authorization: "Bearer " + token, ...(body ? {"Content-Type": "application/json"} : {})}, body: body ? JSON.stringify(body) : undefined, cache: "no-store"});
-  const reply = await response.json(); if (!response.ok) throw new Error(reply.error || "Service unavailable"); return reply.data;
+  const reply = await response.json(); if (!response.ok) throw new Error([reply.error || "Service unavailable", reply.hint].filter(Boolean).join(" ")); return reply.data;
 }
 function options(id, entries, preferred) {
   const select = $(id), previous = preferred ?? select.value;
@@ -50,27 +50,59 @@ function renderWifi() {
   if (!networks.length) empty("networks", !data ? "Wi-Fi service unavailable." : !data.enabled ? "Turn on Wi-Fi to discover networks." : "No nearby networks. Try scanning again.");
   wifiDetail();
 }
-function group() { return state.proxy?.groups?.find((item) => item.name === $("group").value); }
+function proxyNodes() {
+  const groups = state.proxy?.groups || [], byName = new Map(groups.map(g => [g.name, g]));
+  const primary = byName.get("PROXY") || groups.find(g => g.name !== "GLOBAL") || groups[0];
+  if (!primary) return [];
+  const global = byName.get("GLOBAL"), prefix = state.proxy.proxy.mode === "global" && global && global !== primary && global.nodes.includes(primary.name) ? [{group: global, node: primary.name}] : [];
+  const nodes = new Map();
+  function visit(g, path, seen) {
+    if (seen.has(g.name)) return;
+    const visited = new Set([...seen, g.name]);
+    for (const name of g.nodes || []) {
+      const steps = [...path, {group: g, node: name}];
+      if (byName.has(name)) visit(byName.get(name), steps, visited);
+      else if (!nodes.has(name)) nodes.set(name, {name, steps, selected: steps.every(step => step.group.selected === step.node)});
+    }
+  }
+  visit(primary, prefix, new Set());
+  if (prefix.length && global.nodes.includes("DIRECT") && nodes.has("DIRECT")) {
+    nodes.set("DIRECT", {name: "DIRECT", steps: [{group: global, node: "DIRECT"}], selected: global.selected === "DIRECT"});
+  }
+  return [...nodes.values()];
+}
 function renderProxy() {
-  const data = state.proxy;
-  $("proxy-status").textContent = data ? "Mihomo · " + data.proxy.mode : "Proxy unavailable";
-  options("group", (data?.groups || []).map((g) => [g.name, g.name]));
-  if (data && document.activeElement !== $("mode")) $("mode").value = data.proxy.mode;
-  $("mode").disabled = !data || state.busy; $("set-mode").disabled = !data || state.busy; $("test-all").disabled = !group()?.nodes?.length || state.busy;
+  const data = state.proxy, nodes = proxyNodes();
+  $("proxy-status").textContent = !data ? "Proxy unavailable" : {direct: "Current: Direct", rule: "Current: Rule", global: "Current: Global"}[data.proxy.mode] || data.proxy.mode;
+  if (data) $("mode").value = data.proxy.mode;
+  $("mode").disabled = !data || state.busy || state.testing;
+  $("test-all").disabled = !nodes.length || state.busy || state.stopTesting;
   $("test-all").textContent = state.stopTesting ? "Stopping…" : state.testing ? "Stop tests" : "Test all";
-  if (state.stopTesting) $("test-all").disabled = true;
+  $("proxy-description").textContent = data?.proxy.mode === "direct" ? "All traffic connects directly. Your node selection will be used in Rule or Global mode." : "Choose Use to switch nodes. The current node is marked Selected.";
   $("nodes").replaceChildren();
-  const g = group();
-  for (const name of g?.nodes || []) {
-    const row = element("div", "node-row" + (g.selected === name ? " selected" : ""));
-    const main = element("div", "row-main"); main.append(element("div", "row-title", name), element("div", "row-subtitle", g.selected === name ? "Current connection" : "Available"));
+  for (const n of nodes) {
+    const row = element("div", "node-row" + (n.selected ? " selected" : ""));
+    const main = element("div", "row-main"); main.append(element("div", "row-title", n.name), element("div", "row-subtitle", n.selected ? "Selected" : "Available node"));
     const actions = element("div", "node-actions");
-    const delay = element("span", "row-end", state.delays.get(name) || "Not tested");
-    const test = element("button", "subtle", "Test"); test.disabled = state.busy || state.testing; test.onclick = () => testNodes([name]);
-    const choose = element("button", g.selected === name ? "subtle" : "primary", g.selected === name ? "Selected" : "Use"); choose.disabled = state.busy || g.selected === name; choose.onclick = () => operate("proxy", "proxy-group-select", {group: g.name, node: name});
+    const delay = element("span", "row-end", state.delays.get(n.name) || "Not tested");
+    const test = element("button", "subtle", "Test"); test.disabled = state.busy || state.testing; test.onclick = () => testNodes([n.name]);
+    const choose = element("button", n.selected ? "subtle" : "primary", n.selected ? "Selected" : "Use"); choose.disabled = state.busy || state.testing || n.selected;
+    choose.onclick = () => selectProxy(n.steps);
     actions.append(delay, test, choose); row.append(main, actions); $("nodes").append(row);
   }
-  if (!g?.nodes?.length) empty("nodes", data ? "No selectable proxy groups." : "Proxy service unavailable. Check that Mihomo and the network panel backend are installed.");
+  if (!nodes.length) empty("nodes", data ? "No nodes available. Check that your subscription has loaded." : "Proxy service unavailable. Check Mihomo and the network backend.");
+}
+async function selectProxy(steps) {
+  if (state.busy || state.testing) return;
+  state.busy = true; generation++; renderProxy(); message("Switching node…");
+  let success = false;
+  try {
+    // Set the leaf first, then route parent groups to it (GLOBAL → PROXY).
+    for (const step of [...steps].reverse()) await api("action", {domain: "proxy", action: "proxy-group-select", fields: {group: step.group.name, node: step.node}});
+    success = true;
+  } catch (error) { message(error.message, true); }
+  finally { state.busy = false; await refresh(true); renderProxy(); }
+  if (success) message("Node selected.");
 }
 function renderDevices() {
   const data = state.devices, audio = data?.audio;
@@ -95,9 +127,9 @@ function renderInformation(data) {
   if (!data) { empty("information-content", "Device information unavailable."); return; }
   const gib = (n) => n ? (n / 1048576).toFixed(1) + " GiB" : "Unavailable";
   const groups = [
-    ["COMPUTER", "Your device", [["Model", data.model], ["Board", data.board], ["CPU", data.cpu], ["Memory", `${gib(data.memoryKiB)} total · ${gib(data.availableMemoryKiB)} available`]]],
-    ["SYSTEM", "Under the surface", [["OS", data.os], ["Kernel", data.kernel], ["Target", data.target], ["Uptime", Math.round((data.uptimeSeconds || 0) / 60) + " minutes"]]],
-    ["GRAPHICS", "Connected displays", [...(data.gpus || []).map((g) => ["GPU", `${g.name} · ${g.driver}`]), ...(data.displays || []).map((d) => [d.name, (d.modes || []).slice(0, 3).join(", ")])]],
+    ["COMPUTER", "Hardware overview", [["Model", data.model], ["Board", data.board], ["CPU", data.cpu], ["Memory", `${gib(data.memoryKiB)} total · ${gib(data.availableMemoryKiB)} available`]]],
+    ["SYSTEM", "Operating system", [["OS", data.os], ["Kernel", data.kernel], ["Target", data.target], ["Uptime", Math.round((data.uptimeSeconds || 0) / 60) + " minutes"]]],
+    ["GRAPHICS", "Graphics & displays", [...(data.gpus || []).map((g) => ["GPU", `${g.name} · ${g.driver}`]), ...(data.displays || []).map((d) => [d.name, (d.modes || []).slice(0, 3).join(", ")])]],
     ["CONNECTIONS", "Network & power", [["Interfaces", (data.interfaces || []).join(", ") || "Unavailable"], ...(data.batteries || []).map((b) => [b.name, `${b.capacity}% · ${b.status}`])]]
   ];
   for (const [eyebrow, title, rows] of groups) { const card = element("section", "card information-card"), dl = element("dl"); details(dl, rows.length ? rows : [["Status", "Unavailable"]]); card.append(element("div", "eyebrow", eyebrow), element("h2", "", title), dl); $("information-content").append(card); }
@@ -108,6 +140,8 @@ async function refresh(quiet = false) {
   refreshing = true; const page = state.page, current = generation;
   $("refresh").disabled = true;
   try {
+    if (page === "apps") { await window.folioStore.refresh(); return; }
+    if (page === "settings" || page === "health") { await window.folioSettings.refresh(); return; }
     const data = await api(page);
     if (generation !== current) return;
     state[page] = data;
@@ -153,12 +187,12 @@ $("connect-form").onsubmit = (event) => {
 $("show-password").onchange = () => { $("password").type = $("show-password").checked ? "text" : "password"; };
 $("cancel-connect").onclick = () => $("connect-dialog").close();
 $("connect").onclick = () => openConnect(false); $("hidden-network").onclick = () => openConnect(true);
-$("adapter").onchange = renderWifi; $("group").onchange = renderProxy; $("backlight").onchange = renderBacklight;
+$("adapter").onchange = renderWifi; $("backlight").onchange = renderBacklight;
 $("scan").onclick = () => operate("wifi", "scan", {interface: $("adapter").value});
 $("radio").onclick = () => { const enabled = !state.wifi.enabled; confirmAction(enabled ? "Turn on Wi-Fi?" : "Turn off Wi-Fi?", enabled ? "Enable wireless connections." : "Your active wireless connection will be interrupted.", () => operate("wifi", "radio", {enabled})); };
 $("disconnect").onclick = () => { const fields = {interface: $("adapter").value}; confirmAction("Disconnect Wi-Fi?", "Your active wireless connection will be interrupted.", () => operate("wifi", "disconnect", fields)); };
 $("forget").onclick = () => { const n = network(), fields = {interface: $("adapter").value, uuid: n.profiles[0]}; confirmAction("Forget " + n.ssid + "?", "The saved connection will be removed. An active connection may be affected.", () => operate("wifi", "forget", fields)); };
-$("set-mode").onclick = () => operate("proxy", "proxy-mode", {mode: $("mode").value});
+$("mode").onchange = () => operate("proxy", "proxy-mode", {mode: $("mode").value});
 $("mute").onclick = () => operate("devices", "mute"); $("set-output").onclick = () => operate("devices", "output", {name: $("output").value});
 for (const [id, action] of [["volume", "volume"], ["brightness", "brightness"]]) {
   $(id).oninput = () => { $(id + "-value").textContent = $(id).value + "%"; };
@@ -166,18 +200,18 @@ for (const [id, action] of [["volume", "volume"], ["brightness", "brightness"]])
 }
 async function testNodes(nodes) {
   if (state.testing) { state.stopTesting = true; renderProxy(); return; }
-  state.testing = true; state.stopTesting = false; const deadline = Date.now() + 120000;
+  state.testing = true; state.stopTesting = false;
   try {
     for (const node of nodes) {
-      if (state.stopTesting || Date.now() > deadline) break;
+      if (state.stopTesting) break;
       state.delays.set(node, "Testing…"); renderProxy();
       try { const data = await api("action", {domain: "proxy", action: "proxy-delay", fields: {node}}); state.delays.set(node, data.delay + " ms"); }
-      catch { state.delays.set(node, "Unavailable"); }
+      catch { state.delays.set(node, "Timed out or unavailable"); }
       renderProxy();
     }
   } finally { state.testing = false; state.stopTesting = false; renderProxy(); }
 }
-$("test-all").onclick = () => testNodes(group()?.nodes || []);
+$("test-all").onclick = () => testNodes(proxyNodes().map(n => n.name));
 $("refresh").onclick = () => refresh();
 for (const button of document.querySelectorAll("[data-page]")) button.onclick = () => {
   state.page = button.dataset.page; generation++;

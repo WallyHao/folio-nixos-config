@@ -10,6 +10,10 @@ let
   };
 in
 {
+  checks = {
+    account-migration = import ./tests/account-migration.nix { inherit pkgs; migration = power.migration; };
+    legacy-retirement-files = import ./tests/legacy-retirement-files.nix { inherit pkgs; };
+  };
   targetSettings.folio = {
     "folio-system:system" = {
       time-zone = "Asia/Shanghai";

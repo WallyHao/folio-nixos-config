@@ -26,10 +26,24 @@ in pkgs.runCommand "folio-native-applications" {
   test -x ${generation}/home-path/bin/zen-beta
   test -x ${generation}/home-path/bin/obs
   test -x ${generation}/home-path/bin/pi
+  test -x ${generation}/home-path/bin/zathura
+  test -x ${generation}/home-path/bin/yazi
+  test -x ${generation}/home-path/bin/imv
+  # imv 5.0.1 prints its version successfully but exits with status 1.
+  ${generation}/home-path/bin/imv -v >imv-version || test "$?" -eq 1
+  grep -Fx 'Version: ${pkgs.imv.version}' imv-version
+  ${generation}/home-path/bin/zathura --version >zathura-version
+  ${generation}/home-path/bin/yazi --version >yazi-version
+  grep -Fx 'application/pdf=org.pwmt.zathura.desktop' ${generation}/home-files/.config/mimeapps.list
+  grep -F 'selection-clipboard' ${generation}/home-files/.config/zathura/zathurarc
+  grep -Fx 'image/png=imv.desktop' ${generation}/home-files/.config/mimeapps.list
+  grep -Fx 'image/jpeg=imv.desktop' ${generation}/home-files/.config/mimeapps.list
+  grep -F 'background=272e33' ${generation}/home-files/.config/imv/config
+  test -f ${generation}/home-path/share/applications/imv.desktop
   ${generation}/home-path/bin/zen-beta --version >zen-version
   ${generation}/home-path/bin/obs --version >obs-version
   ${generation}/home-path/bin/pi --version >pi-version
-  jq -e '.nativeApplications | length==2 and all(.[]; .executable|startswith("/nix/store/"))' ${generation}/folio-applications.json
+  jq -e '.nativeApplications | length==4 and all(.[]; .executable|startswith("/nix/store/"))' ${generation}/folio-applications.json
   browser=$(jq -er '.nativeApplications[] | select(.name=="zen") | .executable' ${generation}/folio-applications.json)
   grep -F '/home/folio/.config/zen/fixture' "$browser"
   grep -F "$browser" ${generation}/home-path/share/applications/zen-beta.desktop
@@ -44,5 +58,5 @@ in pkgs.runCommand "folio-native-applications" {
   test ! -e "$profileFiles/places.sqlite"
   test ! -e "$HOME/.config/zen/fixture"
   mkdir $out
-  cp zen-version obs-version pi-version $out/
+  cp zen-version obs-version pi-version zathura-version yazi-version imv-version $out/
 ''

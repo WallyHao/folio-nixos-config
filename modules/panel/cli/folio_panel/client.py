@@ -9,9 +9,10 @@ from . import paths
 
 
 class BackendError(Exception):
-    def __init__(self, message, status="unavailable"):
+    def __init__(self, message, status="unavailable", code="backend-unavailable"):
         super().__init__(message)
         self.status = status
+        self.code = code
 
 
 async def process(arguments, request=None, timeout=65):
@@ -31,7 +32,9 @@ async def process(arguments, request=None, timeout=65):
         if len(output) > 2 * 1024 * 1024:
             raise BackendError("Backend response is too large")
         return json.loads(output)
-    except (TimeoutError, ValueError):
+    except TimeoutError:
+        raise BackendError("Backend timed out", code="backend-timeout") from None
+    except ValueError:
         raise BackendError(
             "Backend timed out or returned an invalid response"
         ) from None
@@ -44,11 +47,50 @@ async def process(arguments, request=None, timeout=65):
 def result(reply):
     if not isinstance(reply, dict) or reply.get("status") != "success":
         message = reply.get("error") if isinstance(reply, dict) else None
-        raise BackendError(message or "Backend rejected the operation")
+        status = reply.get("status", "unavailable") if isinstance(reply, dict) else "unavailable"
+        code = {"conflict": "configuration-conflict", "invalid": "invalid-configuration"}.get(status, "backend-unavailable")
+        raise BackendError(message or "Backend rejected the operation", status, code)
     return reply["data"]
 
 
 class Client:
+    async def doctor(self):
+        return result(await process([paths.LEGACY, "--json", "doctor"], timeout=75))
+
+    async def settings(self):
+        data = result(await process([paths.LEGACY, "--json", "config", "show"]))
+        preferences = data["configuration"]["folio-environment:environment"].get("preferences", {})
+        defaults = {"appearance": "dark", "scheme": "everforest", "font-family": "Maple Mono NF CN", "font-size": 16}
+        origin = "bootstrap default"
+        descriptor = Path("/run/folio/public/system-descriptor.json")
+        try:
+            record = json.loads(descriptor.read_text())
+            defaults.update({k: v for k, v in record["preferences"].items() if k in defaults})
+            origin = "system default"
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        return {"digest": data["digest"], "preferences": preferences, "defaults": defaults,
+                "effective": {**defaults, **preferences},
+                "origins": {key: "user override" if key in preferences else origin for key in defaults}}
+
+    async def save_settings(self, digest, preferences):
+        # The full desired document stays private; the API exposes public preferences only.
+        data = result(await process([paths.LEGACY, "--json", "config", "show"]))
+        if data["digest"] != digest:
+            raise BackendError("Configuration changed. Reload settings before saving.", "conflict", "configuration-conflict")
+        document = data["configuration"]
+        target = document["folio-environment:environment"].setdefault("preferences", {})
+        for key, value in preferences.items():
+            if value is None:
+                target.pop(key, None)
+            else:
+                target[key] = value
+        with tempfile.TemporaryDirectory(prefix="folio-settings-") as directory:
+            path = Path(directory) / "draft.json"
+            path.write_text(json.dumps(document, ensure_ascii=False))
+            path.chmod(0o600)
+            return result(await process([paths.LEGACY, "--json", "config", "import", str(path), "--expected-digest", digest]))
+
     async def wifi(self, action="status", **fields):
         return result(await process([paths.WIFI], {"action": action, **fields}))
 
@@ -64,7 +106,8 @@ class Client:
         # Proxy requests contain names/modes only. Wi-Fi secrets never use this path.
         with tempfile.TemporaryDirectory(prefix="folio-panel-") as directory:
             request = Path(directory, "request.json")
-            request.write_text(json.dumps({root: {"action": action, **fields}}))
+            # libyang rejects escaped UTF-16 surrogate pairs in emoji node names.
+            request.write_text(json.dumps({root: {"action": action, **fields}}, ensure_ascii=False), encoding="utf-8")
             request.chmod(0o600)
             reply = await process(
                 [

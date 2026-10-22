@@ -1,2 +1,11 @@
 Usage: folio config show|edit|import FILE|export FILE
 Read or durably commit desired configuration.
+
+  config get /preferences/font-size
+  config set /preferences/font-size 18
+  config set /preferences/appearance '"light"'
+  config unset /preferences/font-size
+  config import FILE --expected-digest DIGEST
+
+Named module paths use /modules/NAME/SETTING. Values are JSON.
+Saved changes take effect after plan/build/apply. Identity fields are read-only.
