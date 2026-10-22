@@ -1,9 +1,11 @@
 # Folio Reference
 
-Detailed configuration, deployment and recovery documentation. For the desktop
-preview and project overview, return to the [main README](../README.md).
+Detailed architecture, configuration, deployment and recovery notes.
 
-**Model-driven NixOS configuration, with reviewed deployments and recoverable operations.**
+[Project overview](../README.md) · [Architecture](#architecture-and-configuration) · [Modules](#module-catalogue) · [Recovery](#recovery-and-model-upgrades) · [Verification](#development-and-verification)
+
+> This reference contains operational details for an existing Folio installation.
+> The [main README](../README.md) explains the design, its evolution and current limitations.
 
 Folio combines NixOS and standalone Home Manager with YANG models and sysrepo.
 One CLI manages machine policy, personal preferences and application operations;

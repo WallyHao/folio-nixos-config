@@ -1,14 +1,18 @@
 <div align="center">
 
-# Folio · NixOS Configuration
+# Folio
 
-A readable Niri desktop, shared themes, and configuration managed through YANG and sysrepo.
+**A personal NixOS desktop, built around shared appearance and modeled configuration.**
 
-[The journey](#the-journey-to-folio) · [Desktop](#desktop) · [Architecture](#architecture) · [Themes](#themes) · [Limitations](#current-limitations)
+<sub>NixOS · Home Manager · Niri · YANG / sysrepo · MIT</sub>
+
+[The journey](#the-journey-to-folio) · [Design](#what-defines-folio) · [Desktop](#desktop) · [Themes](#themes)
+
+[Architecture](#architecture) · [Usability](#usability-and-management) · [Hardware](#hardware-and-portability) · [Limitations](#current-limitations)
 
 </div>
 
-![Folio desktop in Everforest Dark, with Btop, Yazi and a Foot terminal](assets/screenshots/everforest-dark-desktop.png)
+[![Folio desktop in Everforest Dark, with Btop, Yazi and a Foot terminal](assets/screenshots/everforest-dark-desktop.png)](assets/screenshots/everforest-dark-desktop.png)
 
 <p align="center"><sub>Everforest Dark · Niri · Foot · Yazi · Btop · Maple Mono NF CN</sub></p>
 
@@ -19,23 +23,27 @@ looking for ideas to adapt to their own configurations.
 
 ## The journey to Folio
 
+**The first configuration — everything in one file.**
 My first NixOS configuration put everything into a single Nix file. That was easy
 to start with: every setting was in one place, and adding something meant finding
 a spot for it. As the configuration grew, the file became increasingly bloated.
 It became harder to see where one piece of configuration ended and another began.
 
+**Koru — one file per application.**
 I built [Koru](https://github.com/WallyHao/koru-nixos-dotfiles) to address that.
 It was my first attempt at modularization, with a separate configuration file for
 each application. That made the repository easier to navigate, but the same
 problem returned inside the more complicated applications. One file per program
 was still a large file once that program needed enough configuration.
 
+**Sylphy — each application became a project.**
 In Sylphy, a configuration I have since deleted, I introduced stronger constraints
 and gave each application a small project directory of its own. Configuration,
 helpers and supporting files could be organized together. There were real
 benefits, but adding a module became much more expensive. The structure required
 so much work that I soon abandoned it.
 
+**Folio — shared rules, less repeated infrastructure.**
 Folio comes from reconsidering that trade-off. I still want clear boundaries,
 validation and predictable behavior, but I also want to be able to add and change
 modules without rebuilding the same management machinery each time. Here, YANG
@@ -59,13 +67,13 @@ backends, so improving usability can build on the existing configuration model.
 
 | Choice | What it provides |
 | --- | --- |
-| Shared appearance | One global theme selection drives system, desktop, terminal and managed application colors. |
-| Modeled configuration | YANG describes settings and constraints; sysrepo validates and persists desired state. |
-| Capability-owned modules | Each capability keeps its schema, packages, commands, runtime and tests together. |
-| Coordinated deployment | Reviewed source and configuration are captured together, then applied through NixOS and Home Manager. |
-| Recorded recovery | Persistent workers, journals and retained revisions support inspection, resume and rollback. |
-| Common controls | The CLI and local panel expose module backends through consistent interfaces. |
-| A movable installation | One USB installation serves the supported laptop and desktop, with a separate disposable VM target for testing. |
+| **Shared appearance** | One global theme selection drives system, desktop, terminal and managed application colors. |
+| **Modeled configuration** | YANG describes settings and constraints; sysrepo validates and persists desired state. |
+| **Capability-owned modules** | Each capability keeps its schema, packages, commands, runtime and tests together. |
+| **Coordinated deployment** | Reviewed source and configuration are captured together, then applied through NixOS and Home Manager. |
+| **Recorded recovery** | Persistent workers, journals and retained revisions support inspection, resume and rollback. |
+| **Common controls** | The CLI and local panel expose module backends through consistent interfaces. |
+| **A movable installation** | One USB installation serves the supported laptop and desktop, with a separate disposable VM target for testing. |
 
 ## Desktop
 
@@ -77,6 +85,9 @@ Visual details follow the shared palette: the focused window ring, cursor
 outline and Yazi icons use the same accent, while file icons retain their
 individual shapes. Waybar, notifications, the launcher and local panel also
 receive the selected colors.
+
+<details>
+<summary><strong>Desktop components</strong></summary>
 
 | Area | Components |
 | --- | --- |
@@ -93,6 +104,8 @@ receive the selected colors.
 | Fonts and cursor | Maple Mono NF CN and a recolored GoogleDot cursor |
 | Desktop controls | Folio's local browser panel |
 | Optional tools | OBS Studio, Flatpak applications and Isaac Sim / Isaac Lab helpers |
+
+</details>
 
 Module and application selections determine which components are installed.
 Personal profiles, credentials, notes and sessions remain owned by their
@@ -125,6 +138,15 @@ explicit; keeping a module's source in the repository does not enable it.
 
 ### From configuration to a running system
 
+```mermaid
+flowchart LR
+    A[Settings] --> B[YANG validation]
+    B --> C[sysrepo]
+    C --> D[Immutable snapshot]
+    D --> E[Nix build]
+    E --> F[NixOS + Home Manager]
+```
+
 YANG defines the shape of settings, including types, defaults and constraints.
 Sysrepo stores the validated desired configuration. The manager captures that
 configuration with its source and model identities into immutable inputs for Nix.
@@ -150,8 +172,8 @@ applications, with coordinated switching from a single global selection.
 
 | Scheme | Character | Modes |
 | --- | --- | --- |
-| Everforest | Green surfaces, warm text and yellow emphasis; adapted for stronger contrast | Dark and light |
-| Folio Graphite | Neutral surfaces with blue emphasis | Dark and light |
+| **Everforest** | Green surfaces, warm text and yellow emphasis; adapted for stronger contrast | Dark and light |
+| **Folio Graphite** | Neutral surfaces with blue emphasis | Dark and light |
 
 The [palette catalogue](modules/appearance/lib) defines shared colors and
 semantic roles such as background, foreground and accent. Components consume
@@ -164,10 +186,14 @@ applications still need reopening to load their new styles.
 
 ## Usability and management
 
+### One management interface
+
 The CLI brings module settings, deployment review, diagnostics and recovery into
 one interface. Accepted deployment work runs in persistent workers, so its
 lifetime does not depend on keeping a terminal open. History and journals make
 partial results available for inspection after an interruption.
+
+### A local control panel
 
 The local panel makes common tasks easier to reach: networking, proxy selection,
 audio, display controls, device information, software management and settings.
@@ -175,11 +201,7 @@ It shares the CLI's backends and follows the desktop palette. This lets the
 graphical interface use the same validation and operation records as the rest
 of the system.
 
-Application ownership is explicit. Native packages follow Nix generations;
-managed Flatpak applications have their own recorded lifecycle. Personal data
-remains separate from managed configuration. Retained deployment rollback covers
-recorded artifacts and configuration, while application data and independently
-managed Flatpak revisions require their own recovery paths.
+### Easier application installation
 
 I introduced Flatpak to make installing desktop applications easier. Applications
 available through Flathub can be found and installed from the panel without
@@ -187,6 +209,11 @@ writing a Nix package declaration or rebuilding the system for each installation
 This complements the native packages managed by Nix and makes adding everyday
 software more approachable. Folio records which applications it manages and
 preserves personal data when removing them.
+
+Native packages follow Nix generations; managed Flatpak applications have their
+own recorded lifecycle. Retained deployment rollback covers recorded artifacts
+and configuration. Personal data and independently managed Flatpak revisions
+require their own recovery paths.
 
 ## Hardware and portability
 
@@ -211,14 +238,19 @@ its storage identities and account policy need adapting for other hardware.
 
 ## Current limitations
 
-**Development toolchains are still an open problem.** This version does not yet
-have a settled approach to organizing and maintaining them. The presence of
+### Development toolchains
+
+This version does not yet have a settled approach to organizing and maintaining
+development toolchains. The presence of
 terminal utilities and optional simulation helpers does not make the repository
 a complete development environment.
 
-**The text editor configuration is still preliminary.** Emacs, Org and Org-roam
-are present, but the editor has not received the detailed configuration needed
+### Editor configuration
+
+Emacs, Org and Org-roam are present, but the editor has not received the detailed configuration needed
 to make it a finished part of the overall workflow.
+
+### Maintenance and verification
 
 The shared management framework also has a cost: models, migrations and runtime
 integration need maintenance. Folio reduces repeated work across modules, but
@@ -230,12 +262,17 @@ hardware behavior on every machine. The
 [verification reference](docs/reference.md#verification-map) records the scope
 and limits of that evidence.
 
-## Model upgrades
+<a id="model-upgrades"></a>
+
+<details>
+<summary><strong>Model upgrades</strong></summary>
 
 Changes to YANG models or repository tools require paired maintenance of the
 configuration repository and its matching closure for each affected scope.
 The [model upgrade reference](docs/reference.md#model-upgrades) retains the
 technical procedure and recovery details.
+
+</details>
 
 ## References
 
