@@ -1,436 +1,765 @@
 # Folio
 
-Folio is a NixOS configuration framework built around module-owned YANG models
-and sysrepo. One CLI manages system and user configuration; each module executes
-its own operations. Root Nix composition lives in the manager module.
+**Model-driven NixOS configuration, with reviewed deployments and recoverable operations.**
 
-Status: foundation, durable user configuration, Foot deployment, root deployment
-and system-owned power actions have passed isolated UEFI guest tests. A standalone
-UEFI image and module-owned VM lifecycle are implemented. Later modules below
-remain the implementation contract until their stages pass. Owned Zen/OBS Flatpak
-lifecycle and regular-file configuration delivery have passed an isolated guest
-gate. Niri, desktop resources, cold-start Chinese input and actual OBS portal capture
-have passed a disposable virtual DRM guest gate. Exact GUI parity and physical
-hardware acceptance remain unverified. No development-host
-activation or physical installation has been performed. See [STRUCTURE.md](STRUCTURE.md)
-for directory ownership.
+Folio combines NixOS and standalone Home Manager with YANG models and sysrepo.
+One CLI manages machine policy, personal preferences and application operations;
+each capability owns its schema, implementation and lifecycle.
 
-Terminal/developer tools, the paired model upgrade and selective removal with
-personal-data preservation have also passed a disposable user-profile guest gate.
-System policy and network-owned connection/proxy actions have passed an isolated
-UEFI guest gate, including real DNS/proxy traffic, firewall and key-only SSH.
-Integrated release acceptance has passed one disposable UEFI lifecycle, including
-both scopes, interrupted recovery, retained rollback, cached apps, actual Chinese
-input/OBS capture, denied effects and externally observed reboot/poweroff. The
-unified Folio hardware configuration builds successfully; physical acceptance
-remains deferred.
+The design connects three distinct concerns: validated desired configuration,
+immutable build inputs, and verified runtime effects. Saving a setting records
+intent. A reviewed deployment builds and activates that intent. Status and
+recovery records describe what actually happened.
 
-Implemented modules keep Nix implementation in `src/`, client entry points and
-command resources in `cli/`, subscribers and operations in `runtime/`, models in
-`model/`, and behavioral checks in the outer `tests/`. Module `default.nix` files
-expose those owned implementations. Manager composition remains
-`modules/manager/src/outputs.nix`; product documentation stays in this README.
+## What makes Folio different
 
-## Foundation workflow
+| Feature | Practical benefit |
+| --- | --- |
+| **Module-owned architecture** | Schemas, packages, commands, runtime and tests live with the capability they implement. Public contracts keep composition explicit. |
+| **Typed, durable configuration** | YANG/libyang validate values and constraints. Optimistic commits detect concurrent edits; failed editor saves retain private drafts. |
+| **Pure Nix evaluation** | Builds consume normalized, frozen configuration with source, model, tool and descriptor identities. Evaluation never queries live sysrepo. |
+| **Coordinated system and user deployment** | One reviewed plan binds both targets, applies the system first and checks stale inputs before activation. |
+| **Persistent operations and recovery** | Independent systemd workers survive client exit. Durable journals expose partial results, explicit resume and retained rollback. |
+| **Shared appearance with visible inheritance** | System defaults, personal overrides and module settings resolve consistently; public preference origins remain inspectable. |
+| **Explicit application ownership** | Native apps follow Nix generations. Flatpak apps use a separate recorded lifecycle, explicit adoption and data-preserving removal. |
+| **Local desktop controls** | The browser panel uses module backends for networking, devices, software, settings and diagnostics, with no cloud service or external frontend assets. |
 
-The root Flake reuses Sylphy's pinned Nixpkgs/Home Manager inputs. Packages include
-`sysrepo-library` (3.7.11), `sysrepo-libyang` (3.13.6), `sysrepo-tools`,
-`manager-normalizer`, `manager-input`, and `manager-bootstrap`. The minimal
-`nixosConfigurations.portable` is a disposable storage fixture, not a physical
-installation target. `homeConfigurations.folio` renders Foot using the adapted
-Sylphy renderer and selected font/padding. Neither output queries live sysrepo.
+Folio currently targets `x86_64-linux`. Its desktop combines Niri, Everforest,
+Maple Mono NF CN, Fcitx5/Rime, Foot and Zsh. A dedicated `folio` target supports the
+existing USB installation; `portable` provides a disposable UEFI test environment.
+The physical target is specific to that installation, rather than a general installer.
 
-```sh
-nix develop
-nix build --no-link .#checks.x86_64-linux.catalogue .#checks.x86_64-linux.foundation
-bootstrap=$(nix build --no-link --print-out-paths .#manager-bootstrap)
-# Within the development shell, initialize only a disposable user instance:
-scratch=$(mktemp -d)
-export XDG_STATE_HOME="$scratch/state" XDG_RUNTIME_DIR="$scratch/run"
-mkdir -p "$XDG_RUNTIME_DIR"
-folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
-folio-repository user cfg --export --module folio-environment --format json --defaults report-all
-folio-prepare-input "$bootstrap/user.json" "$bootstrap" > "$scratch/folio-input.json"
-```
+## Contents
 
-`folio-repository` binds the documented persistent/runtime paths and distinct
-system/user SHM prefixes. `init` installs models and initial data atomically through
-sysrepo, preserves existing startup data, and refuses model/library identity
-changes requiring an explicit paired upgrade. `ctl`/`cfg` are maintenance wrappers;
-direct edits do not implement the managed durable-commit protocol.
+- [Daily use](#daily-use)
+- [Reviewed deployment](#reviewed-deployment)
+- [Architecture and configuration](#architecture-and-configuration)
+- [Module catalogue](#module-catalogue)
+- [Desktop and developer environment](#desktop-and-developer-environment)
+- [Applications](#applications)
+- [Local web panel](#local-web-panel)
+- [Hardware targets and virtual machines](#hardware-targets-and-virtual-machines)
+- [Recovery and model upgrades](#recovery-and-model-upgrades)
+- [Legacy migration reference](#legacy-migration-reference)
+- [Development and verification](#development-and-verification)
 
-Frozen input format 1 contains scope, normalized RFC 7951 configuration, a
-versioned read-only bootstrap system descriptor, model SHA-256 identities, pinned
-tool versions, and configuration/descriptor digests. Digests cover compact JSON
-with lexically sorted object keys plus one LF. libyang validates types and emits
-defaults; only the schema's system-ordered module/user/group lists are sorted.
-User-ordered arrays and RFC 7951 scalar encodings are preserved. A source snapshot
-containing `folio-input.json` consumes that data through pure Nix and rejects
-mismatched digests/model/tool identities. Resolved public preference values and
-their origins are recorded and checked; absent user overrides inherit the system
-descriptor's defaults. The provisioned system service publishes its compiled
-descriptor; standalone bootstrap retains an explicit bootstrap origin.
+## Daily use
 
-For a separate root-identity/scope check, run
-`bash modules/sysrepo/tests/scopes.sh "$bootstrap"` in the development shell.
-It requires Linux user/mount namespaces and mounts private `/var/lib` and `/run`;
-it does not initialize system state on the development host. Managed rollback and
-offline maintenance are described below.
-
-## User configuration development
-
-The `folio` package provides `config show/edit/import/export` and
-`modules list/enable/disable` in user scope. Writes use sysrepocfg and the real
-manager C subscriber. The Home Manager output installs `folio-manager.service`;
-it initializes the repository before subscribing and reconciles interrupted
-configuration commits first. Guest activation is covered by the user-deployment
-check; the portable image provisions the initial product system services.
-
-For isolated development, keep the scratch XDG paths from the foundation example
-and run `folio-manager-subscriber user "$bootstrap"` in the development shell.
-In another shell with the same XDG paths, use `folio --json config show`,
-`folio config edit`, or `folio config import FILE`. Exported documents contain
-desired RFC 7951 data, suitable for reviewing or importing; `show` returns the
-configuration with its digest. Stop the development subscriber when finished.
-
-Editor drafts and exported configuration files use two-space indented JSON.
-Compact canonical JSON is reserved for internal digest and transport processing.
-
-Edits use private temporary documents and optimistic digest checks. Commits
-serialize writers and durably record prepared/accepted/saved phases. Recovery
-validates journal digests, restores prepared-only data, and rolls accepted data
-forward into running/startup before consumers start. A failed save remains a
-failure. JSON commands return one `{ status, data, error, taskId }` envelope;
-missing write subscribers return exit 3, validation exit 2, conflicts exit 4.
-Unavailable rollback protocols/inputs return exit 3; unsupported scopes return exit 2.
-
-Run `nix build --no-link .#checks.x86_64-linux.configuration` for the bounded
-real-sysrepo commit/edit/conflict/failure/restart integration scenario.
-
-## User build and deployment
-
-The following workflow requires the provisioned `folio` account with
-`HOME=/home/folio`, a running user manager subscriber and its initialized
-repository. The portable UEFI image provides this disposable environment.
+These commands assume a provisioned installation with initialized repositories
+and running manager subscribers. Run them as the provisioned desktop account.
+System configuration also requires membership in `folio-operators`.
 
 ```sh
-folio config edit
-plan_id=$(folio --json plan --source /path/to/folio-checkout | jq -r .data.planId)
-folio build "$plan_id"
-folio apply "$plan_id"
-folio --json status
+folio modules list
+folio config show
+folio config get /preferences/font-size
+folio config set /preferences/font-size 18
+folio config set /preferences/appearance '"light"'
+folio config unset /preferences/font-size
+folio doctor
+folio panel
 ```
 
-Plans copy the root Flake/lock, module code and optional assets once, exclude
-environment metadata/state/output paths, reject escaping symlinks and evaluate
-only immutable store bytes. Each plan binds desired configuration, descriptor,
-source identity, current profile and a bounded timeout. Build/apply submit durable
-tasks to independent `folio-task-<id>.service` user units. `--no-wait` returns the
-task ID; `--request-id ID` makes repeated identical submissions return that task.
-Client exit or subscriber restart does not cancel the worker. Use
-`folio status TASK_ID` to inspect the recorded outcome.
+Field paths use `/preferences/FIELD` or `/modules/NAME/SETTING`; values are JSON.
+`unset` removes an override so the applicable default can take effect. Use
+`folio config edit` for a complete document, or `config export FILE` and
+`config import FILE` for explicit review and transfer.
 
-Build never publishes applied state. Apply rechecks stale inputs, enforces the
-provisioned account/home and one standalone Home Manager profile, preserves first
-adoptions with unique backups and rejects later changes to managed files. It
-records profile effects before activation and verifies the actual selected
-profile and generated files before success. Disabling terminal removes its
-managed contribution while preserving application data. The profile is
-`$XDG_STATE_HOME/nix/profiles/home-manager` (default `~/.local/state/...`). Plans,
-tasks, successful builds and `current.json` live under the scoped `deployments/`;
-explicit Nix GC roots retain source/worker/artifact closures. Cleanup and managed
-rollback use the explicit maintenance commands below; interrupted activation reports failure or interruption.
+All supported configuration writes share validation, optimistic conflict checks
+and durable persistence. `config import FILE --expected-digest DIGEST` protects
+an external editor from overwriting newer changes. Failed editor saves retain a
+private draft under `$XDG_STATE_HOME/folio/drafts/` and print its recovery command.
+Identity fields cannot be changed through the single-field interface.
 
-Deployment now retains matching configuration/model identities in scoped
-`deployments/revisions/`. On subscriber restart, recovery probes actual effects:
-it can finish an activation's recorded successful publication or restore only a
-profile selection when actual files/running system still match the before
-closure. It never repeats activation to infer success. Ambiguous effects and
-failed restoration stay visible in `status` under `recovery`, degrade health and
-block further applies. Preserve those records and their GC roots for explicit
-managed rollback and schema migration.
+Saving configuration and enabling a module change desired state. Deploy those
+changes explicitly:
 
-Offline paired maintenance is available through the separate
-`folio-manager-maintain SCOPE BOOTSTRAP ACTION ID [FROZEN_SOURCE_OR_REVISION]` command.
-`BOOTSTRAP` must identify the currently selected generation's immutable bootstrap,
-recorded in its `folio-home.json` or `folio-system.json`. Run user maintenance as
-the provisioned account with its real HOME and runtime directory; system
-maintenance requires root. For example, on a provisioned disposable user system:
+```sh
+folio plan --source /path/to/folio-nixos-config
+folio build PLAN_ID
+folio apply PLAN_ID
+```
+
+`folio doctor` is read-only. It inspects service availability, prerequisites,
+configuration persistence, deployment drift and interrupted work, and reports
+concrete next commands. `folio history` and `folio status` provide the underlying
+records. History remains partially readable when one scope is unavailable.
+
+### CLI conventions
+
+| Interface | Contract |
+| --- | --- |
+| Unscoped `plan`, `build`, `apply`, `rollback` | Reviewed system/user workflow. |
+| `--user` / `--system` | Explicit scoped configuration and deployment interfaces. |
+| `--json` | One `{ status, data, error, taskId }` result envelope; progress goes to stderr. It changes formatting, not scope. |
+| `--no-wait` | Return the durable task/workflow ID after acceptance. |
+| `--request-id ID` | Repeated submissions with identical inputs reuse the recorded operation. |
+| `status ID` | Inspect a task or reviewed workflow, including recorded progress and results. |
+| `resume WORKFLOW_ID` | Explicitly retry interrupted reviewed work after checking earlier tasks. |
+
+Exit codes are `0` success, `1` operation failure, `2` usage or validation error,
+`3` unavailable service/evidence and `4` conflict. RPC acceptance does not establish
+successful completion. Use each command's `--help` for module-specific arguments.
+
+## Reviewed deployment
+
+### Review once, deploy the reviewed inputs
+
+`folio plan` captures one source snapshot for both scopes and evaluates the
+resulting system and user artifacts. Its baseline is the last applied environment,
+so both committed-but-unapplied changes and uncommitted source files are included.
+The installed hardware target is retained; a conflicting source target is rejected.
+
+The review shows affected modules, source paths, changed setting names, public
+preference values and activation hints. Other configuration values remain hidden.
+It identifies first deployments, disabled contributions and changes that need an
+application restart, new login or kernel reboot. If neither target changed, no
+plan is created. Otherwise confirmation and a comment retain the exact inputs.
+
+```sh
+folio plan --source "$PWD"
+folio build PLAN_ID
+folio apply PLAN_ID
+folio history
+folio rollback PLAN_ID
+```
+
+A plan binds desired configuration, source, models, tool versions, the system
+descriptor, selected profiles and timeouts. Source capture includes the root
+Flake/lock, modules and optional assets; it excludes runtime/output metadata and
+rejects escaping symlinks. Evaluation uses immutable Nix-store bytes.
+
+Builds do not publish applied state. Apply requires successful builds, checks both
+scopes for stale inputs and unresolved effects, then activates system before user.
+The user target is bound to the planned system descriptor, including inherited
+preferences. Unchanged targets must still match their recorded configuration and
+actual effects.
+
+System and user activation are sequential. A partial failure records per-scope
+results; a retry verifies and skips targets that are already current. Cancelling a
+review removes provisional drafts. If confirmation stops between scopes, any
+confirmed scoped plans remain inspectable and no combined plan is reported.
+
+### Long-running work survives the terminal
+
+Reviewed build/apply coordination and scoped deployment tasks run in independent
+systemd services. Closing the CLI or restarting a subscriber does not cancel the
+accepted work.
+
+```sh
+folio --no-wait build PLAN_ID
+folio status WORKFLOW_ID
+folio resume WORKFLOW_ID
+```
+
+Resume observes earlier tasks before retrying. Live tasks are awaited; unresolved
+effects block further activation. New attempts recheck inputs and use fresh scoped
+request IDs after previous tasks finish. Reboot preserves the records and requires
+explicit resume; boot never automatically activates an old queued plan.
+
+### Automation
+
+```sh
+result=$(folio --json plan --source "$PWD" --yes --comment "Update desktop settings") &&
+plan_id=$(printf '%s\n' "$result" | jq -r '.data.planId // empty') &&
+if [ -n "$plan_id" ]; then
+  folio build "$plan_id" && folio apply "$plan_id"
+fi
+```
+
+Non-interactive reviewed planning requires `--yes --comment TEXT`. The original
+scoped creation interface remains available through
+`folio --json --user plan --source DIRECTORY` or its system equivalent.
+
+### Rollback boundaries
+
+`folio rollback PLAN_ID` requires a successful apply, previews the complete target
+state and asks for confirmation; `--yes` skips that prompt. It restores retained
+artifacts, configuration and model identities, including unchanged scope baselines.
+System restoration uses ordinary sudo authentication. Rollback adds history and
+preserves later plans.
+
+Personal application data and separately managed Flatpak revisions are outside
+Nix deployment rollback. Mutable application settings in a writable checkout,
+such as Pi's native configuration, follow their own version-control history.
+
+## Architecture and configuration
+
+### One source tree, explicit ownership
+
+Only the repository root has a `flake.nix` and `flake.lock`. The root delegates
+composition to [modules/manager/src/outputs.nix](modules/manager/src/outputs.nix).
+There are no separate host/home trees or nested module Flakes.
+
+```text
+flake.nix / flake.lock
+modules/
+  <capability>/
+    default.nix     public exports
+    model/          YANG schemas and revision history
+    src/            Nix packages and system/user adapters
+    cli/            command adapters and help
+    runtime/        subscribers, workers and operations
+    tests/          capability-owned checks
+```
+
+Directories exist only when needed. Module presence does not enable it. The
+manager explicitly collects the catalogue, checks command/model collisions and
+selects the configured contributions. Modules consume public resources and
+capabilities; they do not import another module's private implementation or call
+its private runtime scripts.
+
+The manager owns identity, module selection, shared preferences, configuration
+commits and deployment records. Each capability owns its settings and actions.
+Sysrepo provides modeled storage, validation and subscription dispatch. The
+manager's deployment callback is not a generic router for arbitrary module actions.
+
+### From desired data to observed effects
+
+```text
+CLI / panel
+    │ validate + optimistic durable commit
+    ▼
+sysrepo desired configuration: running + startup
+    │ capture + normalize + bind identities
+    ▼
+immutable source and folio-input.json
+    │ pure Nix evaluation and reviewed build
+    ▼
+recorded artifacts → system activation → user activation
+    │ verify actual effects
+    ▼
+status, task journals and retained recovery revisions
+```
+
+YANG 1.1 owns types, defaults, ranges, enumerations and structural constraints.
+JSON follows RFC 7951. Module prerequisites are checked before configuration
+persistence where applicable; planning checks system capabilities against the
+bound descriptor. Missing prerequisites fail explicitly rather than enabling
+another capability silently.
+
+Frozen input format 1 records normalized configuration, SHA-256 configuration and
+descriptor digests, model hashes, pinned tool versions, resolved preferences and
+their origins. libyang emits defaults; canonicalization sorts object keys and
+system-ordered identity lists while preserving user-ordered arrays and RFC 7951
+scalar encodings. Nix rejects inconsistent input identities.
+
+### Independent scopes, shared public defaults
+
+| Scope | Persistent state | Runtime state | Responsibility |
+| --- | --- | --- | --- |
+| System | `/var/lib/folio/` | `/run/folio/` | Accounts, machine policy, prerequisites and system deployment. |
+| User | `$XDG_STATE_HOME/folio/` | `$XDG_RUNTIME_DIR/folio/` | Personal preferences, user contributions and Home Manager deployment. |
+
+User state defaults to `~/.local/state/folio`. Repository instances use distinct
+shared-memory prefixes. Persistent roots contain `sysrepo/`, `configuration/`,
+`deployments/` and `backups/`.
+
+The system publishes its compiled identity, users, defaults and capabilities at
+`/run/folio/public/system-descriptor.json`. User snapshots bind this root-owned,
+read-only descriptor. Saving desired system settings does not republish them as
+applied. User configuration cannot create accounts or redefine the system identity.
+
+Preferences resolve from system defaults to personal overrides, with supported
+module overrides last. Resolved values and origins enter the snapshot. A declared
+capability is a prerequisite fact; it does not establish device or service health.
+
+### Durable commits and privilege boundaries
+
+The CLI edits a private document and commits with an expected digest. A scoped
+lock serializes writers. Before/after journals record `prepared`, `accepted` and
+`saved` phases using atomic replacement and durable flushes. Recovery restores a
+prepared-only change or rolls an accepted change forward into running/startup
+before consumers start. Configuration callbacks do not activate external effects.
+
+`running` holds accepted desired data, `startup` holds persisted desired data and
+`operational` reports observed state. Direct `sysrepocfg` edits are maintenance
+operations outside the managed commit protocol. Existing desired configuration is
+never replaced with defaults by an ordinary boot or rebuild.
+
+System administration is granted at provisioning through `folio-operators` and
+scoped repository permissions. Builds run as `folio-builder`; fixed root workers
+activate the recorded NixOS closure. Ordinary managed updates need neither a
+blanket passwordless sudo rule nor membership in Nix `trusted-users`. Offline
+system maintenance requires root.
+
+This is a local administrative boundary: an authorized operator's chosen source
+is trusted administration input. It is not a hostile multi-user isolation design
+or an implicit NETCONF/NACM policy. Requests cannot supply arbitrary executable
+paths or shell payloads for privileged workers.
+
+## Module catalogue
+
+System and user selections are independent. The table describes available
+contributions, rather than claiming every module is enabled by default.
+
+| Module | System contribution | User contribution |
+| --- | --- | --- |
+| `manager` | Configuration and deployment service | CLI, configuration and deployment service |
+| `sysrepo` | Repository initialization and models | Repository initialization and models |
+| `system` | Boot, storage, accounts, locale, time, console, logging, zram and Nix | — |
+| `network` | NetworkManager, DNS, firewall, SSH and optional Mihomo | — |
+| `devices` | Hardware access, Bluetooth and power policy | Audio session, device controls and observations |
+| `vm` | KVM access | Disposable VM lifecycle |
+| `desktop` | Login session and portal prerequisites | Niri, Waybar, Mako, launcher, clipboard and screenshots |
+| `appearance` | Console appearance where applicable | Fonts, cursor, GTK and shared appearance resources |
+| `input` | — | Fcitx5/Rime and session integration |
+| `terminal` | Shell registration | Foot, Zsh, tools, Yazi, Typst and Git/GitHub CLI |
+| `emacs` | — | Emacs, Org and Org-roam |
+| `agents` | — | Codex and Pi |
+| `applications` | Flatpak infrastructure | Native applications and owned Flatpak lifecycle |
+| `panel` | — | Local browser frontend package; no selectable system/user adapter |
+| `isaac` | — | Optional Isaac Sim / Isaac Lab setup and inspection commands |
+
+For modules with selectable adapters, disabling removes their managed contribution
+on apply. Stored settings and personal application data are preserved.
+Models and command adapters can be
+available while the capability is disabled; availability does not imply activation.
+
+### Public Nix contract
+
+A module's `default.nix` receives `pkgs` and `lib`; the manager may also receive
+the collected public command map. Optional exports include:
+
+| Export | Purpose |
+| --- | --- |
+| `packages` | Named derivations, exported as `<module>-<component>`. |
+| `checks` | Owned checks, exported as `<module>-<check>`. |
+| `models` | System/user YANG paths, including the required import closure. |
+| `commands` | Command roots with executable paths, supported scopes and optional help. |
+| `requirements` | Per-scope prerequisites and system capabilities. |
+| `impacts` | Public activation hints for deployment review. |
+| `nixosModule` / `homeManagerModule` | Context-to-module constructors for each scope. |
+| `migrations` / `subscribers` | Hash-bound schema transitions and registered consumers for paired maintenance. |
+
+Adapters receive identity, resolved globals, their own settings and public
+capabilities. They never query a mutable repository during evaluation. See
+[the catalogue collector](modules/manager/src/catalogue.nix) and
+[configuration composition](modules/manager/src/configuration.nix) for the exact
+contract. Additional target-specific exports remain owned by their modules.
+
+Public root outputs include `nixosConfigurations.portable`,
+`nixosConfigurations.folio`, `homeConfigurations.folio`,
+`packages.x86_64-linux.*`, `checks.x86_64-linux.*`, the development shell,
+`lib.folio.targets` and `lib.folio.identities`. Standalone builds use bootstrap
+defaults unless the source contains a prepared `folio-input.json`.
+
+## Desktop and developer environment
+
+### Consistent appearance and session integration
+
+The desktop uses Niri, Waybar, Mako, Fuzzel, clipboard history and screenshots.
+Everforest light/dark palettes, Maple Mono NF CN, a recolored GoogleDot cursor and
+GTK resources share resolved preferences. Font and preference origins are recorded
+in `~/.config/folio/appearance.json`.
+
+GTK 3 uses adw-gtk3 with Folio colors. GTK 4/libadwaita retains its native stylesheet
+and receives named colors and modern CSS variables. Open applications need a
+restart to reload styles. Fuzzel's border follows the desktop border width; power
+confirmation prompts share the launcher's appearance. The TTY greeter uses the
+Everforest ANSI palette and a console font.
+
+Folio's patched Niri provides a 300 ms focus-ring fade that respects global
+animation settings. A generation update preserves the running compositor; log
+out and back in to load a new binary. Applying greeter configuration does not
+restart greetd during the current session.
+
+Fcitx5/Rime Ice starts as a user service and seeds defaults only when absent.
+Existing profiles, dictionaries and history remain intact. Initial dictionary
+deployment must finish before Chinese composition is ready.
+
+```sh
+folio devices status
+folio devices volume +5
+folio devices mute
+folio devices brightness 50
+folio devices profile balanced
+```
+
+Device commands report actual observations and use native services. Missing
+hardware or authorization returns unavailable. Bluetooth pairing is available
+through Blueman. External-monitor DDC/CI control is not included.
+
+### Terminal, documents and coding tools
+
+`terminal` provides Foot and Zsh with Powerlevel10k, completion, suggestions and
+highlighting. Independent switches control tools including bat, btop, eza, fd,
+fzf, jq, ripgrep, zoxide, just, Typst and Yazi. Git/GitHub CLI settings live under
+`folio-terminal:terminal.git`; configure the target user's own identity.
+Changing the login shell requires the system account's explicit `login-shell`
+selection in addition to shell package registration.
+
+Yazi follows the shared palette. Run `yazi`, or `y` in Zsh to also change the
+shell's directory on exit. Markdown uses `$EDITOR`; PDFs and images use desktop
+associations. The applications module supplies Zathura and imv, controlled by
+`applications.native.zathura` and `.imv`.
+
+Emacs provides Org/Org-roam, backlinks, completion and Everforest preferences.
+`C-c n f` finds notes, `C-c n b` shows backlinks and `C-c n h` opens the start page.
+Notes default to `~/Documents/documents`; configure
+`folio-emacs:emacs.notes-directory` to reuse another location. Personal additions
+can live in the unmanaged `~/.config/folio/emacs/local.el`.
+
+### Codex and Pi
+
+The `agents` module independently selects Codex and Pi. Codex receives Zsh
+completion and a Folio theme without rewriting personal configuration. An optional
+PTY color adapter maps fixed accents to the selected palette; non-terminal
+commands run directly. Authentication, sessions and mutable configuration remain
+application-owned. Review the compatibility adapter when updating the pinned CLI.
+
+Pi uses its native settings and resources under
+[modules/agents/src/pi/config](modules/agents/src/pi/config), rather than a second
+YANG representation. Set `agents.pi.config-directory` to an absolute writable
+checkout to edit those resources in place. The `folio` target defaults to this
+repository's local checkout; existing desired data must select that path explicitly.
+The portable target uses an immutable snapshot.
+
+The launcher exposes the configuration at `~/.config/folio/pi` and keeps private
+agent state under `$XDG_STATE_HOME/folio/pi`. Settings, model/resource declarations
+and local packages may be tracked in the checkout; authentication, sessions,
+project trust, downloaded packages and caches stay outside it. Pre-existing
+personal files are not silently replaced. A missing configured checkout fails
+explicitly.
+
+With a writable checkout, `/settings`, model selection and `pi install` can change
+tracked native configuration. Review those changes with Git and use `/reload`
+after manual edits. Relative local packages can use `./packages/my-tools` in
+`settings.json`. Writable checkout changes are live application settings and are
+not undone by generation rollback. `FOLIO_PI_CONFIG_DIR` selects configuration
+for one invocation; `PI_CODING_AGENT_DIR` explicitly selects a private agent root.
+The launcher provides `wl-clipboard` for Wayland text and image clipboard access.
+
+Former standalone Git/Codex modules and dsh are retained only as supported schema
+migration history. Hash-bound transforms preserve applicable selections and
+preferences; they do not migrate credentials or conversations. Conflicting old/new
+settings fail explicitly. Update the root lock and rebuild to update packaged clients.
+
+### Isaac Sim / Isaac Lab
+
+The optional `isaac` user module installs commands, then leaves large environment
+setup explicit:
+
+```sh
+folio modules enable isaac
+# Plan, build and apply the module selection first.
+isaac-doctor --stage preflight
+isaac-setup
+isaac-status
+isaac-lab --help
+```
+
+Versions and content identities are pinned in
+[modules/isaac/src/versions.json](modules/isaac/src/versions.json). Downloads,
+environments and experiment outputs stay in user directories. The runtime check
+covers the command contract; simulator, rendering and training require actual
+GPU acceptance. The base desktop does not install a CUDA SDK.
+
+### Network and machine policy
+
+The system `network` module supplies NetworkManager, connection DNS and a
+default-deny inbound firewall. SSH and Mihomo are opt-in. SSH uses public-key
+authentication; its firewall port opens only when explicitly selected.
+
+```sh
+folio --system network status
+folio --system network connect CONNECTION_UUID INTERFACE
+folio --system network disconnect INTERFACE
+folio --system network proxy-mode rule
+folio --system network proxy-select DIRECT
+```
+
+CLI connection commands use existing NetworkManager profiles. Profile credentials
+remain outside Folio desired data. Proxy commands use the private Mihomo Unix
+controller and report actual observations; live mode/node selection is runtime
+state, separate from persisted policy. Disabled services and missing profiles or
+nodes return unavailable.
+
+An optional `proxy.provider-file` references target-local YAML under `/run` or
+`/var/lib`, loaded as a systemd runtime credential. Evaluation and builds never
+read its contents. The proxy listener binds loopback; TUN is separately opt-in.
+Do not put provider secrets in tracked source or frozen configuration.
+
+The `system` module models locale, time synchronization, console policy, bounded
+journal storage, zram and Nix settings. Physical storage requires explicit stable
+root/EFI paths and account policy; no adapter partitions disks.
+
+## Applications
+
+### Native packages and Flatpak have distinct lifecycles
+
+Native Zen Beta/OBS and document viewers are selected through
+`folio-applications:applications.native` and deployed with the user generation.
+The model rejects selecting both native and Flatpak delivery for Zen or OBS.
+Native package rollback follows Home Manager; personal profiles remain intact.
+
+The panel's software catalogue and `folio apps` share one applications backend.
+Supported Flathub IDs and branches use x86_64 refs; Zen and OBS also have the
+`zen` and `obs` aliases with specialized settings and permissions. Generic apps
+retain upstream sandbox permissions.
+
+```sh
+folio apps init
+folio apps refresh
+folio apps install org.example.App --ref app/org.example.App/x86_64/stable
+folio apps adopt org.example.App --ref app/org.example.App/x86_64/stable
+folio apps remove org.example.App
+folio apps list
+```
+
+The example ID is a placeholder; use an actual Flathub app/ref. `init` explicitly
+initializes the verified official Flathub remote. Install/adopt persist desired
+selection before submitting a durable worker. A failed installation leaves
+visible desired/actual drift.
+
+The catalogue distinguishes **Managed by Folio**, **User installed** and
+**System provided**. Configuration selection alone does not establish ownership.
+An existing user installation requires explicit adoption before modification;
+system applications are read-only in the catalogue. Removal persists deselection
+and preserves personal data. Unrelated applications and overrides are left alone.
+
+### Recorded transactions, explicit updates
+
+```sh
+folio apps prepare all
+folio apps install all --offline
+folio apps update zen
+folio apps reconcile zen --offline
+folio apps status TASK_ID
+folio apps resume TASK_ID
+folio apps rollback REVISION_ID all --offline
+```
+
+Preparation downloads and records resolved app, runtime and extension commits
+without activating them. Reconcile preserves an already resolved commit;
+explicit update resolves a new one. Pinned policy requires the requested commit.
+No timer silently updates managed applications, and no Flatpak operation occurs
+during Nix evaluation or derivation builds.
+
+Offline deployment requires retained plans and matching cached content. If refs
+or commits no longer match, the operation fails before deploying different bytes.
+Historical rollback depends on retained content; version records are not an
+indefinite archive. Shared runtimes are neither automatically pruned nor downgraded.
+
+Mutations serialize and journal before/after state per application. There is no
+atomic transaction across all apps or between Flatpak and Home Manager. Completed
+results remain visible after failure; explicit resume checks stale configuration
+and unresolved effects. The panel reads these same journals after a restart.
+
+### Managed configuration preserves application state
+
+User activation publishes a rooted immutable file manifest. The applications
+worker materializes supported Flatpak settings as regular files through atomic
+replacement, with content hashes and unique first-adoption backups. It rejects
+path traversal, unexpected symlinks and conflicting ownership. `--adopt-files`
+explicitly adopts supported existing files; unexpected later edits require
+resolution.
+
+For Zen, select an existing profile through `zen-profile` before reconciliation.
+Missing profiles report `configuration-pending`; stale manifests require a new
+user deployment. Folio manages supported preferences and owned CSS, preserving
+`prefs.js`, databases, logins and sessions. Required restarts are reported without
+killing the browser. OBS scenes, accounts, recording profiles and mutable settings
+remain application-owned; full Qt appearance parity is not claimed.
+
+Native Zen can target an existing directory under `~/.config/zen/` through
+`applications.native.zen-profile`. Its preferences and owned CSS use the same
+renderer, with conflicts rather than silent overwrites. The pinned native package
+opens tabs as separate normal windows for Niri, including restored sessions.
+Fully quit and reopen Zen after changing the package or browser integration.
+
+## Local web panel
+
+Run `folio panel` as the desktop user, or launch **Folio Panel**. To try a frontend
+build directly:
+
+```sh
+nix build --out-link modules/panel/result .#folio
+./modules/panel/result/bin/folio panel
+```
+
+| Page | Actions and observations |
+| --- | --- |
+| Wi-Fi | Scan, connect to saved/new/hidden personal networks, disconnect and manage profiles. Enterprise/legacy authentication is unavailable. |
+| Proxy | Switch Direct/Rule/Global, choose nodes and run bounded endpoint tests. |
+| Display & Audio | Default output, volume, mute and supported backlight controls. |
+| Device | CPU, memory, graphics, displays, interfaces, uptime and available batteries. |
+| Software | Flathub search, explicit ownership/adoption, install/remove and durable task progress. |
+| Settings | Public appearance preferences, inheritance/reset and conflict-safe draft saving. |
+| Diagnostics | Read-only doctor findings and suggested next commands. |
+
+The responsive interface uses Folio's colors and fonts. Unsaved settings survive
+background refresh; a stale save preserves the draft and reports a conflict.
+Settings save desired configuration; deployment remains an explicit CLI workflow.
+Runtime network/device controls act immediately and are outside generation rollback.
+
+The standard-library Python server binds only `127.0.0.1`, uses a random API session
+token and validates host/origin. The launch fragment is removed after the browser
+stores its token for the tab. A private runtime record lets later launches reuse
+the service; launching a newer installed frontend replaces an older server.
+There are no external assets or frontend build dependencies.
+
+Native NetworkManager/PipeWire/backlight permissions and system operator policy
+still apply. Wi-Fi credentials are delivered to libnm on stdin and saved by
+NetworkManager outside Folio configuration. The panel does not need sudo.
+
+## Hardware targets and virtual machines
+
+| Target | Intended use |
+| --- | --- |
+| `folio` | Existing migrated USB installation shared between the supported laptop and desktop. |
+| `portable` | Disposable x86_64 UEFI guest for development and acceptance. |
+
+```sh
+nix eval --json .#lib.folio.targets
+nix build --no-link .#nixosConfigurations.folio.config.system.build.toplevel
+nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
+```
+
+An ordinary checkout defaults to `portable`. Installed bootstrap `target.json`
+and frozen `folio-target.json` retain hardware selection across future plans.
+Within a frozen source, `nixosConfigurations.portable` is the manager's stable
+entry for the selected target. The environment/account identity remains separate
+from the hardware target. Evaluation never autodetects the host.
+
+### Existing USB installation
+
+The `folio` target supports the Lenovo Legion Y7000 IRX9 (i7-13650HX, RTX 4060)
+and MSI MAG B650M MORTAR WIFI (Ryzen 7 9700X, RTX 3090 and AMD integrated graphics).
+It supplies Intel/AMD microcode, i915/amdgpu, firmware/Mesa and one stable NVIDIA
+open-module driver with DRM modesetting. PCI matching selects drivers; Niri has
+no fixed PRIME addresses or DRM card numbering.
+
+Storage uses the inspected USB root/EFI UUIDs and Btrfs `root`, `home` and `nix`
+subvolumes. Internal disks are not configured or partitioned. The boot menu is
+visible for three seconds and retains up to ten generations; EFI variable writes
+are disabled. Secure Boot enrollment/signing is not provided. Shut down normally
+before moving the disk between machines; moving it alone requires no rebuild.
+
+Storage/boot policy lives in [modules/system/src/folio.nix](modules/system/src/folio.nix);
+CPU/GPU policy lives in [modules/devices/src/folio.nix](modules/devices/src/folio.nix).
+This target assumes the migrated account and runtime state already exist.
+An unrelated physical installation requires its own inspected device paths,
+account policy and hardware acceptance. Retired laptop/desktop target names need
+an explicit transition; ordinary planning does not silently rename hardware identity.
+
+### Disposable UEFI guests
+
+```sh
+image=$(nix build --no-link --print-out-paths .#vm-image)
+"$image/bin/run-folio-vm" portable
+```
+
+The fixture includes immutable source at `/etc/folio/source`, locked inputs,
+labeled disposable disks and the prototype `folio` password `kl;'`. That password
+belongs to the guest fixture; the physical target preserves its existing password
+and disables prototype credentials.
+
+The `vm` user contribution provides `folio vm build JOB_ID IMMUTABLE_SOURCE`,
+`start`, `stop`, `status` and `cleanup`. System provisioning supplies KVM access;
+start checks actual device access. The image launcher also works before a Folio
+user service has been installed; `folio-vm-tool status|stop|cleanup portable`
+controls that bootstrap job from the `vm-tools` package.
+
+Jobs keep private qcow2 overlays, EFI variables and QMP sockets under
+`$XDG_STATE_HOME/folio/vm/jobs/`, using QEMU user-mode networking. Stop requests ACPI
+shutdown and waits; cleanup refuses active jobs and archives logs before removing
+disposable disks and roots. No host disk passthrough or network bridge is required.
+
+## Recovery and model upgrades
+
+### Diagnose before changing recovery state
+
+```sh
+folio doctor
+folio status
+folio status TASK_OR_WORKFLOW_ID
+folio history
+```
+
+Subscriber recovery compares actual effects with recorded before/after state.
+It can finish publication of a verified activation or restore a profile selection
+when effects still match the earlier closure. It never reruns activation merely
+to infer success. Ambiguous effects remain visible as recovery-required and block
+new applies.
+
+Plans, builds, tasks, revisions and GC roots live under scoped `deployments/`;
+reviewed coordination records live under the user's `deployments/workflows/`.
+Preserve those records and backups during recovery. `folio cleanup` previews
+eligible records; `folio cleanup --apply` removes only selected records and known
+roots. It excludes active workers, retained current/previous revisions and
+backup/recovery references. It neither runs global Nix GC nor prunes repository
+backups or application data.
+
+### Model upgrades
+
+Ordinary deployment requires the source's scoped model/tool identities to match
+the installed repository. A new YANG revision therefore needs explicit paired
+maintenance before ordinary planning. A generic frozen-input evaluation failure
+on an older manager can be a model mismatch; current planning reports that case
+explicitly. The applications catalogue requires model revision `2026-10-26`.
+
+Maintenance upgrades the schema, normalized data and matching closure together.
+Module-owned transforms are bound to exact revision hashes; changing a schema
+without advancing its revision is rejected. The candidate must match the isolated
+migration result and all model/tool/configuration identities before installation.
+A source file containing arbitrary desired JSON is not sufficient.
+
+```text
+folio-manager-maintain SCOPE BOOTSTRAP snapshot ID
+folio-manager-maintain SCOPE BOOTSTRAP upgrade ID FROZEN_SOURCE
+folio-manager-maintain SCOPE BOOTSTRAP restore ID
+```
+
+`BOOTSTRAP` is the currently selected generation's immutable bootstrap.
+`FROZEN_SOURCE` must be an immutable store source with candidate models and a
+validated `folio-input.json` matching the migrated configuration and descriptor.
+`folio-prepare-input` normalizes candidate data and binds identities; the maintenance
+coordinator independently verifies it against the migration result.
+
+For example, inspect and snapshot the selected user pair:
 
 ```sh
 artifact=$(readlink -e "${XDG_STATE_HOME:-$HOME/.local/state}/nix/profiles/home-manager")
 bootstrap=$(jq -r .bootstrap "$artifact/folio-home.json")
 folio-manager-maintain user "$bootstrap" snapshot before-upgrade
-# Restore that snapshot's models, startup/running data and selected closure:
+# To restore that same retained pair:
 folio-manager-maintain user "$bootstrap" restore before-upgrade
 ```
 
-Snapshots require desired startup/running data to agree with the selected closure.
-Rollback can also capture an unapplied later desired revision: the snapshot records
-its desired data and the separately verified actual deployment digest, preserving
-that drift as evidence instead of calling it applied.
-The command rejects active deployment/VM jobs, unresolved effects and interrupted
-maintenance. It stops registered consumers, records their prior active state and
-uses runtime service conditions to prevent premature restart during activation.
-Repository mutations also require an exclusive repository lock and no real
-sysrepo connection locks. The scoped mutation lock precedes repository and
-initialization locks; consumers restart after the mutation lock is released.
+Use a new transaction ID for an upgrade. User maintenance runs as the provisioned
+account with its real HOME/runtime directory; system maintenance requires root.
+Each scope upgrades separately. A system upgrade does not migrate the user
+repository, and a fallback subscriber defers when its model identity differs.
 
-`upgrade ID FROZEN_SOURCE` builds a candidate bootstrap and closure from an
-immutable source containing `folio-input.json`; system builds run as
-`folio-builder`. The candidate configuration must exactly match the isolated
-migration result, model/tool identities and closure metadata. Successful
-installation activates and verifies the paired closure before publishing its
-maintenance revision. Installation/activation failure attempts to restore the
-original repository and closure. A failed restore retains the schema barrier,
-consumer conditions and journals; repeat `restore ID` after resolving the recorded
-failure. Restore is independent of the manager RPC service. Application data is
-outside these snapshots.
+The coordinator builds before stopping consumers, refuses active or unresolved
+jobs, then stops registered consumers, locks the repository, snapshots the old
+pair and validates an isolated candidate. Installation activates and verifies
+the paired closure before publishing success. Failure attempts restoration;
+failed restoration retains the barrier and journal for explicit `restore ID`.
+Never hot-replace schemas while callbacks or deployments are active.
 
-Backups live in scoped `backups/repositories/ID/`, with raw repositories, normalized
-exports, model identities, coordinator/transaction journals and GC roots for both
-pairs. Partial candidate preparations are retained on explicit retry. Changed
-models without a new YANG revision are rejected. Terminal owns two hash-bound
-schema transitions: `2026-10-18` to `2026-10-19` adds opacity in percent; the next
-revision, `2026-10-20`, converts that value to a decimal unit fraction (`75` becomes
-`"0.75"`). Both schemas and their transforms remain module-owned. The Foot
-renderer consumes the fraction as background alpha. Unknown transformations
-remain unavailable; schema revisions are never changed in place.
+Backups live under `backups/repositories/ID/`, including repositories, normalized
+data, identities, journals and roots for both pairs. Do not delete those roots or
+call repository primitive `finalize` to bypass verification.
 
-`folio rollback REVISION_ID` restores a retained revision's desired configuration,
-models and closure together. IDs come from `status`'s applied `revisionId` (or
-`planId` for an ordinary deployment) and scoped `deployments/revisions/`. Source,
-configuration, model, tool, account and closure identities are checked before
-installation. A later failed desired revision is preserved only in the before
-snapshot; boot does not reapply it after rollback. `--rebuild` reconstructs the old
-source using current manager/repository implementations while retaining its old
-models, adapters and lock. A rebuild must still prove a supported worker protocol
-and exact retained model/tool identities; incompatible source is unavailable.
-System rollback is an offline root operation, invoked as root with
-`folio --system rollback REVISION_ID [--rebuild]`; user rollback runs as its owner.
+Scoped `folio --user|--system rollback RETAINED_ID [--rebuild]` supports advanced
+retained revision recovery. An explicit compatibility rebuild must still prove
+supported worker protocol and retained model/tool identities. First adoption of a
+Sylphy Home Manager profile uses the separate `adopt` maintenance entry point.
 
-`folio cleanup` previews eligible plans/tasks; `folio cleanup --apply` records the
-selection and removes only their deployment records and known GC-root links.
-Cleanup takes queue before mutation locks, excludes active/locked workers,
-current/previous successful revisions and every backup/recovery/upgrade reference,
-and preserves adoption backups and application data. It does not run global Nix
-GC or prune repository backups. System cleanup likewise requires root. `status`
-includes maintenance phases; while consumers are offline it can inspect readable
-scoped journals without opening the repository. Pending maintenance degrades
-health and blocks new configuration commits/applies. Do not delete backup roots
-or invoke repository primitive `finalize` as a substitute for paired verification.
+## Legacy migration reference
 
-Status probes profile/configuration drift and actual startup persistence. The C
-subscriber also publishes configuration/state and deployment plans/tasks through
-the operational datastore, for example
-`folio-repository user cfg --export --datastore operational --module folio-deployment --format json`.
-Configuration health does not establish desktop or hardware health.
+These operations preserve recovery access for the existing Sylphy installation.
+They are separate from daily configuration and model upgrades.
 
-Run `nix build --no-link .#checks.x86_64-linux.user-deployment` for real isolated
-user edit/build/apply, changed Foot output, adoption/conflict, disable/data
-preservation and operational-state evidence. The development-shell command
-`bash modules/manager/tests/build.sh . "$bootstrap"` separately checks immutable
-source capture and a real user worker surviving subscriber exit; it builds into
-isolated XDG roots and never activates on the development host.
+### Existing Sylphy account and home migration
 
-## System deployment and disposable guests
-
-The disposable system adapter provisions `folio`, the dedicated
-`folio-operators` management group, an unprivileged `folio-builder` account and
-separate root/user subscribers. Lingering starts the user subscriber without
-selecting or applying a Home Manager generation. Root plans and builds evaluate
-and build through `folio-builder`; only the recorded root worker selects the
-system profile and runs the verified closure's fixed activation entry point.
-
-An authorized operator can use `folio --system config show/edit/import/export`,
-`modules list/enable/disable`, `plan`, `build`, `apply` and `status`. Saves change
-desired data only. There is no
-passwordless sudo rule or additional Nix trusted user.
-
-The root repository and SHM directories use the provisioned operator group and
-setgid mode 2770; root journals/plans remain private. Sysrepo checks the sender's
-actual session user against module permissions. Its callback session user is the
-subscriber identity, so it is not treated as an authenticated requester name.
-This is the documented local administrative group boundary, not per-user NACM.
-
-`/run/folio/public/system-descriptor.json` is root-owned, read-only compiled system
-identity/defaults/capabilities data. Saving desired settings does not republish
-them as applied. User snapshots bind this descriptor when available, including
-its digest, registered home and preference origins. The configuration-commit RPC
-carries `configuration-json` text and validates the document with libyang, keeping
-singleton lists/leaf-lists intact across the pinned library's RPC transport.
-
-Run `nix build --no-link .#checks.x86_64-linux.system-scope` to verify real
-operator/non-operator access, isolated desired stores, durable root commits,
-read-only actual descriptors and user plan binding in a disposable guest.
-Run `nix build --no-link .#checks.x86_64-linux.system-deployment` for actual UEFI
-boot, unprivileged system builds, root activation, changed timezone, unchanged
-user generation, unauthorized/payload rejection and externally observed power.
-
-```sh
-# On a KVM-capable development machine; this launches only a disposable guest.
-image=$(nix build --no-link --print-out-paths .#vm-image)
-"$image/bin/run-folio-vm" portable
-# Inside the guest, as the provisioned folio account:
-folio --system config edit
-plan_id=$(folio --json --system plan --source /etc/folio/source | jq -r .data.planId)
-folio --system build "$plan_id"
-folio --system apply "$plan_id"
-folio --system system reboot
-```
-
-The image includes its immutable source at `/etc/folio/source` and locked inputs
-in the guest store. No live repository is read during evaluation. The prototype
-`folio` password is `kl;'`. Boot uses
-systemd-boot, EFI and labeled disposable disks; physical installation is pending.
-Power commands return durable **acceptance**, never a claim of completed reboot
-or shutdown. Completion requires outside observation.
-
-The VM module owns `folio vm build JOB_ID IMMUTABLE_SOURCE`, `start`, `stop`,
-`status` and `cleanup`. Enable/apply its user contribution before using its RPC
-commands; system provisioning supplies the KVM group, while start probes actual
-device access. Build waits by default; `--no-wait` returns its stable job ID.
-The image's launcher works before a Folio user service has been installed.
-`folio-vm-tool status|stop|cleanup portable` controls that bootstrap job from the
-`vm-tools` package. Each job has a private qcow2 overlay, EFI variables and QMP
-socket under `$XDG_STATE_HOME/folio/vm/jobs/`. Networking uses QEMU user mode.
-Stop requests ACPI shutdown and waits a bounded time; it never kills a guest to
-claim success. Cleanup refuses active jobs and archives metadata/build/serial
-logs under `folio/vm/logs/` before removing its disposable disk and GC roots.
-
-## Development handoff
-
-Implementation follows [tasks/INDEX.md](tasks/INDEX.md), which defines ordered
-stages, dependencies, acceptance gates, and AGENT handoff requirements. Read
-[tasks/WORKFLOW.md](tasks/WORKFLOW.md) and
-[tasks/SYLPHY-REUSE.md](tasks/SYLPHY-REUSE.md) before implementing a stage.
-
-Development, comments, CLI help and messages, task records, and commit messages
-must be in English. Reuse existing Sylphy implementations and preferences where
-applicable, adapting them to Folio's module and identity contracts. Batch related
-changes and run targeted checks during development. Run the relevant acceptance
-gate at each coherent stage boundary, then commit on `main` using an English
-Conventional Commit message. Do not run the complete suite after every small edit.
-
-Product documentation is maintained only in this root README for now. Task files
-are implementation work records; existing STRUCTURE.md remains a layout reference.
-Module READMEs and additional documentation trees shown in the planned layout are
-deferred until their scope is confirmed.
-
-## Initial environment
-
-- Environment: `portable`; platform: `x86_64-linux`.
-- Account: `folio`; home: `/home/folio`; prototype password: `kl;'`.
-- Emacs is the editor, including Org and Org-roam. Neovim and Panel are excluded.
-- Reuse Sylphy's Everforest dark/hard palette, Maple Mono NF CN, GoogleDot cursor,
-  desktop geometry, and applicable application preferences. Adapt identity and paths.
-- Preserve existing application data; do not copy browser logins, credentials,
-  or private network data into source or build inputs.
-- Hardware/storage definitions must name the actual deployment target. VM disks
-  are disposable fixtures, never assumed to describe a physical installation.
-
-`portable` is an environment/output name, not a binding to the development
-laptop or a guarantee of compatibility with every machine. The default system
-is an x86_64 UEFI disposable guest with root/EFI labels `nixos`/`ESP`. No specific
-GPU PCI IDs or development-host disk UUIDs are selected. Physical deployments
-must select the `physical` storage profile, supply inspected stable root/EFI
-paths and disable the prototype password. That model support is not an installer
-or proof of physical driver/boot compatibility. Keep existing data and recovery
-access; a physical target needs its own reviewed configuration and acceptance.
-
-### Hardware targets
-
-One root Flake and `modules/manager/src/defaults.nix` supply shared software,
-preferences and user identity. Manager composition uses public system storage/boot
-and devices CPU/GPU exports. There are two supported targets:
-
-| Target | Purpose |
-| --- | --- |
-| `folio` | Existing migrated USB installation shared across the laptop and desktop |
-| `portable` | Disposable UEFI guest for development and acceptance tests |
-
-```sh
-nix build --no-link --print-out-paths .#nixosConfigurations.folio.config.system.build.toplevel
-nix build --no-link --print-out-paths .#nixosConfigurations.portable.config.system.build.toplevel
-nix eval --json .#lib.folio.targets
-```
-
-The ordinary checkout defaults to `portable`. Use the explicit `folio` output to
-prepare the physical USB system. Its bootstrap `target.json` and frozen source
-`folio-target.json` record the hardware selection. Plans retain the installed
-selection; conflicting source targets are rejected. Within a frozen source,
-`nixosConfigurations.portable` is the manager's stable entry for its selected
-target. Hardware names are separate from the existing environment/account
-identity. Builds never autodetect hardware or read live sysrepo.
-
-The old `laptop`, `desktop`, `laptop-migration` and `desktop-migration` build
-outputs and dedicated GPU profiles have been removed. Old installed bootstraps
-still name their original targets: ordinary plans against this simplified source
-cannot update those installations until an explicit transition to `folio`.
-Retained immutable system generations and recovery data remain available; source
-cleanup does not switch the live system or remove old boot entries. Recovery
-helpers still recognize retained `laptop-migration` closures.
-
-### One USB system across the laptop and desktop
-
-`folio` preserves the existing migrated account, password/keyring policy, private
-runtime proxy compatibility, software and Btrfs mounts across both machines. It
-is not a fresh-install image: the Folio account and migration runtime state must
-already exist. CPU/GPU policy lives in `modules/devices/src/folio.nix`; storage and
-boot policy live in `modules/system/src/folio.nix`.
-
-Supported machines are the Lenovo Legion Y7000 IRX9 with Intel i7-13650HX and
-RTX 4060, and MSI MAG B650M MORTAR WIFI with Ryzen 7 9700X, RTX 3090 and AMD
-integrated graphics. The closure supplies Intel/AMD microcode, i915/amdgpu,
-firmware/Mesa and one stable NVIDIA driver with open modules and DRM modesetting.
-See the [NVIDIA module documentation](https://github.com/NVIDIA/open-gpu-kernel-modules).
-Kernel PCI matching selects applicable drivers; Niri selects display/render
-adapters without fixed PRIME addresses, DRM card numbers or global render
-variables. Integrated-GPU rendering, discrete-GPU power saving and application
-compute environments still require appropriate runtime configuration/validation.
-No CUDA SDK is installed in the base desktop.
-
-Storage uses inspected USB root/EFI UUIDs and Btrfs `root`, `home`, `nix`
-subvolumes. Internal disks are not configured or partitioned. The boot menu keeps
-up to ten generations and boots the default immediately with the menu hidden; EFI variable writes
-are disabled. Machines must support x86_64 UEFI USB boot. Check the ESP removable
-fallback loader during deployment: its contents were not readable without
-privilege during preparation. Secure Boot enrollment/signing is not provided.
-
-After deploying `folio` once, future plans retain that target on either machine.
-Shut down normally before moving the disk. Moving it alone requires no rebuild
-or target selection. Keep a known-working system generation while validating both
-machines. Builds do not establish physical display, suspend or power health.
-
-Earlier build/policy evidence is retained outside source under
-`/tmp/folio-mobile-*` and `/tmp/folio-target-rename-build.log`; the earlier name
-`mobile` was renamed to `folio`. No activation, EFI writes or reboot was performed
-while preparing or simplifying these targets. Live desired data and personal files
-were not changed.
-
-Simplification validation (2026-10-19) passed:
-
-```sh
-nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
-  .#nixosConfigurations.folio.config.system.build.toplevel \
-  .#system-retirement .#checks.x86_64-linux.catalogue
-nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths -L \
-  .#checks.x86_64-linux.account-migration
-```
-
-Evidence: `/tmp/folio-simplify-build.log`, `/tmp/folio-simplify-account-check.log`
-and `/tmp/folio-simplify-policy.json`. Evaluation confirmed exactly the two public
-targets, rejection of retired targets, frozen `folio` identity, retained driver
-support and existing password preservation. The account guest verified rename/
-restore and login-service recovery; this does not establish physical activation.
-
-### Migrating the existing Sylphy account
-
-`nixosConfigurations.folio` retains guarded account migration support for the
-inspected existing USB installation. It supplies both machines' hardware, adds
-administrator access and login/passwd GNOME Keyring integration, and retains the
-existing private proxy policy at runtime. It is not a fresh-install target:
-activation refuses to create a duplicate UID 1000 or run before the offline rename.
+The `system-migration`, `system-keyring` and `system-retirement` packages retain
+specialized migration and recovery tools for the existing USB installation.
+These are advanced operations for an inspected legacy account, separate from
+ordinary deployment. The current `folio` target assumes the account already
+exists; its normal configuration no longer enables the migration adapter.
 
 Build `system-migration` and the target system, then run the immutable migration
 tool with local sudo authentication:
@@ -521,7 +850,7 @@ links, opaque application data, tty autologin shutdown/recovery, and legacy
 descriptor recovery. It does not prove
 physical boot or actual account/keyring password synchronization on the laptop.
 
-### Retiring legacy system compatibility
+### Legacy system compatibility cleanup
 
 After account and home-path migration, the `folio` target uses hostname `folio`,
 retains the existing local password, and provisions the keyring through the normal
@@ -558,776 +887,87 @@ real systemd credential properties and transient hostname changes. It also check
 resume after interrupted finalization and rejection of deployment drift. It does
 not establish successful system activation on the actual host.
 
-## Ownership and scope
+## Development and verification
 
-The manager owns environment/user identity, module selection, shared preferences,
-configuration revisions, build inputs, and deployment records. Application models
-and their callbacks belong to the corresponding module. Sysrepo owns modeled
-storage, validation, and subscription dispatch.
+### Isolated development
 
-Modules do not import one another's private implementation. Public YANG imports
-and capability requirements are allowed. The Nix composition supplies public
-resources explicitly. No runtime discovers and calls another module's private
-scripts. Manager build/deploy callbacks do not dispatch arbitrary module actions.
+Use the root development shell and temporary XDG paths for repository experiments:
 
-There is one module directory per capability, with optional system and user
-adapters. There are no top-level host/home trees. A user adapter can require a
-system capability; missing prerequisites produce a finding, not silent enablement
-or privilege escalation.
+```sh
+nix develop
+bootstrap=$(nix build --no-link --print-out-paths .#manager-bootstrap)
+scratch=$(mktemp -d)
+export XDG_STATE_HOME="$scratch/state" XDG_RUNTIME_DIR="$scratch/run"
+mkdir -p "$XDG_RUNTIME_DIR"
+folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
+folio-repository user cfg --export --module folio-environment --format json --defaults report-all
+folio-manager-subscriber user "$bootstrap"
+```
 
-System and user module selections are separate. Defaults are:
+Run the subscriber in a dedicated shell. A second shell must use the same scratch
+XDG paths before submitting configuration commands. Stop the subscriber when
+finished. This example initializes only a disposable user instance.
 
-| Module | System contribution | User contribution |
-| --- | --- | --- |
-| manager | System configuration and deployment service | CLI and user configuration/deployment service |
-| sysrepo | System repository initialization and models | User repository initialization and models |
-| system | Boot, storage, accounts, locale, time, console, logging, zram, Nix | None |
-| network | Connectivity, proxy, DNS, firewall, SSH | Preferences and command adapters where needed |
-| devices | Device access, Bluetooth, power policy | Audio session, device controls and observed state |
-| vm | KVM access where supported | VM build, launch, stop and disposable state |
-| desktop | Niri session availability and portal prerequisites | Niri preferences, Waybar, Mako, launcher and clipboard |
-| appearance | System/console appearance where applicable | Fonts, cursor, GTK and shared resources |
-| input | Required input infrastructure where applicable | Fcitx5/Rime configuration and session integration |
-| terminal | Login shell registration | Foot, Zsh, prompt, tools, Typst and Git/GitHub CLI |
-| emacs | None | Emacs, Org, Org-roam |
-| agents | None | Codex and optional Pi |
-| applications | Flatpak support | Native Zen Beta/OBS packages and explicit Flatpak lifecycle |
+`folio-repository init` preserves existing startup data and rejects model/library
+identity changes. Its `ctl` and `cfg` interfaces are maintenance wrappers, not a
+replacement for managed durable configuration writes.
 
-The concrete adapter owns the NixOS/Home Manager options. In particular, audio
-device setup and user audio services are not configured independently by two
-adapters. System-provided user services are reported as system contributions.
+Implementation, CLI help/messages and commit messages use English. Keep product
+documentation in this README and behavioral checks under the owning module.
+Reuse public resources explicitly; add runtime operations only for concrete public
+actions. Run checks appropriate to the changed contract rather than the entire
+suite after every small edit.
 
-## Nix interface
+### Verification map
 
-Only the root has `flake.nix` and `flake.lock`. It declares inputs and calls
-`modules/manager/src/outputs.nix`. That file constructs outputs without querying
-sysrepo and explicitly enumerates the module catalogue. Directory presence does
-not enable a module. An unknown module or unsupported scope is an error.
+Self-contained checks are exported by their owning module as
+`<module>-<check>`. Cross-module and deployment fixtures are composed in
+[modules/manager/tests/default.nix](modules/manager/tests/default.nix), keeping
+test wiring out of production output composition. Existing short check names,
+including `cli-workflow`, `panel`, `appearance` and `account-migration`, remain
+aliases for the same derivations.
 
-Each `default.nix` is a function receiving `pkgs` and `lib`. The manager entry
-may additionally receive `cliCommands`, the collected public command map; this
-is build-time data, not other modules' implementations. Collection uses Nix
-laziness so the manager's own command declarations do not depend on its CLI build.
+The shared `tools` check exercises the generated developer environment across
+terminal, agents and Emacs; its fixture lives with manager integration tests.
+Capability-specific behavior remains under each owning module's `tests/`.
 
-| Optional output | Type and meaning |
+Python unit tests use `test_*.py`; executable acceptance scripts retain scenario
+names. Process doubles live in `tests/fixtures/` and do not activate the host.
+Isaac's installed GPU validation commands live in `runtime/validation/`, separately
+from the isolated regression tests that exercise them.
+
+| Check | Evidence covered |
 | --- | --- |
-| `packages` | Attribute set of named derivations; defaults to `{}`. |
-| `models` | `{ system = [ paths ]; user = [ paths ]; }`; lists default empty. Include model import closure. |
-| `commands` | Attribute set of command roots to `{ path; scopes; }`; scopes are `system` and/or `user`. Defaults to `{}`. |
-| `nixosModule` | `null` or a context-to-NixOS-module constructor. |
-| `homeManagerModule` | `null` or a context-to-Home-Manager-module constructor. |
+| `catalogue`, `foundation` | Public composition, schemas, normalization and repository foundations. |
+| `configuration`, `cli-workflow` | Real sysrepo commits, stale edits, private drafts, reviewed planning and durable workflow behavior. |
+| `user-deployment`, `system-scope`, `system-deployment` | Profile effects, access policy, cross-scope deployment, retained rollback and guest power observation. |
+| `agents-migration` | Paired schema/data upgrade and restore with hash-bound transitions. |
+| `applications-store`, `applications-native`, `applications` | Catalogue ownership, native delivery and application lifecycle. |
+| `panel`, `panel-browser`, `panel-network` | HTTP boundaries, Chromium interactions/layout and native network integration. |
+| `appearance`, `desktop-focus-fade`, `desktop` | GTK resources, sampled focus-ring behavior and session integration. |
+| `tools`, `tools-deployment`, `agents`, `agents-colors` | Generated tools, user deployment, coding-client integration and color adaptation. |
+| `network-proxy`, `isaac-runtime` | Module-owned proxy and optional simulation command contracts. |
+| `account-migration`, `legacy-retirement`, `legacy-retirement-files` | Legacy account and compatibility recovery paths. |
 
-Adapter context is `{ identity, globals, settings, capabilities }`: identity
-contains environment, platform, scope and optional account; globals are resolved
-public preferences; settings are only this module's normalized configuration;
-capabilities are published prerequisite facts. Nix supplies standard module
-arguments normally. Constructors do not access a mutable repository.
-
-The manager's bootstrap output file does not call its own public entry back
-through itself. Internal Nix files are ordinary imports, never independent Flakes.
-Duplicate public command roots, conflicting YANG names/revisions, unknown data,
-and unsatisfied prerequisites fail explicitly.
-
-Install the available catalogue's applicable models and command adapters even
-when a capability is disabled; do not start its application service until selected.
-Introduce a new module's model through a validated schema upgrade before accepting
-configuration that uses its new nodes. Model availability is not activation.
-
-Initial root outputs are `packages.<platform>.<module>-<component>`,
-`packages.<platform>.folio`, `nixosConfigurations.portable`,
-`homeConfigurations.folio`, `devShells.<platform>.default`, and
-`checks.<platform>.*` when checks exist. Standalone outputs use packaged bootstrap
-data unless a prepared source snapshot supplies a frozen configuration file.
-No impure live-database evaluation is required.
-
-## Models and data
-
-YANG 1.1 models use names `folio-<capability>`, namespace
-`urn:folio:<capability>`, dated revisions, and kebab-case node names. JSON uses
-RFC 7951 encoding. Defaults, ranges, enumerations, references within one data
-tree, and structural constraints belong in YANG. Nix evaluation checks package
-and adapter constraints; runtime probes check actual effects.
-
-The manager defines the shared roots; modules augment their own configuration
-and state branches. The conceptual tree in each scoped repository is:
-
-```text
-folio-environment:environment
-├── name                         portable
-├── platform                     x86_64-linux
-├── scope                        system | user
-├── account                      user scope identity
-├── users                        system-owned account records
-├── preferences                  shared defaults or user overrides
-├── modules[name]
-│   ├── enabled
-│   └── <module-owned settings>
-├── configuration                revision/hash and persistence state (observed)
-└── state                        applied revision and health (observed)
-
-folio-deployment:deployment
-├── plan / build / apply / rollback actions
-└── tasks[id]                    observed task records
-```
-
-Module-specific schema structure is defined locally. A disabled module's data
-may remain stored; its configured services and packages are removed on apply.
-Disabling a module does not delete its application data.
-
-System user records contain name, UID, home, groups, and login shell policy.
-User repositories cannot create accounts or redefine their system identity.
-Public system identity/defaults are exported as a versioned read-only descriptor;
-user plans bind its digest. No cross-repository `leafref` or two-way data sync is
-assumed. References across scopes are validated against this descriptor.
-Declared capabilities and observed health are separate fields; a declaration
-alone does not prove that a prerequisite service or device is working.
-
-Public preferences include palette roles, font family/sizes, language and input
-defaults. The system owns machine-wide defaults; users own personal overrides;
-module-specific overrides win last. The resolved values and origins enter the
-snapshot. Identity and privilege fields are not overridable preferences.
-
-## Datastores and persistence
-
-There are two independent repository instances, using separate shared-memory
-prefixes and runtime directories:
-
-| Scope | Persistent root | Runtime root |
-| --- | --- | --- |
-| System | `/var/lib/folio/` | `/run/folio/` |
-| User | `$XDG_STATE_HOME/folio/` | `$XDG_RUNTIME_DIR/folio/` |
-
-Each persistent root contains `sysrepo/`, `configuration/`, `deployments/`, and
-`backups/`. User state defaults to `~/.local/state/folio`. Wrappers bind repository
-and shared-memory settings; application clients do not select arbitrary paths.
-The fixed sysrepo package must support both root and user repository ownership.
-
-`candidate` holds drafts, `running` holds accepted desired data, `startup` holds
-persisted desired data, and `operational` reports actual state. None of these
-datastores substitutes for a deployment journal.
-
-The supported CLI edits a private temporary RFC 7951 document. It submits a
-manager configuration-commit operation with an expected base digest; it does not
-leave a shared candidate open while the user edits. One commit lock per scope
-serializes writers. Concurrent stale edits fail with a conflict.
-
-Commit protocol: validate and save a prepared journal with before/after data;
-update running; persist an accepted journal marker; synchronize startup; then
-report saved. Journal writes use atomic replacement and durable file/directory
-flushes. On restart, an accepted record rolls forward; a prepared-only record
-restores the previous data. Reconcile both datastores before starting consumers.
-Callbacks validate configuration but do not apply external side effects during
-this protocol. Applying changes is a separate operation after durable acceptance.
-
-Direct sysrepocfg datastore edits are maintenance operations outside this
-persistence protocol. Read/export and RPC submission still use sysrepocfg.
-Configuration save failure is reported; it is not called a successful deployment.
-
-Initial defaults are generated from versioned module defaults and the chosen
-environment identity. Import them only into a new repository. Boot and ordinary
-rebuild never overwrite an existing desired configuration. Import/export is
-explicit; exported JSON is a backup/review artifact, not a second live authority.
-
-## Execution and passwordless updates
-
-CLI runtime dependencies are Bash, jq and sysrepocfg. Subscribers use C with
-libsysrepo/libyang. Fixed store-path Shell programs may implement command-oriented
-operations, receiving JSON on stdin and returning modeled JSON. No `eval` or
-request-supplied executable paths are used. Compilers and headers stay in build
-or development dependencies, not the installed user environment.
-
-Each module owns its subscriptions. A module may run separate system and user
-subscribers, only when needed. No generic manager action router is introduced.
-Module-private helpers remain local; shared code is extracted only for actual
-reuse. Systemd supervises subscribers and separate long-running workers.
-
-User builds/activation execute as the account using standalone Home Manager.
-They use the ordinary Nix daemon permissions. System activation executes in a
-preinstalled root manager service. `folio` is an explicitly authorized prototype
-operator via a dedicated management group and scoped repository permissions.
-This is administrative authority granted at installation, not absence of privilege.
-It does not depend on a blanket passwordless sudo rule or adding the account to
-Nix `trusted-users`.
-
-The system manager validates the requested environment, operation and recorded
-input, then uses a known unprivileged build identity and a fixed activation
-worker. The root worker consumes immutable plan/artifact identities. Only the
-recorded NixOS closure is eligible for activation; arbitrary shell payloads or
-mutable activation paths are rejected. This prototype trusts the authorized
-operator's selected source code as system administration input.
-
-The first installation provisions accounts, groups, repositories and root
-services with installation privileges. Later user installs and system updates
-require no sudo password. Updating runtime schema/services follows the same
-scope: user upgrades as the user, system upgrades through the installed service.
-Repository groups grant coarse local access; this is a single-operator prototype,
-not a hostile multi-user security boundary. Do not trust a username supplied in
-JSON as authentication. System handlers use library/session identity and the
-provisioned access policy; they do not assume NETCONF/NACM is automatically in
-the direct sysrepocfg path.
-
-## Local web panel
-
-Build the shared frontend and launch it as your desktop user:
+For a focused configuration/UI change:
 
 ```sh
-nix build --out-link modules/panel/result .#folio
-./modules/panel/result/bin/folio panel
-```
+nix build --no-link \
+  .#checks.x86_64-linux.configuration \
+  .#checks.x86_64-linux.cli-workflow \
+  .#checks.x86_64-linux.panel \
+  .#checks.x86_64-linux.panel-browser
 
-`folio panel` opens the local web panel in the default browser. You can also
-launch **Folio Panel** from the application launcher. The responsive interface
-uses Everforest colors and the installed appearance font family and size, with
-pages for Wi-Fi, proxy, sound/display and device information. Wi-Fi opens first;
-use the navigation or keyboard focus to move between pages, and Refresh to reload
-state. Half-width Niri windows use a compact top navigation bar; the side rail
-appears only at 1600 CSS pixels and wider. Network cards stack below 1120 pixels,
-with connection details and action buttons arranged to suit the available width.
-
-The Python standard-library server listens only on `127.0.0.1` at an allocated
-port. A private runtime record under `$XDG_RUNTIME_DIR/folio-panel` lets repeated
-launches reuse it. Each API request requires a random session token; host and
-origin checks reject cross-site requests. The launch URL delivers the token in
-its fragment, then the browser removes it from the URL and retains it in tab
-session storage. No external assets, cloud service or frontend build is required.
-Closing a tab leaves the local service available in the user runtime; a later launch
-replaces a server from an older installed package automatically.
-
-- **Wi-Fi:** select an adapter, scan, connect to saved/new/hidden personal
-  networks, disconnect, toggle radio and confirm profile deletion. Open and
-  personal WPA networks are supported; enterprise and legacy authentication
-  are unavailable. Credentials travel to the native libnm client on stdin and
-  are saved by NetworkManager in a user-restricted connection, outside Folio data.
-- **Proxy:** inspect Mihomo selector groups, select nodes, change runtime mode
-  and run bounded sequential latency tests. Tests use a fixed public endpoint;
-  results describe that endpoint only. The system network subscriber mediates
-  access to the private controller; unavailable services remain unavailable.
-- **Display & Audio:** select the default output, adjust volume up to 100 percent,
-  toggle mute and adjust supported backlights. Output selection does not promise
-  migration of existing streams. External-monitor DDC/CI control is not included.
-- **Device:** observe CPU, memory, graphics drivers, connected displays, network
-  interfaces, OS, uptime and available batteries. Missing metrics are unavailable.
-
-Runtime controls act immediately and are outside configuration rollback. Native
-NetworkManager/PipeWire/backlight permissions apply; proxy access requires the
-system operator group. Do not launch the panel with sudo. Existing installations
-need the new `folio-network-panel` model through the documented paired schema
-upgrade and a matching subscriber; building the frontend alone does not install
-these services. Ordinary CLI commands still delegate to the existing manager;
-the proposed intelligent apply and unified history/rollback remain pending.
-
-Run `nix build --no-link .#checks.x86_64-linux.panel` for HTTP/authorization checks,
-`.#checks.x86_64-linux.panel-browser` for real Chromium interaction checks and
-desktop/mobile screenshots, and `.#checks.x86_64-linux.panel-network` for isolated
-native backend integration.
-Hardware acceptance remains separate from these checks.
-
-## CLI contract
-
-```text
-folio config show|edit|import|export [--system]
-folio modules list|enable|disable NAME [--system]
-folio plan|build|apply|rollback [--system]
-folio status [--system]
-folio apps init|list|install|update|remove|reconcile|adopt|prepare ...
-folio apps rollback|resume|status REVISION_OR_TASK_ID ...
-folio --system system reboot|poweroff
-folio vm build|start|stop|status ...
-```
-
-Environment defaults to the installed `portable` identity; `--environment`
-selects another registered environment. User scope defaults to the current
-account. `--system` explicitly selects system configuration/deployment. System-only
-power commands declare their scope and do not silently reinterpret a user command.
-Unsupported scopes fail before side effects. Nested subcommands are owned by
-their module's command adapter.
-
-Module selection edits desired data; `apply` applies it. Flatpak install/remove
-commands first persist the new application selection, then submit their own
-application task. A failed installation leaves visible desired/actual drift.
-Updates have explicit resolution plans; automatic updates are initially disabled.
-`apply` without a scope flag updates the user Nix/Home Manager profile. Application
-installation and manifest materialization are explicit applications operations;
-their pending state is visible after a configuration-only update.
-
-CLI defaults to waiting for a task result, with `--no-wait` returning its ID.
-Interrupting the CLI stops waiting, not the durable task. `--json` emits one
-result envelope: `{ status, data, error, taskId }`; progress goes to stderr.
-Exit codes: 0 success, 1 operation failure, 2 usage/model validation error,
-3 unavailable service/evidence, 4 conflict. Missing subscribers are unavailable,
-not successful no-ops. A successful RPC transport is not proof of task success.
-Short RPCs default to a 30-second timeout; long operations acknowledge a durable
-task instead of blocking that callback. Build/task timeouts are configurable and
-recorded in the plan. Retrying a task submission with the same request ID and
-input digest returns the original task, not a duplicate deployment.
-
-## Build and deployment protocol
-
-One immutable input contains normalized configuration, required public system
-descriptor, YANG models/imports, source bytes and `flake.lock`. Hash normalized
-libyang JSON with deterministic object ordering; preserve YANG list semantics
-and RFC 7951 number encoding. Record the tool/model identities used. Sources
-are copied once before validation; exclude runtime state, credentials and outputs.
-Reject escaping symlinks. The editable working directory is not a running build's
-input. Git metadata is not required for a local prototype snapshot.
-
-Plans record scope, environment, owner, input digest, prior deployment, proposed
-effects, prerequisites and artifacts. Builds have no activation side effects.
-Configuration changes after planning produce a stale-plan conflict on apply.
-Successful closures and retained rollback closures have explicit Nix GC roots.
-Retain at least the current and previous successful deployment; older records
-are pruned only through explicit cleanup. Cleanup preserves all closures and
-snapshots referenced by active tasks or retained recovery records.
-
-Task phases are `queued`, `validating`, `building`, `activating`, `verifying`,
-`succeeded`, `failed`, or `interrupted`. Persist the current phase before each
-external effect. Records include before/after profile paths, observed results,
-errors and timestamps. Return a task ID only after durable queue submission.
-Systemd workers outlive their subscriber and requesting terminal. Manager upgrades
-leave the old worker/closure rooted until its task finishes.
-
-There is one mutation lock per scope/account, and an applications lock for Flatpak
-changes. Apply and application operations take user-configuration before application
-locks when both are needed; no reverse lock order. Cross-scope work takes no
-simultaneous scope locks. Check revisions again before activation.
-
-One account-owned Home Manager profile is authoritative. Boot preserves its
-selection; system-only apply does not publish another Home generation. A combined
-update is a CLI sequence of separately submitted system, user and applications
-operations, each bound to its own plan. Stop on failure and report partial success;
-the manager service does not dispatch application RPCs.
-
-Recovery probes actual profiles/services after an interrupted side effect. It
-does not blindly re-run activation or destructive commands. Preserve conflicting
-unmanaged regular files with unique backups before adoption; later unexpected
-edits are reported as conflicts. Activation failure retains before/after evidence.
-Attempt restoration only for recorded reversible effects; report recovery-required
-when it fails. Application-owned mutable data is outside generation rollback.
-
-Managed rollback restores the target scope's retained closure and matching desired
-configuration, including required models. Do not automatically reapply a newer
-failed desired revision. If data/schema restoration cannot complete, stop and
-report the mismatch. Rebuild an old source with the current protocol when an old
-closure does not support managed rollback.
-
-## Model upgrades
-
-Use YANG revisions for schema changes, not a second per-module API-version system.
-Treat additive optional fields separately from renamed/removed fields or changed
-types. Modules own explicit migrations when existing data changes meaning.
-
-Serialize configuration and deployment mutations; quiesce affected subscribers;
-export startup/running data and capture model revisions; migrate an isolated copy;
-validate with the new schema; then install schema/data and restart subscribers.
-Preserve the old repository backup and closure. Failed migrations restore that
-pair before resuming. Do not hot-replace schemas while callbacks or deployments
-are active. Recovery tooling can restore offline without the manager running.
-
-System maintenance runs with the `folio-operators` effective group so datastore
-imports retain `root:folio-operators` ownership. The system-provided fallback user
-subscriber starts only when its bootstrap matches the existing user model/library
-identity. A mismatch defers that fallback without failing system activation;
-upgrade the user repository and its Home Manager closure separately. Deferral
-does not complete a user migration or establish user-service health.
-
-For the first transition from a Sylphy Home Manager profile, use the explicit
-`folio-manager-maintain user OLD_BOOTSTRAP adopt ID FROZEN_SOURCE` entry point.
-It requires Sylphy protocol/schema version 1 metadata matching the current
-account and home, no existing Folio applied record, and unchanged managed files.
-The frozen input must match the migrated desired configuration. Adoption retains
-the old repository and legacy closure independently, backs up first file
-collisions, and starts newly enabled subscribers after activation. It does not
-invent a Folio identity for the old profile. Explicit `restore ID` restores both
-retained components; subsequent migrations use ordinary `upgrade`.
-
-Terminal startup files live in `~/.config/zsh`, including when a legacy session
-already exports `ZDOTDIR`. Desktop profiles retain the upstream Niri session unit
-with `keep-old`; compositor updates take effect at the next login. The pinned
-Home Manager switcher is patched to honor this setting for an already active
-unit that was previously provided only by the system. User apply also resumes
-enabled Folio subscribers that were stopped by their manager dependency.
-
-## Flatpak and application configuration
-
-All Flatpak applications belong to `applications`. Install as the user with
-`--user`; initialize Flathub explicitly from its official repository descriptor.
-The bootstrap app set is Zen (`app.zen_browser.zen`) and OBS
-(`com.obsproject.Studio`). Typst stays in `terminal` through Nix.
-
-For native installations, select `applications.native.zen` and/or
-`applications.native.obs`, and set the corresponding Flatpak `app.selected` to
-false. The model rejects selecting both deliveries for the same application.
-Native packages and launchers are installed and rolled back with the Home Manager
-generation through `folio apply`; `folio apps list` reports their actual delivered
-executables. Flatpak lifecycle commands operate only on Flatpak selections.
-
-Native Zen Beta uses the reviewed upstream package pin. Optionally set
-`applications.native.zen-profile` to an existing profile directory name under
-`~/.config/zen/` (for example `folio`). Both `zen-beta` and its desktop entry then
-open that directory directly. The selected native profile receives Folio's
-preference file and owned browser/content CSS through Home Manager, using the
-same renderer as the Flatpak delivery. The directory must already exist; unmanaged
-`user.js` or CSS entry files cause a conflict instead of being overwritten.
-Browser databases, logins, session data and `prefs.js` remain application owned.
-Native Zen opens each new tab in a separate normal window for Niri to tile.
-The pinned, signed One Tab per Window extension handles new tabs (including
-private browsing); a browser-owned AutoConfig hook prevents Zen workspace
-replication and adopts restored tabs into independent windows after Zen finishes
-restoring them. Page state is moved rather than recreated from URLs. Link and
-external-open preferences use new windows. This behavior is bundled with the
-native browser package and requires fully quitting Zen and opening it again after
-applying a generation. `checks.x86_64-linux.browser-windows` exercises new tabs,
-links, private tabs and actual session restoration in a disposable profile.
-Restart Zen to load changed preferences and styles. OBS configuration
-also remains application owned. Native selections default to false when upgrading
-an existing repository; enabling them is a separate explicit desired change.
-
-The current application entry is `folio apps` in user scope. Enable/apply its
-system contribution for Flatpak infrastructure and its user contribution for the
-subscriber and generated manifest. Then use:
-
-```sh
-folio apps init
-folio apps prepare all
-folio apps install all --offline
-folio apps list
-folio apps update zen
-folio apps reconcile zen --offline
-folio apps adopt obs
-folio apps remove obs
-folio apps rollback REVISION_ID all --offline
-folio apps status TASK_ID
-folio apps resume TASK_ID
-```
-
-Mutations accept `zen`, `obs`, or `all`, optional `--offline` and
-`--request-id ID`; `--no-wait` is a global option. `prepare` downloads and records
-complete resolved transactions without deploying apps. Offline work requires
-those retained plans and matching cached refs, including locale and graphics
-extensions. Initial pinned installation requires the target commit to resolve
-from that preparation; a different available branch head is rejected. Existing
-installed pinned apps use explicit commit updates. Historical rollback currently
-requires local retained content and matching refs; missing/changed refs return
-unavailable before effects. Shared deployed runtimes are preserved; a historical
-plan requiring a different shared runtime is unavailable.
-
-Set the Zen app's `zen-profile` to an existing relative profile directory recorded
-in its sandbox `profiles.ini`, then build/apply the user configuration and run
-reconcile. Missing profiles or stale manifests leave configuration pending.
-`--adopt-files` allows first ownership of existing supported files, retaining
-unique backups. Unexpected edits to an already owned file must be resolved before
-resuming its recorded task. Workspace seeding and OBS Qt appearance remain
-explicitly unsupported; scenes, logins, databases and sessions remain app-owned.
-
-The application model records ID, remote, branch, architecture, enabled state,
-version policy, optional requested commit, configuration settings and managed
-permission overrides. Observed data records installed full refs/commits, runtime
-and extension refs, configuration digest and health. Ownership is keyed by
-installation scope plus full ref, not display name.
-
-Default version policy is explicit refresh of the stable branch. A normal
-reconcile preserves an already resolved commit; only update/initial install
-resolves a newer commit. Plans record the resolved application and dependency
-commits. A pinned app uses its requested commit. `flatpak pin` is not used as
-application version locking. No timers silently update managed applications.
-
-Preparation downloads required refs without activating them, captures the actual
-resolved commits, and revalidates the plan before deployment. If a remote or
-local ref changes, replan rather than silently deploying different bytes. Deploy
-from prepared local content, checking the resulting commits. No online Flatpak
-operation occurs during Nix evaluation or a Nix derivation build.
-
-Serialize mutations and apply per application, recording before/after state.
-There is no atomic transaction across all apps or across Flatpak and Home Manager.
-On failure, preserve completed results and allow idempotent resume. If an existing
-installation was not Folio-owned, explicit adoption is required before modifying
-it. Removal preserves user data; unrelated apps/remotes/overrides are left alone.
-
-Record previous refs/commits for rollback. Preflight verifies that old applications,
-dependencies and extensions remain available locally or remotely. If not, report
-rollback-unavailable before changing anything. Version records are not an archive;
-indefinite offline Flatpak rollback is not promised. NixOS rollback alone does not
-restore Flatpak versions. Shared runtime changes are tracked and may affect
-unmanaged apps; do not prune or downgrade shared runtimes automatically.
-
-Nix generates a manifest of managed application files. User activation publishes
-the manifest and roots its immutable sources. The applications runtime materializes
-files as regular files using temporary files and atomic replacement, with content
-hashes and unique first-adoption backups. Do not expose the whole Nix store merely
-to resolve Home Manager symlinks inside a Flatpak sandbox. Reject path traversal,
-unexpected symlink destinations and conflicting managed ownership. Keep immutable
-generated sources and the manifest rooted for rollback.
-
-Reconciliation order is prerequisites, prepared app installation, managed files,
-and verification. If a profile does not exist yet, report `configuration-pending`;
-do not guess a profile or overwrite its registry. Retry after profile selection
-or creation. Configuration changes requiring restart report `restart-required`
-without killing the app or discarding user work.
-Refuse file deployment when the manifest's desired configuration digest is stale;
-build/apply the current user configuration first. This prevents new desired
-settings from being reported as applied using an old manifest. Query Flatpak
-using explicit machine-oriented columns and fixed locale, not translated progress
-text. SDKs and flatpak-builder are not installed merely to run applications.
-
-Zen manages an explicitly selected profile's supported preference file and owned
-CSS resources, adapted from Sylphy. Do not overwrite `prefs.js`, browser databases,
-session data, logins, or arbitrary existing CSS. Theme files use a Folio-owned
-namespace; existing entry files require explicit adoption or a supported include.
-The initial three-workspace layout is a one-time seed when supported, not a
-continuous overwrite of mutable workspace state.
-
-OBS installation, desktop integration and declared permissions are managed.
-Scenes, recording profiles, accounts and mutable preferences stay app-owned.
-Only supported external theme/configuration interfaces are used; GTK theming
-alone does not establish OBS/Qt theming parity. Report unsupported appearance
-features rather than overwriting OBS state. Screen-capture acceptance requires
-actual frames through desktop portals and PipeWire. Devices and desktop retain those host capabilities.
-
-## Terminal and developer tools
-
-The user `terminal` selection now renders Foot and Zsh with the reused Pure
-Powerlevel10k prompt, completion, history, suggestions and highlighting. Its
-`folio-terminal:terminal.shell` settings control those features; `.tools` contains
-independent boolean switches for bat, btop, eza, fd, fzf, jq, ripgrep, zoxide, unzip,
-unrar, chsrc, just and Typst. Typst remains a terminal component. Only the named
-unrar package is allowed by the unfree predicate. Zsh history/cache are writable
-per-user state. The system terminal contribution registers Zsh; changing a user's
-login shell still requires an explicit system account `login-shell` selection.
-
-`terminal` also owns Git and optional GitHub CLI through
-`folio-terminal:terminal.git`. Git defaults new repositories to `main` and enables
-rebasing pulls. Set `.git.user-name` and `.git.user-email` in the terminal settings;
-no personal identity, signing key or token is supplied. `.git.enabled=false`
-removes only Git/GitHub CLI's managed contribution while keeping the terminal.
-
-`emacs` provides Org/Org-roam, backlinks, search/completion, the dashboard and
-Everforest preferences. `C-c n f` finds notes, `C-c n b` shows backlinks and
-`C-c n h` opens the start page. Notes default to `~/Documents/Notes`; set
-`folio-emacs:emacs.notes-directory` to reuse an existing directory. The rebuildable
-index and editor history stay in `$XDG_STATE_HOME/folio/emacs`. Optional personal
-additions live in `~/.config/folio/emacs/local.el`, which Folio does not manage.
-
-`agents` groups independently selectable coding clients under
-`folio-agents:agents`. `.codex.enabled`, `.codex.theme` and
-`.codex.shell-completion` control the pinned Codex CLI, Zsh completion and
-a selectable Folio `.tmTheme`.
-Choose it with `/theme`; theme loading follows the
-[official Codex customization interface](https://learn.chatgpt.com/docs/cli-customization).
-Mutable Codex configuration, authentication and session state remain application
-owned. `.pi.enabled` installs Pi from the root Flake's locked nixpkgs input
-(currently `1.1.0`). Fresh defaults enable both clients. dsh is retired; its
-private data is preserved but its package and compatibility patches are removed.
-
-Pi uses its native configuration rather than a second YANG representation.
-Maintain shared settings and resources in `modules/agents/src/pi/config/` in this
-same repository. `settings.json`, optional `models.json`, `mcp.json`,
-`keybindings.json`, instruction files, and `extensions/`, `skills/`, `prompts/`,
-`themes/`, and `packages/` use Pi's own formats. Create resources only as needed.
-No separate configuration repository or Folio plugin manager is required.
-
-The user generation exposes this directory at `~/.config/folio/pi`. Set
-`.pi.config-directory` to an absolute writable checkout directory to edit it
-in place. The `folio` hardware target defaults to
-`/home/folio/Workspace/folio-nixos-config/modules/agents/src/pi/config`;
-existing desired data must select that path explicitly during schema migration.
-The portable target uses an immutable configuration snapshot instead. Without a
-writable directory, edit the repository and apply a new generation; Pi's native
-persistent settings/package writes cannot modify the immutable snapshot.
-
-The `pi` launcher keeps its writable agent directory at
-`$XDG_STATE_HOME/folio/pi` (default `~/.local/state/folio/pi`) and links only the
-native configuration/resource names above into it. Authentication, sessions,
-project trust, downloaded npm/Git packages and caches stay outside the checkout.
-It refuses to replace pre-existing personal configuration files or unrelated
-links. A missing configured checkout fails explicitly. `FOLIO_PI_CONFIG_DIR`
-selects a configuration directory for one invocation; an explicitly supplied
-`PI_CODING_AGENT_DIR` selects another private agent directory.
-
-With the writable checkout selected, `/settings`, model selection and
-`pi install` write native settings back into that checkout. Review and commit
-those changes normally. Put local packages under `config/packages/`; relative
-resource/package paths resolve through the private agent directory, whose named
-resource directories link back to the checkout. Absolute resource paths also
-work. For portable local declarations, use paths such as `./packages/my-tools`
-in `settings.json`; review paths written by `pi install` before sharing them.
-Writable checkout edits are live application configuration: generation rollback
-does not undo them. Review and restore those edits with Git. Project `.pi/`
-resources continue to follow Pi's native project trust and
-loading rules. Use `/reload` after manual edits. Keep keys out of tracked config;
-use Pi login or environment-based credentials. Do not commit downloaded package
-caches or dependencies. To update Pi itself, update the root nixpkgs lock and
-rebuild; runtime package installation remains independent of that lock.
-
-The launcher supplies `wl-clipboard` for Wayland copy/paste, including Pi's
-native clipboard commands and image reads. It inherits the desktop's
-`WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; restart Pi after updating its launcher.
-
-GitHub/Codex/Pi authentication requires the target user's own setup. Disabling
-a module removes its managed files while preserving repositories, notes, indexes
-and personal application data.
-
-The former standalone `git` and `codex` modules are retired. Their original YANG
-files remain only as hash-bound migration history in their new owning modules.
-Use paired schema maintenance when upgrading an existing repository; an ordinary
-configuration import cannot rename installed schemas. Migration moves Codex
-preferences to `agents.codex` and Git identity/preferences to `terminal.git`,
-preserves enabled/disabled choices and leaves Pi disabled for migrated standalone
-Codex users until explicitly selected. An additional hash-bound migration replaces
-`agents.dsh.enabled` with `agents.pi.enabled`, preserving its boolean value and
-Codex preferences. It does not migrate dsh credentials, plugins or conversations.
-Conflicting old/new agent settings, conflicting Git settings, or enabled Git with a disabled terminal fail
-explicitly rather than overriding preferences. Retained rollback restores the
-complete older model/data identity. Authentication, sessions and repository-local
-Git settings are outside these transforms.
-
-Use `folio config export desired.json`, edit the owning module settings, then
-`folio config import desired.json` and the plan/build/apply workflow above. A
-configuration commit alone does not install software or change the login shell.
-
-## Desktop, input and device integration
-
-The greetd/tuigreet login screen uses the console's Everforest ANSI palette:
-background, foreground, yellow accents and gray borders match the desktop.
-A centered 60-column prompt shows only the login form, without a greeting or clock.
-It retains the console's Terminus font, since a Linux TTY cannot use the desktop
-OpenType font. Apply this change in system scope; greetd is not restarted during
-activation, and the new greeter appears on the next boot.
-
-User modules render Niri, Waybar, Mako, Fuzzel, clipboard
-history and screenshots; system desktop owns the login session and portal
-prerequisites. Fuzzel's border width follows `desktop.border-width` (default 3),
-so the launcher and Niri focus rings have the same thickness. Reboot and
-power-off confirmations use a Fuzzel dmenu prompt and therefore share the
-launcher's font size, colors, selection and border style. Appearance provides
-Everforest palettes, Maple Mono NF CN, a recolored GoogleDot cursor and GTK
-resources. Shared preference and module override origins are recorded in
-`~/.config/folio/appearance.json`. Applying a generation does not log out the
-current desktop; session-dependent changes need a new login.
-
-GTK 3 uses adw-gtk3 with the selected Everforest palette. GTK 4/libadwaita keeps
-its native stylesheet and receives both legacy named colors and modern CSS
-variables. GTK interface, document, monospace and titlebar fonts share the
-resolved appearance font family and point size (by default Maple Mono NF CN 16).
-Restart open applications after applying to reload their user stylesheet.
-Run `nix build --no-link .#checks.x86_64-linux.appearance` to check real GTK 3
-and libadwaita widgets in both dark and light modes, including CSS parsing,
-resolved fonts, foreground colors and the libadwaita accent color.
-
-The desktop owns a patched Niri 26.04 package with a 300 ms focus-ring opacity
-transition. The previous ring fades out while the new ring fades in; interrupted
-transitions resume from their current opacity. Window content opacity is unchanged.
-The transition follows Niri's global animation disable and slowdown settings.
-Both the system session and the user session unit select this package. Applying
-it preserves the running compositor; log out and back in to load a new binary.
-Run `nix build .#checks.x86_64-linux.desktop-focus-fade` for an isolated software
-display check that samples actual ring pixels before, during and after a switch.
-
-Fcitx5/Rime Ice starts as a user service. Initial profile and candidate defaults
-are seeded only when absent; existing personal profiles, dictionaries and history
-are preserved. The bar observes the real input-method indicator. Chinese input
-has committed text from a fresh profile in an isolated Wayland guest. First-run
-Rime Ice dictionary deployment must finish before Chinese composition is ready.
-
-`folio devices status` reports actual audio, Bluetooth adapter, backlight, power
-profile and basic hardware observations. `volume`, `mute`, `brightness` and
-`profile` use the module's own subscriber and native services. Media and brightness
-keys call those public commands when the user devices module is selected. Missing
-hardware or authorization returns unavailable; a configured service does not prove
-physical device health. Bluetooth pairing remains available through Blueman.
-Physical GPU, sound, backlight and Bluetooth acceptance remains separate from guest
-checks. The virtual DRM acceptance fixture observed changing OBS frames through
-the real portal and PipeWire. It uses software Mesa in an isolated SDL/Xvfb QEMU
-display; it does not establish physical GPU acceleration or encoder performance.
-
-## Network and system policy
-
-The system-owned `network` contribution enables NetworkManager, DHCP/connection
-DNS and a default-deny inbound firewall. Explicit `dns` addresses override
-connection DNS. SSH and Mihomo are opt-in; SSH permits public-key authentication
-and opens its configured port only when `ssh.open-firewall` is enabled. Provision
-authorized public keys on the target in `~/.ssh/authorized_keys` or
-`/run/folio/authorized_keys/ACCOUNT`.
-
-```sh
-folio --system network status
-folio --system network connect CONNECTION_UUID INTERFACE
-folio --system network disconnect INTERFACE
-folio --system network proxy-mode rule
-folio --system network proxy-select DIRECT
-```
-
-These commands require system operator access. Connection commands use an existing
-NetworkManager profile; provision its credentials outside Folio desired data.
-Proxy actions use Mihomo's private Unix controller and return actual observations.
-Live proxy mode/selection are application state; they do not commit desired policy.
-Disabled services, missing profiles/nodes and backend failures return unavailable.
-The optional `proxy.provider-file` references a target-local YAML under `/run` or
-`/var/lib`; systemd loads it as a runtime credential. Evaluation and builds never
-read its contents. The proxy listener binds loopback; TUN is separately opt-in.
-
-System policy models locale/time sync, console, bounded journald storage, zstd
-zram and Nix build/store settings. Storage defaults describe a disposable guest.
-Physical configuration requires explicit stable root/EFI device paths and
-`prototype-password=false`; accounts then start with locked password hashes.
-No adapter partitions disks. The public `nixosModules.portable` exposes the same
-frozen composition as `nixosConfigurations.portable` for explicit integration.
-Physical storage boot, Wi-Fi, TUN, private provider nodes and NTP synchronization
-require separate target evidence.
-
-## Operations and VM policy
-
-Manager owns build/deploy/rollback; network owns connection/proxy actions;
-devices owns audio/Bluetooth/brightness; desktop owns exposed session actions;
-applications owns Flatpak lifecycle; system owns reboot/poweroff; vm owns guest
-lifecycle. Other modules need operations only when a concrete public action exists.
-Read-only state providers may have runtime without an operations directory.
-
-Power requests acknowledge acceptance and then schedule the power operation.
-They are never reported as completed before external observation. Commands are
-tested only against disposable guests, never by powering off the development host.
-
-Use QEMU/KVM directly with OVMF for UEFI tests; libvirt is not an initial dependency.
-Use user-mode networking and temporary disk images by default. No host disk
-passthrough, bridge changes or automatic reboot of the host. Guest jobs use stable
-IDs, logs and explicit cleanup. VM access is granted at initial system provisioning.
-
-## Verification
-
-Four levels: static checks, module tests, integration tests, and complete-system
-tests. Behavioral checks live under the owning module's outer `tests/`.
-The final release scenario reuses the manager and desktop fixtures rather than
-introducing another test framework.
-
-- Static: Nix/Shell syntax, shell lint, YANG import/type/constraint validation.
-- Module: request translation, configuration rendering, scope checks, modeled
-  errors and ownership behavior without changing the host.
-- Integration: real isolated sysrepo, actual CLI and subscribers, persistence,
-  missing subscribers, conflicts, migrations and controlled backend failures.
-- System: disposable VM boot, both scopes, passwordless updates, persistence,
-  interrupted deployment, rollback, desktop/Flatpak integration and power actions.
-
-Pi replacement acceptance passed on 2026-10-20 with:
-
-```sh
-nix build --no-link --no-update-lock-file --max-jobs 2 --print-out-paths \
-  path:.#checks.x86_64-linux.agents \
-  path:.#checks.x86_64-linux.agents-migration \
-  path:.#checks.x86_64-linux.applications-native \
-  path:.#checks.x86_64-linux.tools-deployment
 git diff --check
 ```
 
-These checks exercised a real Pi extension, native settings writes and local
-package install/remove under temporary homes; real sysrepo schema/data upgrade
-and restore, including rejected source hashes; and disposable guest profile
-activation/disable with private data retained. The `folio` target's configuration
-link was separately built and verified to point at the writable checkout. No live
-model request, host schema migration or host activation was performed.
+Checks span static validation, module behavior, isolated real-sysrepo integration
+and disposable complete-system guests. The usability acceptance run on 2026-10-22
+passed configuration, workflow, panel/browser, store, migration and UEFI deployment
+gates, including detached coordination, rollback and observed reboot/shutdown.
 
-`checks.x86_64-linux.integrated-release` requires an isolated public Flatpak cache
-and matching retained application plans as explicit overrides. It fails before
-boot when either is missing; it never substitutes host application data. With
-their existing store paths in `FOLIO_TEST_CACHE` and `FOLIO_TEST_PLANS`, run:
+The integrated release fixture requires an isolated public Flatpak cache and
+matching retained application plans. Supply existing store paths explicitly:
 
 ```sh
 nix build --no-link --impure --expr '
@@ -1338,29 +978,33 @@ nix build --no-link --impure --expr '
   }'
 ```
 
-Nix build success does not prove activation or health. Reboot tests observe a
-changed boot ID and restored services; shutdown tests observe clean guest exit
-from outside. Unauthorized operations must leave the guest running. Bound all
-waits; report unavailable evidence as unknown. Graphics/Wi-Fi/physical SSD boot
-need separate hardware acceptance, not claims based on VM success.
+The fixture fails before boot when either input is missing and never substitutes
+host application data. The complete guest gate has covered both scopes,
+interrupted recovery, cached apps, actual Chinese input, OBS portal/PipeWire
+frames and externally observed power actions.
 
-## Implementation order
+### Evidence boundaries
 
-1. Root Flake, manager entries, fixed sysrepo/libyang and bootstrap data.
-2. User repository, Foot configuration snapshot/build/apply, CLI and C subscriber.
-3. System repository, root deployment service and passwordless VM system updates.
-4. Persistence recovery, schema migration and managed rollback.
-5. Flatpak Zen/OBS installation, managed regular-file delivery and observed state.
-6. Desktop, input, developer tooling and network/system policy (implemented).
-7. Integrated VM acceptance and separately authorized physical hardware validation.
+A successful build establishes evaluation/buildability, not activation or hardware
+health. Guest results do not establish physical GPU acceleration, suspend, Wi-Fi,
+backlight, Bluetooth, storage boot or encoder performance on both target machines.
+Generic Flatpak selection has schema-persistence and backend-protocol coverage;
+the usability gate did not download and install arbitrary live Flathub apps.
+Isaac simulator/rendering/training stages require separate GPU evidence.
+
+Power RPCs report durable acceptance. Completion requires an external observation
+such as a changed guest boot ID or clean QEMU exit. Native service declarations
+and configured capabilities likewise remain separate from observed health.
 
 ## Upstream references
 
-- [Sysrepo API, permissions, instances and datastores](https://github.com/sysrepo/sysrepo)
-- [YANG 1.1](https://www.rfc-editor.org/rfc/rfc7950.html)
-- [YANG JSON encoding](https://www.rfc-editor.org/rfc/rfc7951.html)
+- [Sysrepo](https://github.com/sysrepo/sysrepo)
+- [YANG 1.1 — RFC 7950](https://www.rfc-editor.org/rfc/rfc7950.html)
+- [YANG JSON encoding — RFC 7951](https://www.rfc-editor.org/rfc/rfc7951.html)
 - [Standalone Home Manager](https://nix-community.github.io/home-manager/installation/standalone.html)
 - [Flatpak command reference](https://docs.flatpak.org/en/latest/flatpak-command-reference.html)
 - [Flatpak desktop integration](https://docs.flatpak.org/en/latest/desktop-integration.html)
+- [NVIDIA open GPU kernel modules](https://github.com/NVIDIA/open-gpu-kernel-modules)
+- [Yazi configuration](https://yazi-rs.github.io/docs/configuration/yazi/)
 - [Zen Linux installation](https://docs.zen-browser.app/guides/install-linux)
 - [OBS Linux installation](https://obsproject.com/kb/linux-installation)
