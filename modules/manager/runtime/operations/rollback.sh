@@ -64,6 +64,30 @@ snapshot_artifact_matches() {
       (if $scope=="system" then .scope=="system" else .scope=="user" and .account==$account and .home==$home end)' \
     "$metadata" >/dev/null
 }
+bind_before_applied_digest() {
+  local closure=$1 expected_bootstrap=$2 before_digest retained_source
+  # A saved desired edit need not have been applied to the selected closure.
+  # Bind the old closure to its retained deployment, while preserving both
+  # desired datastores in the snapshot for migration and recovery.
+  if snapshot_artifact_matches "$closure" "$expected_bootstrap"; then return 0; fi
+  before_digest=$(jq -er --arg artifact "$closure" \
+    'select(.format==1 and .artifact==$artifact) | .configurationDigest' "$backup/deployment.json") || {
+      echo 'Pending desired changes require a retained deployment matching the selected closure' >&2; return 1;
+    }
+  [[ "$before_digest" =~ ^[a-f0-9]{64}$ ]] || return 1
+  retained_source=$(jq -er .source "$backup/deployment.json") || return 1
+  immutable "$retained_source" && [[ -f "$retained_source/folio-input.json" ]] || return 1
+  jq -e --arg digest "$before_digest" --arg scope "$scope" \
+    --slurpfile identities "$expected_bootstrap/identities.json" \
+    '.format==1 and .scope==$scope and .configurationDigest==$digest and
+      .models==$identities[0].models[$scope] and .tools==$identities[0].tools' \
+    "$retained_source/folio-input.json" >/dev/null || return 1
+  jq -cS .configuration "$retained_source/folio-input.json" >"$work/before-applied.json"
+  [[ $(digest "$work/before-applied.json") == "$before_digest" ]] || return 1
+  jq --arg digest "$before_digest" '.beforeAppliedDigest=$digest' "$backup/transaction.json" |
+    folio-atomic-write "$backup/transaction.json"
+  snapshot_artifact_matches "$closure" "$expected_bootstrap"
+}
 artifact_effects_match() {
   local closure=$1 file relative
   [[ $(readlink -e "$profile") == "$closure" ]] || return 1
@@ -138,14 +162,14 @@ restart_consumers() {
   fi
 }
 finish() {
-  local code=$?
+  local code=$? unchanged_resumed=false
   trap - EXIT
   if "$stopped" && ! "$complete"; then
     # Never start consumers against ambiguous repository/closure effects.
     # Before installation, the unchanged pair is safe to resume.
     if ! "$installed" && [[ ! -e "$state/schema-transaction.json" ]]; then
       flock -u 9
-      if restart_consumers; then phase aborted || code=1; else code=1; fi
+      if restart_consumers; then phase aborted || code=1; unchanged_resumed=true; else code=1; fi
     elif [[ "$action" == upgrade || "$action" == adopt || "$action" == rollback ]]; then
       while IFS= read -r service; do stop_consumer "$service" || code=1; done < <(jq -r '.masked[]' "$journal")
       if maintain restore "$id" &&
@@ -162,7 +186,11 @@ finish() {
   fi
   rm -rf "$work"
   if (( code != 0 )); then
-    echo 'Offline maintenance failed; retain the journal and use explicit restore before resuming consumers' >&2
+    if "$unchanged_resumed"; then
+      echo 'Offline maintenance aborted before installation; the original repository and consumers were resumed. Retain the journal.' >&2
+    else
+      echo 'Offline maintenance failed; retain the journal and use explicit restore before resuming consumers' >&2
+    fi
   fi
   exit "$code"
 }
@@ -338,6 +366,9 @@ if [[ "$action" != restore ]]; then
     [[ "$before_digest" =~ ^[a-f0-9]{64}$ ]] || exit 4
     jq --arg digest "$before_digest" '.beforeAppliedDigest=$digest' "$backup/transaction.json" |
       folio-atomic-write "$backup/transaction.json"
+  fi
+  if [[ "$action" == upgrade ]]; then
+    bind_before_applied_digest "$old_artifact" "$bootstrap"
   fi
   # An offline snapshot must bind the closure to exactly the saved desired data.
   # Legacy adoption records the old repository and independently identified

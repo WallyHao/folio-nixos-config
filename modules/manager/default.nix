@@ -2,6 +2,7 @@
 let implementation = import ./src/package.nix { inherit pkgs lib cliCommands; };
 in
 {
+  checks.pending-upgrade = import ./tests/pending-upgrade.nix { inherit pkgs; };
   checks.workflow = import ./tests/workflow.nix { inherit pkgs; };
   subscribers = {
     user = [ "folio-manager.service" ];
