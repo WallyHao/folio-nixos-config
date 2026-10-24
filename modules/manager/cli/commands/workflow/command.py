@@ -861,7 +861,11 @@ class Workflow:
                     }
                 )
                 continue
-            if observed.get("maintenance"):
+            pending_maintenance = any(
+                record.get("phase") not in {"complete", "restored", "aborted"}
+                for record in observed.get("maintenance", {}).values()
+            )
+            if pending_maintenance:
                 findings.append(
                     {
                         "scope": scope,
@@ -894,7 +898,7 @@ class Workflow:
             if (
                 observed.get("health") in {"degraded", "unavailable", "unknown"}
                 and not observed.get("recovery")
-                and not observed.get("maintenance")
+                and not pending_maintenance
             ):
                 findings.append(
                     {
