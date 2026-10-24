@@ -1,8 +1,9 @@
 { pkgs, lib }:
 context:
 let
-  enabled = context.settings."folio-applications:applications".native.zathura or true;
-in {
+  enabled = context.settings.native.zathura or true;
+in
+{
   programs.zathura = {
     enable = enabled;
     options = {

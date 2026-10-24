@@ -1,0 +1,6 @@
+Usage: folio prepare
+Initialize saved Wi-Fi and the fastest Hong Kong / United States VPN node.
+Automatically check disk space/mounts, failed services, NTP, DNS and work endpoints.
+Local checks run alongside network setup; DNS/HTTPS checks wait for stable Wi-Fi/VPN.
+Then offer service/time repairs and storage cleanup (default: No).
+Repairs and cleanup require interactive confirmation. Cleanup retains three system generations.

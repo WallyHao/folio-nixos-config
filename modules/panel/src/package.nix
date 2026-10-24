@@ -1,7 +1,15 @@
-{ pkgs, legacyCli, wifi, devices, repository, storeBackend }:
+{
+  pkgs,
+  legacyCli,
+  wifi,
+  devices,
+  repository,
+  storeBackend,
+}:
 let
   python = pkgs.python3;
-in pkgs.stdenvNoCC.mkDerivation {
+in
+pkgs.stdenvNoCC.mkDerivation {
   pname = "folio-panel";
   version = "0.2.0";
   src = ../cli;

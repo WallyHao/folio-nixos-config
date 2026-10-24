@@ -1,16 +1,66 @@
 { pkgs }:
 pkgs.buildFHSEnv {
   name = "isaac-fhs";
-  targetPkgs = p: with p; [
-    bashInteractive coreutils findutils gnugrep gnused gawk util-linux
-    python312 uv git curl cacert jq file binutils patchelf
-    gcc cmake ninja pkg-config gnumake
-    zlib openssl libffi libxml2_13 libGL libglvnd vulkan-loader vulkan-tools
-    libx11 libxcb libxcursor libxi libxrandr libxinerama libxext
-    libxrender libxfixes libxkbcommon libxt libice libsm libxxf86vm
-    wayland dbus glib nss nspr alsa-lib fontconfig freetype
-    libdrm libunwind libuuid numactl pciutils which
-  ];
+  targetPkgs =
+    p: with p; [
+      bashInteractive
+      coreutils
+      findutils
+      gnugrep
+      gnused
+      gawk
+      util-linux
+      python312
+      uv
+      git
+      curl
+      cacert
+      jq
+      file
+      binutils
+      patchelf
+      gcc
+      cmake
+      ninja
+      pkg-config
+      gnumake
+      zlib
+      openssl
+      libffi
+      libxml2_13
+      libGL
+      libglvnd
+      vulkan-loader
+      vulkan-tools
+      libx11
+      libxcb
+      libxcursor
+      libxi
+      libxrandr
+      libxinerama
+      libxext
+      libxrender
+      libxfixes
+      libxkbcommon
+      libxt
+      libice
+      libsm
+      libxxf86vm
+      wayland
+      dbus
+      glib
+      nss
+      nspr
+      alsa-lib
+      fontconfig
+      freetype
+      libdrm
+      libunwind
+      libuuid
+      numactl
+      pciutils
+      which
+    ];
   multiPkgs = _: [ ];
   profile = ''
     export UV_PYTHON_DOWNLOADS=never

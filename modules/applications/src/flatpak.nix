@@ -1,10 +1,29 @@
-{ pkgs, lib, context, configurationDigest }:
+{
+  pkgs,
+  lib,
+  context,
+  configurationDigest,
+}:
 let
-  settings = context.settings."folio-applications:applications" or { };
-  application = app:
-    if app.name == "zen" then import ./apps/zen.nix { inherit pkgs lib context app; }
-    else if app.name == "obs" then import ./apps/obs.nix { inherit app; }
-    else { inherit (app) name ref; files = [ ]; };
+  settings = context.settings;
+  application =
+    app:
+    if app.name == "zen" then
+      import ./apps/zen.nix {
+        inherit
+          pkgs
+          lib
+          context
+          app
+          ;
+      }
+    else if app.name == "obs" then
+      import ./apps/obs.nix { inherit app; }
+    else
+      {
+        inherit (app) name ref;
+        files = [ ];
+      };
 in
 {
   format = 1;

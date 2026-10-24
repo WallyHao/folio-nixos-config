@@ -5,9 +5,7 @@ import sys
 def main():
     if sys.argv[1:] in (["panel"], ["--serve"]):
         if os.geteuid() == 0:
-            print(
-                "Run folio panel as your desktop user, without sudo.", file=sys.stderr
-            )
+            print("Run folio panel as your desktop user, without sudo.", file=sys.stderr)
             return 2
         from .server import launch, serve
 

@@ -1,9 +1,11 @@
 { pkgs, packages }:
 context: {
-  assertions = [{
-    assertion = context.capabilities.devices-provisioned or false;
-    message = "Device controls require system-provisioned services and permissions";
-  }];
+  assertions = [
+    {
+      assertion = context.capabilities.devices-provisioned or false;
+      message = "Device controls require system-provisioned services and permissions";
+    }
+  ];
   home.packages = [ pkgs.blueman ];
   systemd.user.services.folio-devices = {
     Unit = {

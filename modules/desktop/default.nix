@@ -1,9 +1,17 @@
 { pkgs, lib }:
-let packages = import ./src/package.nix { inherit pkgs; };
-in {
-  checks.focus-fade = import ./tests/focus-fade.nix { inherit pkgs; niri = packages.niri; };
+let
+  packages = import ./src/package.nix { inherit pkgs; };
+in
+{
+  provides.system = [ "desktop-provisioned" ];
+  checks.focus-fade = import ./tests/focus-fade.nix {
+    inherit pkgs;
+    niri = packages.niri;
+  };
   requirements.user.capabilities = [ "desktop-provisioned" ];
-  impacts = [ "Compositor binary changes require logging out and back in; the current session stays running." ];
+  impacts = [
+    "Compositor binary changes require logging out and back in; the current session stays running."
+  ];
   inherit packages;
   migrations = import ./theme-migrations.nix { inherit pkgs; };
   models.system = [ ./model/folio-desktop.yang ];

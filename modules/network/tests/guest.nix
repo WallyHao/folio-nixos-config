@@ -4,7 +4,18 @@
   imports = [ ./guest-base.nix ];
   networking.networkmanager.settings.connectivity.enabled = false;
   services.greetd.enable = lib.mkForce false;
-  environment.systemPackages = [ pkgs.jq pkgs.curl pkgs.iproute2 pkgs.iptables
-    pkgs.openssh pkgs.python3 pkgs.dnsmasq ];
-  virtualisation = { memorySize = lib.mkForce 4096; cores = lib.mkForce 2; diskSize = 16384; };
+  environment.systemPackages = [
+    pkgs.jq
+    pkgs.curl
+    pkgs.iproute2
+    pkgs.iptables
+    pkgs.openssh
+    pkgs.python3
+    pkgs.dnsmasq
+  ];
+  virtualisation = {
+    memorySize = lib.mkForce 4096;
+    cores = lib.mkForce 2;
+    diskSize = 16384;
+  };
 }

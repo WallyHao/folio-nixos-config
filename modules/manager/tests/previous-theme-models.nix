@@ -1,8 +1,23 @@
 # Coherent pre-theme model set for historical upgrade fixtures.
 { pkgs }:
 let
-  owners = [ "agents" "appearance" "applications" "desktop" "devices" "emacs" "input" "manager" "network" "system" "terminal" "vm" ];
-in pkgs.lib.concatMap (owner:
+  owners = [
+    "agents"
+    "appearance"
+    "applications"
+    "desktop"
+    "devices"
+    "emacs"
+    "input"
+    "manager"
+    "network"
+    "system"
+    "terminal"
+    "vm"
+  ];
+in
+pkgs.lib.concatMap (
+  owner:
   map (entry: {
     inherit owner;
     name = "${entry.module}.yang";

@@ -2,13 +2,27 @@
 let
   panel = pkgs.writeShellApplication {
     name = "folio-devices-panel";
-    runtimeInputs = [ pkgs.pulseaudio pkgs.wireplumber pkgs.brightnessctl pkgs.pciutils ];
+    runtimeInputs = [
+      pkgs.pulseaudio
+      pkgs.wireplumber
+      pkgs.brightnessctl
+      pkgs.pciutils
+    ];
     text = "exec ${pkgs.python3}/bin/python3 ${../cli/panel.py}";
   };
   tools = pkgs.writeShellApplication {
     name = "folio-devices-control";
-    runtimeInputs = [ pkgs.jq pkgs.coreutils pkgs.util-linux pkgs.systemd pkgs.pulseaudio
-      pkgs.wireplumber pkgs.brightnessctl pkgs.power-profiles-daemon pkgs.gawk ];
+    runtimeInputs = [
+      pkgs.jq
+      pkgs.coreutils
+      pkgs.util-linux
+      pkgs.systemd
+      pkgs.pulseaudio
+      pkgs.wireplumber
+      pkgs.brightnessctl
+      pkgs.power-profiles-daemon
+      pkgs.gawk
+    ];
     text = builtins.readFile ../runtime/operations/control.sh;
   };
   subscriber = pkgs.stdenv.mkDerivation {
@@ -16,7 +30,11 @@ let
     version = "0.1.0";
     dontUnpack = true;
     nativeBuildInputs = [ pkgs.pkg-config ];
-    buildInputs = [ pkgs.folio.sysrepo pkgs.libyang pkgs.jansson ];
+    buildInputs = [
+      pkgs.folio.sysrepo
+      pkgs.libyang
+      pkgs.jansson
+    ];
     buildPhase = ''
       $CC -std=c11 -Wall -Wextra -Werror -O2 \
         -DTOOL='"${tools}/bin/folio-devices-control"' \
@@ -27,10 +45,24 @@ let
   };
   client = pkgs.writeShellApplication {
     name = "folio-devices";
-    runtimeInputs = [ pkgs.folio.repository pkgs.coreutils pkgs.jq ];
+    runtimeInputs = [
+      pkgs.folio.repository
+      pkgs.coreutils
+      pkgs.jq
+    ];
     extraShellCheckFlags = [ "-x" ];
-    text = "source ${pkgs.folio.cliSupport}/share/folio/client-common.sh\n" +
-      builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/devices/request.jq}" ]
-        (builtins.readFile ../cli/commands/devices/command.sh);
+    text =
+      "source ${pkgs.folio.cliSupport}/share/folio/client-common.sh\n"
+      + builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/devices/request.jq}" ] (
+        builtins.readFile ../cli/commands/devices/command.sh
+      );
   };
-in { inherit tools subscriber client panel; }
+in
+{
+  inherit
+    tools
+    subscriber
+    client
+    panel
+    ;
+}

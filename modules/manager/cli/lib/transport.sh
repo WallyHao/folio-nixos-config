@@ -25,6 +25,12 @@ commit_configuration() {
     finish failure null 'Invalid manager reply'
   status=$(jq -er .status <<<"$result") || finish failure null 'Missing manager status'
   error=$(jq -r '.error // ""' <<<"$result")
+  if [[ ${FOLIO_COMMAND:-} == modules && "$status" == invalid && "$error" == 'Unknown module or unsupported scope' ]]; then
+    error='The running manager catalogue does not recognize this module. First deploy this source with the current module selection, then enable the module and deploy again.'
+  fi
   digest=$(jq -r '.digest // ""' <<<"$result")
+  if [[ "$status" == success && "$FOLIO_JSON" == false ]]; then
+    printf '%s\n' 'Desired configuration saved. Run folio plan, then build and apply the reviewed plan.' >&2
+  fi
   finish "$status" "$(jq -cn --arg digest "$digest" 'if $digest=="" then null else {digest:$digest} end')" "$error"
 }

@@ -5,7 +5,10 @@ let
     version = "0.1.0";
     dontUnpack = true;
     nativeBuildInputs = [ pkgs.pkg-config ];
-    buildInputs = [ pkgs.jansson pkgs.openssl ];
+    buildInputs = [
+      pkgs.jansson
+      pkgs.openssl
+    ];
     buildPhase = ''
       $CC -std=c11 -Wall -Wextra -Werror -O2 ${../runtime/lib/files.c} $(pkg-config --cflags --libs jansson openssl) -o folio-applications-files
     '';
@@ -16,7 +19,10 @@ let
     version = "0.1.0";
     dontUnpack = true;
     nativeBuildInputs = [ pkgs.pkg-config ];
-    buildInputs = [ pkgs.flatpak pkgs.jansson ];
+    buildInputs = [
+      pkgs.flatpak
+      pkgs.jansson
+    ];
     buildPhase = ''
       $CC -std=gnu11 -Wall -Wextra -Werror -O2 ${../runtime/lib/flatpak.c} $(pkg-config --cflags --libs flatpak jansson) -o folio-applications-transaction
     '';
@@ -27,4 +33,13 @@ let
     cp ${../runtime/store.py} $out/lib/folio_store.py
   '';
   runtime = import ./runtime.nix { inherit pkgs files transaction; };
-in { inherit files transaction store; inherit (runtime) worker tools subscriber client; }
+in
+{
+  inherit files transaction store;
+  inherit (runtime)
+    worker
+    tools
+    subscriber
+    client
+    ;
+}

@@ -15,33 +15,49 @@ let
     runtimeInputs = [ pkgs.jq ];
     text = "jq -ceS -f ${./src/migrate-pi.jq}";
   };
-in {
+in
+{
   models.user = [ current ];
   checks.colors = import ./tests/colors.nix { inherit pkgs; };
   packages = {
     inherit codex pi;
     migration = migrate;
     schema-history = pkgs.linkFarm "folio-agents-schema-history" [
-      { name = "2026-10-19/folio-codex.yang"; path = legacy; }
-      { name = "2026-10-22/folio-agents.yang"; path = harness; }
+      {
+        name = "2026-10-19/folio-codex.yang";
+        path = legacy;
+      }
+      {
+        name = "2026-10-22/folio-agents.yang";
+        path = harness;
+      }
     ];
   };
-  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
-    module = "folio-codex"; toModule = "folio-agents";
-    from = "2026-10-19"; to = "2026-10-22";
-    fromSha256 = builtins.hashFile "sha256" legacy;
-    toSha256 = builtins.hashFile "sha256" harness;
-    transform = "${migrate}/bin/folio-agents-migrate-codex";
-  } {
-    module = "folio-agents";
-    from = "2026-10-22"; to = "2026-10-23";
-    fromSha256 = builtins.hashFile "sha256" harness;
-    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-23/folio-agents.yang;
-    transform = "${replaceHarness}/bin/folio-agents-replace-dsh";
-  }];
-  targetSettings.folio."folio-agents:agents".pi = {
-    enabled = true;
-    config-directory = "/home/folio/Workspace/folio-nixos-config/modules/agents/src/pi/config";
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [
+    {
+      module = "folio-codex";
+      toModule = "folio-agents";
+      from = "2026-10-19";
+      to = "2026-10-22";
+      fromSha256 = builtins.hashFile "sha256" legacy;
+      toSha256 = builtins.hashFile "sha256" harness;
+      transform = "${migrate}/bin/folio-agents-migrate-codex";
+    }
+    {
+      module = "folio-agents";
+      from = "2026-10-22";
+      to = "2026-10-23";
+      fromSha256 = builtins.hashFile "sha256" harness;
+      toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-23/folio-agents.yang;
+      transform = "${replaceHarness}/bin/folio-agents-replace-dsh";
+    }
+  ];
+  homeManagerModule = import ./src/user.nix {
+    inherit
+      pkgs
+      lib
+      codex
+      pi
+      ;
   };
-  homeManagerModule = import ./src/user.nix { inherit pkgs lib codex pi; };
 }

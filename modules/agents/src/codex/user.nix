@@ -1,8 +1,12 @@
-{ pkgs, lib, package }:
+{
+  pkgs,
+  lib,
+  package,
+}:
 context:
 let
   settings = context.settings.codex or { };
-  theme.colors = context.theme or (import ../../../appearance/lib { preferences = context.globals; });
+  theme.colors = context.theme;
   themedPackage = import ./package.nix {
     inherit pkgs;
     accent = theme.colors.semantic.accent;
@@ -13,7 +17,8 @@ let
     mkdir -p $out/share/zsh/site-functions
     ${selectedPackage}/bin/codex completion zsh >$out/share/zsh/site-functions/_codex
   '';
-in {
+in
+{
   home.packages = [ selectedPackage ] ++ lib.optional (settings.shell-completion or true) completion;
   # Select the managed theme at launch without replacing Codex's mutable
   # config/auth/session files. The PTY wrapper also covers fixed TUI accents.

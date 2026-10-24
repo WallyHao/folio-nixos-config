@@ -1,4 +1,5 @@
 """Reject unreviewed conflicts while honoring exactly the upstream overrides."""
+
 import contextlib
 import io
 import json
@@ -25,7 +26,10 @@ with tempfile.TemporaryDirectory() as temporary:
     for installed, expected in cases:
         output = io.StringIO()
         code = 0
-        with patch("importlib.metadata.distributions", return_value=installed), contextlib.redirect_stdout(output):
+        with (
+            patch("importlib.metadata.distributions", return_value=installed),
+            contextlib.redirect_stdout(output),
+        ):
             try:
                 runpy.run_path(os.environ["ISAAC_DEPENDENCY_CHECK"], run_name="__main__")
             except SystemExit as error:

@@ -24,7 +24,7 @@ rec {
   collect =
     catalogue:
     let
-      definitions = lib.mapAttrs (_: entry: {
+      definitions = lib.mapAttrs (name: entry: {
         packages = entry.packages or { };
         checks = entry.checks or { };
         models = {
@@ -35,6 +35,12 @@ rec {
         commands = entry.commands or { };
         migrations = entry.migrations or [ ];
         requirements = entry.requirements or { };
+        provides = {
+          system = [ ];
+          user = [ ];
+        }
+        // (entry.provides or { });
+        settingsKey = entry.settingsKey or "folio-${name}:${name}";
         impacts = entry.impacts or [ ];
         subscribers = {
           system = [ ];
@@ -69,19 +75,45 @@ rec {
           lib.mapAttrs' (component: package: lib.nameValuePair "${name}-${component}" package) d.packages
         ) definitions
       );
-      checks = exclusive "check names" (lib.mapAttrsToList (name: d:
-        lib.mapAttrs' (component: check: lib.nameValuePair "${name}-${component}" check) d.checks) definitions);
+      checks = exclusive "check names" (
+        lib.mapAttrsToList (
+          name: d: lib.mapAttrs' (component: check: lib.nameValuePair "${name}-${component}" check) d.checks
+        ) definitions
+      );
+      providers = lib.genAttrs scopes (
+        scope:
+        exclusive "${scope} capability providers" (
+          lib.mapAttrsToList (
+            name: d:
+            exclusive "${scope} capability providers" (
+              map (capability: { ${capability} = name; }) d.provides.${scope}
+            )
+          ) definitions
+        )
+      );
+      public = lib.mapAttrs (_: d: {
+        inherit (d)
+          requirements
+          provides
+          impacts
+          settingsKey
+          ;
+        scopes =
+          lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
+      }) definitions;
     in
     if !validCommands then
       throw "Folio: invalid command scope or missing command path"
     else
-      builtins.deepSeq models {
+      builtins.deepSeq [ models providers ] {
         inherit
           definitions
           commands
           models
           packages
           checks
+          providers
+          public
           ;
         migrations = lib.concatMap (definition: definition.migrations) (builtins.attrValues definitions);
         subscribers = lib.genAttrs scopes (
@@ -91,6 +123,17 @@ rec {
           )
         );
       };
+
+  capabilities =
+    {
+      collection,
+      scope,
+      selections,
+    }:
+    let
+      enabled = map (entry: entry.name) (builtins.filter (entry: entry.enabled or false) selections);
+    in
+    lib.mapAttrs (_: provider: builtins.elem provider enabled) collection.providers.${scope};
 
   select =
     {
@@ -112,8 +155,8 @@ rec {
           throw "Folio: module ${name} does not support ${scope} scope"
         else
           {
-            inherit name adapter;
-            settings = selection;
+            inherit name adapter selection;
+            settings = selection.${definition.settingsKey} or { };
           }
       ) selections;
 }

@@ -1,11 +1,16 @@
-{ pkgs, lib, packages }:
+{
+  pkgs,
+  lib,
+  packages,
+}:
 context:
 let
-  settings = context.settings."folio-network:network" or { };
+  settings = context.settings;
   firewall = settings.firewall or { };
   ssh = settings.ssh or { };
   proxy = settings.proxy or { };
-in {
+in
+{
   imports = [ (import ./mihomo.nix { inherit pkgs lib proxy; }) ];
   networking = {
     useDHCP = false;
@@ -16,8 +21,16 @@ in {
       dns = "default";
       settings = {
         main.rc-manager = "file";
-        connection."wifi.powersave" = { default = 0; ignore = 1; disable = 2; enable = 3; }.${settings.wifi-powersave or "disable"};
-      } // lib.optionalAttrs ((settings.dns or [ ]) != [ ]) {
+        connection."wifi.powersave" =
+          {
+            default = 0;
+            ignore = 1;
+            disable = 2;
+            enable = 3;
+          }
+          .${settings.wifi-powersave or "disable"};
+      }
+      // lib.optionalAttrs ((settings.dns or [ ]) != [ ]) {
         "global-dns-domain-*".servers = lib.concatStringsSep "," settings.dns;
       };
     };
@@ -46,14 +59,21 @@ in {
   systemd.services.folio-network = {
     description = "Folio system network observations and bounded controls";
     wantedBy = [ "multi-user.target" ];
-    after = [ "folio-manager.service" "NetworkManager.service" ];
+    after = [
+      "folio-manager.service"
+      "NetworkManager.service"
+    ];
     requires = [ "folio-manager.service" ];
     serviceConfig = {
-      User = "root"; Group = "folio-operators";
-      RuntimeDirectory = "folio/network"; RuntimeDirectoryMode = "0700";
+      User = "root";
+      Group = "folio-operators";
+      RuntimeDirectory = "folio/network";
+      RuntimeDirectoryMode = "0700";
       RuntimeDirectoryPreserve = true;
       ExecStart = "${packages.subscriber}/bin/folio-network-subscriber";
-      Restart = "on-failure"; RestartSec = 2; UMask = "0077";
+      Restart = "on-failure";
+      RestartSec = 2;
+      UMask = "0077";
     };
   };
 }

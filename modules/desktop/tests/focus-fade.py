@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix="folio-focus-") as directory:
         env.pop(key, None)
     env.update(HOME=directory, XDG_RUNTIME_DIR=str(runtime), WINIT_UNIX_BACKEND="x11")
     config = root / "config.kdl"
-    config.write_text('''
+    config.write_text("""
 layout {
     gaps 32
     center-focused-column "never"
@@ -60,15 +60,27 @@ animations {
     window-movement { off; }
     window-resize { off; }
 }
-''')
+""")
     try:
         # Let Xvfb choose a free display without touching the real session.
         read_fd, write_fd = os.pipe()
         with (out / "xvfb.log").open("w") as log:
             server = subprocess.Popen(
-                ["Xvfb", "-displayfd", str(write_fd), "-screen", "0", "1280x800x24",
-                 "-nolisten", "tcp", "-ac"],
-                env=env, pass_fds=(write_fd,), stdout=log, stderr=log,
+                [
+                    "Xvfb",
+                    "-displayfd",
+                    str(write_fd),
+                    "-screen",
+                    "0",
+                    "1280x800x24",
+                    "-nolisten",
+                    "tcp",
+                    "-ac",
+                ],
+                env=env,
+                pass_fds=(write_fd,),
+                stdout=log,
+                stderr=log,
                 start_new_session=True,
             )
         processes.append(server)
@@ -79,15 +91,20 @@ animations {
             env["DISPLAY"] = ":" + display.readline().strip()
         with (out / "niri.log").open("w") as log:
             compositor = subprocess.Popen(
-                ["niri", "--config", str(config)], env=env,
-                stdout=log, stderr=log, start_new_session=True,
+                ["niri", "--config", str(config)],
+                env=env,
+                stdout=log,
+                stderr=log,
+                start_new_session=True,
             )
         processes.append(compositor)
         socket = wait_for(lambda: next(runtime.glob("niri.*.sock"), None), processes)
         env["NIRI_SOCKET"] = str(socket)
         env["WAYLAND_DISPLAY"] = wait_for(
-            lambda: next((p.name for p in runtime.glob("wayland-*")
-                          if not p.name.endswith(".lock")), None), processes,
+            lambda: next(
+                (p.name for p in runtime.glob("wayland-*") if not p.name.endswith(".lock")), None
+            ),
+            processes,
         )
 
         def msg(*args):
@@ -98,11 +115,23 @@ animations {
 
         for name in ("fade-a", "fade-b"):
             with (out / (name + ".log")).open("w") as log:
-                processes.append(subprocess.Popen(
-                    ["foot", "--app-id", name, "-o", "colors-dark.background=000000",
-                     "sleep", "60"], env=env, stdout=log, stderr=log,
-                    start_new_session=True,
-                ))
+                processes.append(
+                    subprocess.Popen(
+                        [
+                            "foot",
+                            "--app-id",
+                            name,
+                            "-o",
+                            "colors-dark.background=000000",
+                            "sleep",
+                            "60",
+                        ],
+                        env=env,
+                        stdout=log,
+                        stderr=log,
+                        start_new_session=True,
+                    )
+                )
             wait_for(lambda: any(w["app_id"] == name for w in windows()), processes)
         ids = {w["app_id"]: w["id"] for w in windows()}
 

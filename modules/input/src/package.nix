@@ -1,4 +1,7 @@
-{ pkgs, candidateCount ? 7 }:
+{
+  pkgs,
+  candidateCount ? 7,
+}:
 let
   profile = pkgs.writeText "folio-fcitx5-initial-profile" ''
     [Groups/0]
@@ -24,9 +27,11 @@ let
       ascii_composer/switch_key/Shift_L: commit_code
       ascii_composer/switch_key/Shift_R: commit_code
   '';
-in pkgs.writeShellApplication {
+in
+pkgs.writeShellApplication {
   name = "folio-input-seed";
   runtimeInputs = [ pkgs.coreutils ];
-  text = builtins.replaceStrings [ "@profile@" "@rimeDefaults@" ] [ "${profile}" "${rimeDefaults}" ]
-    (builtins.readFile ../runtime/operations/seed.sh);
+  text = builtins.replaceStrings [ "@profile@" "@rimeDefaults@" ] [ "${profile}" "${rimeDefaults}" ] (
+    builtins.readFile ../runtime/operations/seed.sh
+  );
 }

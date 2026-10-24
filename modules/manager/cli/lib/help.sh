@@ -19,6 +19,7 @@ Usage: folio [--json] [--environment portable] [--user|--system] COMMAND
 Commands:
   config show|edit|import FILE|export FILE   Read or durably save desired data
   config get|set|unset /PATH [JSON]         Read or change one setting
+  config explain /PATH                    Explain its value, origin and deployment state
   theme list|set THEME                     List themes or switch system and desktop colors
   modules list|enable NAME|disable NAME     Inspect or change desired selection
   plan [--source DIRECTORY]                Review system/user changes, confirm, add a comment
@@ -30,6 +31,7 @@ Commands:
   history                                 List plans, comments, scopes and executions
   rollback PLAN_ID [--yes]                Preview and restore a successfully applied plan
   cleanup [--apply]                        Preview or remove unreferenced deployment records
+  prepare                                 Prepare Wi-Fi/VPN, check health, offer repairs/cleanup
   vm build|start|stop|status|cleanup ID     Manage a disposable user VM
   apps list|init|install|update|remove|reconcile|adopt|rollback|prepare|resume|status
                                           Manage owned user Flatpak applications

@@ -5,12 +5,18 @@
   networking.hostName = lib.mkForce "sylphy-portable";
   users.mutableUsers = true;
   users.users.folio = {
-    extraGroups = [ "wheel" "networkmanager" ];
+    extraGroups = [
+      "wheel"
+      "networkmanager"
+    ];
     # The offline rename retains the existing shadow entry. Never seed a new
     # password over it; passwd performs the later interactive password change.
     hashedPassword = lib.mkForce null;
   };
-  environment.systemPackages = [ migration pkgs.seahorse ];
+  environment.systemPackages = [
+    migration
+    pkgs.seahorse
+  ];
   system.activationScripts.folioLegacyContext = {
     deps = [ "etc" ];
     text = "${migration}/bin/folio-migrate-account restore-context";

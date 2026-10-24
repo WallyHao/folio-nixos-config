@@ -1,4 +1,5 @@
 """Validate a locally produced, trusted checkpoint and its TensorBoard scalars."""
+
 import argparse
 import json
 import math
@@ -34,5 +35,15 @@ tags = events.Tags()["scalars"]
 assert tags, "No training scalars recorded"
 for tag in tags:
     assert all(math.isfinite(event.value) for event in events.Scalars(tag)), tag
-print(json.dumps({"stage": "checkpoint", "status": "passed", "checkpoint": str(args.checkpoint),
-                  "tensorCount": count, "scalarTags": tags, "iteration": checkpoint.get("iter")}))
+print(
+    json.dumps(
+        {
+            "stage": "checkpoint",
+            "status": "passed",
+            "checkpoint": str(args.checkpoint),
+            "tensorCount": count,
+            "scalarTags": tags,
+            "iteration": checkpoint.get("iter"),
+        }
+    )
+)

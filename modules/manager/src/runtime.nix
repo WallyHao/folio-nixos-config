@@ -49,35 +49,60 @@ let
         + text;
     };
   configuration = operation "folio-manager-configuration" (
-    builtins.replaceStrings [ "@requirements@" ] [ "${../runtime/snapshot/requirements.py}" ]
-      (builtins.readFile ../runtime/operations/configuration.sh));
+    builtins.replaceStrings [ "@requirements@" ] [ "${../runtime/snapshot/requirements.py}" ] (
+      builtins.readFile ../runtime/operations/configuration.sh
+    )
+  );
   maintenance = pkgs.writeShellApplication {
     name = "folio-manager-maintain";
     runtimeInputs = [
-      atomic repository normalizer prepareInput pkgs.folio.repositoryMaintenance
-      pkgs.coreutils pkgs.bash pkgs.jq pkgs.util-linux pkgs.nix pkgs.systemd
-      pkgs.findutils pkgs.diffutils pkgs.ripgrep
+      atomic
+      repository
+      normalizer
+      prepareInput
+      pkgs.folio.repositoryMaintenance
+      pkgs.coreutils
+      pkgs.bash
+      pkgs.jq
+      pkgs.util-linux
+      pkgs.nix
+      pkgs.systemd
+      pkgs.findutils
+      pkgs.diffutils
+      pkgs.ripgrep
     ];
-    text = builtins.replaceStrings [ "@compatibilitySource@" ] [ (toString pkgs.folio.source) ] (builtins.readFile ../runtime/operations/rollback.sh);
+    text = builtins.replaceStrings [ "@compatibilitySource@" ] [ (toString pkgs.folio.source) ] (
+      builtins.readFile ../runtime/operations/rollback.sh
+    );
   };
   cleanup = pkgs.writeShellApplication {
     name = "folio-manager-cleanup";
-    runtimeInputs = [ atomic pkgs.coreutils pkgs.jq pkgs.util-linux ];
+    runtimeInputs = [
+      atomic
+      pkgs.coreutils
+      pkgs.jq
+      pkgs.util-linux
+    ];
     text = builtins.readFile ../runtime/operations/cleanup.sh;
   };
   recovery = operation "folio-manager-recover" (builtins.readFile ../runtime/journal/recover.sh);
   plan = operation "folio-manager-plan" (
-    builtins.replaceStrings [ "@review@" ] [ "${../runtime/snapshot/review.py}" ]
-      (builtins.readFile ../runtime/operations/plan.sh)
+    builtins.replaceStrings [ "@review@" ] [ "${../runtime/snapshot/review.py}" ] (
+      builtins.readFile ../runtime/operations/plan.sh
+    )
   );
   worker = operation "folio-manager-worker" (builtins.readFile ../runtime/operations/deploy.sh);
   status = operation "folio-manager-status" (builtins.readFile ../runtime/operations/status.sh);
-  observed = operation "folio-manager-observed" (builtins.readFile ../runtime/callbacks/operational-data.sh);
+  observed = operation "folio-manager-observed" (
+    builtins.readFile ../runtime/callbacks/operational-data.sh
+  );
   submission =
     kind:
     operation "folio-manager-${kind}" (
       "operation_kind=${kind}\n"
-      + builtins.replaceStrings [ "@worker@" ] [ "${worker}" ] (builtins.readFile ../runtime/operations/submit.sh)
+      + builtins.replaceStrings [ "@worker@" ] [ "${worker}" ] (
+        builtins.readFile ../runtime/operations/submit.sh
+      )
     );
 in
 pkgs.symlinkJoin {

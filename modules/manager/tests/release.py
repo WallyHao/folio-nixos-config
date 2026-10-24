@@ -24,20 +24,35 @@ with subtest("retained rollback restores desired data, files and the rooted clos
     later = folio("--user plan --source /home/folio/source")["data"]["planId"]
     assert folio("build " + later)["status"] == "success"
     assert folio("apply " + later)["status"] == "success"
-    assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() != user_profile
+    assert (
+        user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
+        != user_profile
+    )
     assert "font=Maple Mono NF CN:size=24" in user("cat /home/folio/.config/foot/foot.ini")
     assert folio("rollback " + user_plan)["status"] == "success"
     assert folio("config show")["data"]["digest"] == user_digest
-    assert user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip() == user_profile
+    assert (
+        user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
+        == user_profile
+    )
     assert "font=Maple Mono NF CN:size=18" in user("cat /home/folio/.config/foot/foot.ini")
     assert folio("status")["data"]["health"] == "healthy"
-    user("find " + state + "/roots -type l -exec readlink -f {} + | grep -Fx " + shlex.quote(user_profile))
+    user(
+        "find "
+        + state
+        + "/roots -type l -exec readlink -f {} + | grep -Fx "
+        + shlex.quote(user_profile)
+    )
 
 with subtest("current network and developer contributions coexist in the deployed system"):
     observed = folio("--system network status")
     assert observed["status"] == "success", observed
-    user("/home/folio/.nix-profile/bin/git --version; /home/folio/.nix-profile/bin/codex --version; /home/folio/.nix-profile/bin/emacs --batch --eval '(princ emacs-version)'")
-    user("setsid --wait /home/folio/.nix-profile/bin/zsh -ic 'print -r -- folio-release-shell' </dev/null")
+    user(
+        "/home/folio/.nix-profile/bin/git --version; /home/folio/.nix-profile/bin/codex --version; /home/folio/.nix-profile/bin/emacs --batch --eval '(princ emacs-version)'"
+    )
+    user(
+        "setsid --wait /home/folio/.nix-profile/bin/zsh -ic 'print -r -- folio-release-shell' </dev/null"
+    )
     # The shared default deliberately leaves SSH disabled. Stage 08 owns the
     # enabled/key-authentication/firewall gate; observe the deployed default here.
     machine.fail("systemctl is-active --quiet sshd.service")

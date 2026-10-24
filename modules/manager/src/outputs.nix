@@ -1,9 +1,16 @@
-{ inputs, targetName ? null }:
+{
+  inputs,
+  targetName ? null,
+}:
 let
   targetPath = inputs.self.outPath + "/folio-target.json";
-  selectedTarget = if targetName != null then targetName
-    else if builtins.pathExists targetPath then (builtins.fromJSON (builtins.readFile targetPath)).name
-    else "portable";
+  selectedTarget =
+    if targetName != null then
+      targetName
+    else if builtins.pathExists targetPath then
+      (builtins.fromJSON (builtins.readFile targetPath)).name
+    else
+      "portable";
   system = "x86_64-linux";
   basePkgs = import inputs.nixpkgs {
     inherit system;
@@ -26,23 +33,23 @@ let
       inputLanguage = catalogue.input.packages.indicator;
       normalizer = catalogue.manager.packages.normalizer;
       repositoryMaintenance = sysrepoModule.packages.maintenance;
-      catalogue = pkgs.writeText "folio-catalogue.json" (builtins.toJSON (
-        lib.mapAttrs (_: d: {
-          inherit (d) requirements impacts;
-          scopes = lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
-        }) collection.definitions));
+      catalogue = pkgs.writeText "folio-catalogue.json" (builtins.toJSON collection.public);
       systemConfiguration = portableSystem;
       source = pkgs.runCommand "folio-${selectedTarget}-source" { } ''
         mkdir $out
         cp -R ${sourceTree}/. $out/
         chmod -R u+w $out
-        cp ${pkgs.writeText "folio-target.json" (builtins.toJSON { name = selectedTarget; })} $out/folio-target.json
+        cp ${
+          pkgs.writeText "folio-target.json" (builtins.toJSON { name = selectedTarget; })
+        } $out/folio-target.json
       '';
       sourceTree = lib.fileset.toSource {
         root = ../../..;
         fileset = lib.fileset.unions [
           ../../../flake.nix
           ../../../flake.lock
+          (lib.fileset.maybeMissing ../../../ruff.toml)
+          (lib.fileset.maybeMissing ../../../configuration)
           ../../../modules
         ];
       };
@@ -59,6 +66,7 @@ let
     manager = import ../default.nix {
       inherit pkgs lib;
       cliCommands = collection.commands;
+      bootstrapPreferences = defaults.system."folio-environment:environment".preferences;
     };
     sysrepo = sysrepoModule;
     system = import ../../system/default.nix { inherit pkgs lib; };
@@ -73,6 +81,10 @@ let
     agents = import ../../agents/default.nix { inherit pkgs lib; };
     isaac = import ../../isaac/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };
+    workspace = import ../../workspace/default.nix {
+      inherit pkgs lib;
+      networkPrepare = catalogue.network.packages.prepare;
+    };
     panel = import ../../panel/default.nix {
       inherit pkgs;
       legacyCli = catalogue.manager.packages.cli;
@@ -83,19 +95,28 @@ let
     };
   };
   collection = catalogueLib.collect catalogue;
-  targets = import ./targets.nix { inherit catalogue; };
-  target = targets.${selectedTarget} or (throw "Folio: unknown hardware target '${selectedTarget}'; configure its module-owned hardware and storage before use");
-  composition = import ./configuration.nix { inherit inputs pkgs lib identities collection catalogueLib target; };
-  inherit (composition) defaults prepared configuration context adapters;
-  models = lib.genAttrs [ "system" "user" ] (
-    scope:
-    pkgs.linkFarm "folio-${scope}-models" (
-      map (path: {
-        name = builtins.baseNameOf path;
-        inherit path;
-      }) collection.models.${scope}
-    )
-  );
+  targets = import ../configuration/targets { inherit catalogue; };
+  target =
+    targets.${selectedTarget}
+      or (throw "Folio: unknown hardware target '${selectedTarget}'; configure its module-owned hardware and storage before use");
+  composition = import ./configuration.nix {
+    inherit
+      inputs
+      pkgs
+      lib
+      identities
+      collection
+      catalogueLib
+      target
+      ;
+  };
+  inherit (composition)
+    defaults
+    prepared
+    configuration
+    context
+    adapters
+    ;
   identities = {
     format = 1;
     tools = {
@@ -125,76 +146,32 @@ let
     };
     modules = [ systemModule ];
   };
-  bootstrap = pkgs.runCommand "folio-bootstrap" { } ''
-    mkdir -p $out/models
-    cp ${pkgs.writeText "target.json" (builtins.toJSON { name = selectedTarget; })} $out/target.json
-    ln -s ${models.system} $out/models/system
-    ln -s ${models.user} $out/models/user
-    cp ${pkgs.writeText "system.json" (builtins.toJSON defaults.system)} $out/system.json
-    cp ${pkgs.writeText "user.json" (builtins.toJSON defaults.user)} $out/user.json
-    cp ${
-      pkgs.writeText "catalogue.json" (
-        builtins.toJSON (
-          lib.mapAttrs (_: d: {
-            inherit (d) requirements impacts;
-            scopes =
-              lib.optional (d.nixosModule != null) "system" ++ lib.optional (d.homeManagerModule != null) "user";
-          }) collection.definitions
-        )
-      )
-    } $out/catalogue.json
-    cp ${pkgs.writeText "identities.json" (builtins.toJSON identities)} $out/identities.json
-    cp ${pkgs.writeText "migrations.json" (builtins.toJSON collection.migrations)} $out/migrations.json
-    cp ${pkgs.writeText "subscribers.json" (builtins.toJSON collection.subscribers)} $out/subscribers.json
-    cp ${
-      pkgs.writeText "descriptor.json" (
-        builtins.toJSON {
-          format = 1;
-          environment = "portable";
-          platform = system;
-          users = defaults.system."folio-environment:environment".users;
-          preferences = defaults.system."folio-environment:environment".preferences;
-          capabilities = (context "system").capabilities;
-          origin = "bootstrap";
-        }
-      )
-    } $out/system-descriptor.json
-  '';
-  userPackages = basePkgs.extend (_final: previous: {
-    inherit (pkgs) folio;
-    # Honor keep-old for an already active system-provided user service when
-    # Home Manager takes ownership of its unit for the first time.
-    sd-switch = previous.sd-switch.overrideAttrs (old: {
-      patches = (old.patches or [ ]) ++ [ ./sd-switch-keep-active.patch ];
-    });
-  });
-  userHome = inputs.home-manager.lib.homeManagerConfiguration {
-    pkgs = userPackages;
-    extraSpecialArgs.folioBootstrap = bootstrap;
-    modules = adapters "user" ++ [
-      {
-        home.username = (context "user").identity.account;
-        home.homeDirectory = (context "user").identity.home;
-        home.stateVersion = "26.05";
-        home.extraBuilderCommands = ''
-          cp ${
-            pkgs.writeText "folio-home.json" (
-              builtins.toJSON {
-                format = 1;
-                workerProtocol = 1;
-                scope = "user";
-                bootstrap = toString bootstrap;
-                account = (context "user").identity.account;
-                home = (context "user").identity.home;
-                configurationDigest =
-                  if prepared != null && prepared.scope == "user" then prepared.configurationDigest else null;
-              }
-            )
-          } $out/folio-home.json
-        '';
-      }
-    ];
+  bootstrap = import ./bootstrap.nix {
+    inherit
+      pkgs
+      lib
+      collection
+      identities
+      system
+      ;
+    inherit (composition) defaults context;
+    targetName = selectedTarget;
   };
+  userPackages = basePkgs.extend (
+    _final: previous: {
+      inherit (pkgs) folio;
+      # Honor keep-old for an already active system-provided user service when
+      # Home Manager takes ownership of its unit for the first time.
+      sd-switch = previous.sd-switch.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./sd-switch-keep-active.patch ];
+      });
+    }
+  );
+  userHome = import ./home.nix {
+    inherit inputs bootstrap composition;
+    pkgs = userPackages;
+  };
+  development = import ./development.nix { inherit pkgs; };
 
 in
 {
@@ -204,21 +181,32 @@ in
   };
   nixosModules.portable = systemModule;
   nixosConfigurations.portable = portableSystem;
-  nixosConfigurations.folio = if selectedTarget == "folio" then portableSystem
-    else (import ./outputs.nix { inherit inputs; targetName = "folio"; }).nixosConfigurations.portable;
+  nixosConfigurations.folio =
+    if selectedTarget == "folio" then
+      portableSystem
+    else
+      (import ./outputs.nix {
+        inherit inputs;
+        targetName = "folio";
+      }).nixosConfigurations.portable;
   lib.folio.identities = identities;
+  lib.folio.initialConfiguration = defaults;
+  lib.folio.checkGroups = import ../tests/groups.nix;
+  formatter.${system} = development.formatter;
+  apps.${system}.check = {
+    type = "app";
+    program = "${development.check}/bin/folio-check";
+  };
   lib.folio.targets = {
     portable = "Disposable UEFI guest";
     folio = "Existing migrated USB system shared by the Intel/NVIDIA laptop and AMD/NVIDIA desktop";
   };
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {
-    packages = [
+    packages = development.tools ++ [
       pkgs.cmake
       pkgs.pkg-config
       pkgs.jq
-      pkgs.shellcheck
-      pkgs.nixfmt
       pkgs.python3
       pkgs.util-linux
       collection.packages.sysrepo-tools
@@ -233,6 +221,16 @@ in
     ];
   };
   checks.${system} = import ../tests/default.nix {
-    inherit pkgs inputs bootstrap catalogue collection adapters userPackages userHome catalogueLib;
+    inherit
+      pkgs
+      inputs
+      catalogue
+      collection
+      userPackages
+      catalogueLib
+      identities
+      system
+      ;
+    initialBootstrap = bootstrap;
   };
 }

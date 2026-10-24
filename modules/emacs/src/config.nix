@@ -2,7 +2,15 @@
 let
   palette = (import ../../appearance/lib { }).palettes.dark;
   defaults = map (key: builtins.toJSON palette.${key}) [
-    "bg0" "bg1" "fg" "grey1" "green" "blue" "yellow" "bg_visual" "red"
+    "bg0"
+    "bg1"
+    "fg"
+    "grey1"
+    "green"
+    "blue"
+    "yellow"
+    "bg_visual"
+    "red"
   ];
 in
 ''

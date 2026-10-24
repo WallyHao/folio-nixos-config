@@ -1,32 +1,64 @@
-{ pkgs, inputs, source, bootstrap, prepareInput, modules, runtime, cli,
-  legacySource ? null, cache ? null, plans ? null, drm ? true }:
+{
+  pkgs,
+  inputs,
+  source,
+  bootstrap,
+  prepareInput,
+  modules,
+  runtime,
+  cli,
+  legacySource ? null,
+  cache ? null,
+  plans ? null,
+  drm ? true,
+}:
 let
-  legacy = if legacySource == null then null else import (legacySource + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = legacySource; };
-  };
+  legacy =
+    if legacySource == null then
+      null
+    else
+      import (legacySource + "/modules/manager/src/outputs.nix") {
+        inputs = inputs // {
+          self.outPath = legacySource;
+        };
+      };
   oldBootstrap = if legacy == null then bootstrap else legacy.packages.x86_64-linux.manager-bootstrap;
   descriptor = pkgs.runCommand "folio-desktop-test-descriptor" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
   '';
-  prepared = name: base: configuration: modelBootstrap: pkgs.runCommand name {
-    nativeBuildInputs = [ prepareInput ];
-  } ''
-    mkdir $out
-    cp -R ${base}/. $out/
-    chmod -R u+w $out
-    folio-prepare-input ${configuration} ${modelBootstrap} ${descriptor} >$out/folio-input.json
-  '';
-  oldSeed = prepared "folio-desktop-old-user" (if legacy == null then source else legacySource) "${oldBootstrap}/user.json" oldBootstrap;
+  prepared =
+    name: base: configuration: modelBootstrap:
+    pkgs.runCommand name
+      {
+        nativeBuildInputs = [ prepareInput ];
+      }
+      ''
+        mkdir $out
+        cp -R ${base}/. $out/
+        chmod -R u+w $out
+        folio-prepare-input ${configuration} ${modelBootstrap} ${descriptor} >$out/folio-input.json
+      '';
+  oldSeed = prepared "folio-desktop-old-user" (
+    if legacy == null then source else legacySource
+  ) "${oldBootstrap}/user.json" oldBootstrap;
   schemaSeed = prepared "folio-desktop-schema-upgrade" source "${oldBootstrap}/user.json" bootstrap;
   userSeed = prepared "folio-desktop-user" source "${bootstrap}/user.json" bootstrap;
-  generation = seed: (import (seed + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = seed; };
-  }).homeConfigurations.folio.activationPackage;
+  generation =
+    seed:
+    (import (seed + "/modules/manager/src/outputs.nix") {
+      inputs = inputs // {
+        self.outPath = seed;
+      };
+    }).homeConfigurations.folio.activationPackage;
   oldGeneration = generation oldSeed;
   schemaGeneration = generation schemaSeed;
   userGeneration = generation userSeed;
-  testPython = pkgs.python3.withPackages (p: [ p.websocket-client p.pillow ]);
-in pkgs.testers.runNixOSTest {
+  testPython = pkgs.python3.withPackages (p: [
+    p.websocket-client
+    p.pillow
+  ]);
+in
+pkgs.testers.runNixOSTest {
   name = "folio-desktop-session";
   nodes.machine = { lib, ... }: {
     imports = modules ++ [ (import ./guest.nix { inherit pkgs drm; }) ];
@@ -37,9 +69,22 @@ in pkgs.testers.runNixOSTest {
       # set before the explicit upgrade; no new module RPC is used at this point.
       ExecStart = lib.mkForce "${runtime}/bin/folio-manager-subscriber user ${oldBootstrap}";
     };
-    virtualisation.additionalPaths = [ oldSeed schemaSeed userSeed oldGeneration schemaGeneration userGeneration
-        inputs.nixpkgs inputs.home-manager pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ]
-        ++ pkgs.lib.optional (cache != null) cache ++ pkgs.lib.optional (plans != null) plans;
+    virtualisation.additionalPaths = [
+      oldSeed
+      schemaSeed
+      userSeed
+      oldGeneration
+      schemaGeneration
+      userGeneration
+      inputs.nixpkgs
+      inputs.home-manager
+      pkgs.stdenvNoCC
+      pkgs.shellcheck-minimal
+      pkgs.lndir
+      pkgs.perl
+    ]
+    ++ pkgs.lib.optional (cache != null) cache
+    ++ pkgs.lib.optional (plans != null) plans;
     nix.settings.substituters = lib.mkForce [ ];
   };
   testScript = ''
@@ -76,12 +121,12 @@ in pkgs.testers.runNixOSTest {
     assert folio("apply " + plan)["status"]=="success"
 
     ${pkgs.lib.optionalString (legacy != null) ''
-    with subtest("new user models use the explicit paired schema upgrade path"):
-        before = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
-        user("${runtime}/bin/folio-manager-maintain user ${oldBootstrap} upgrade desktop-models ${schemaSeed}", 600)
-        after = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
-        assert after != before
-        user("folio-repository user ctl --list | grep folio-desktop")
+      with subtest("new user models use the explicit paired schema upgrade path"):
+          before = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
+          user("${runtime}/bin/folio-manager-maintain user ${oldBootstrap} upgrade desktop-models ${schemaSeed}", 600)
+          after = user("readlink -f /home/folio/.local/state/nix/profiles/home-manager").strip()
+          assert after != before
+          user("folio-repository user ctl --list | grep folio-desktop")
     ''}
 
     save(json.loads(user("jq .configuration ${userSeed}/folio-input.json")))
@@ -100,11 +145,19 @@ in pkgs.testers.runNixOSTest {
         assert result["status"]=="unavailable", result
 
     ${pkgs.lib.optionalString (cache != null && plans != null) ''
-    with subtest("cached applications use the actual desktop prerequisites"):
-        user("mkdir -p /home/folio/.local/share/flatpak /home/folio/.local/state/folio/applications/prepared; cp -R ${cache}/. /home/folio/.local/share/flatpak/; chmod -R u+w /home/folio/.local/share/flatpak; cp ${plans}/*.json /home/folio/.local/state/folio/applications/prepared/")
-        assert folio("apps install all --offline")["status"]=="success"
+      with subtest("cached applications use the actual desktop prerequisites"):
+          user("mkdir -p /home/folio/.local/share/flatpak /home/folio/.local/state/folio/applications/prepared; cp -R ${cache}/. /home/folio/.local/share/flatpak/; chmod -R u+w /home/folio/.local/share/flatpak; cp ${plans}/*.json /home/folio/.local/state/folio/applications/prepared/")
+          assert folio("apps install all --offline")["status"]=="success"
     ''}
 
-    ${import ./session-script.nix { inherit pkgs drm cache plans testPython; }}
+    ${import ./session-script.nix {
+      inherit
+        pkgs
+        drm
+        cache
+        plans
+        testPython
+        ;
+    }}
   '';
 }

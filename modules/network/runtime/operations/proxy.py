@@ -37,8 +37,7 @@ def execute(request):
         elif request["action"] == "proxy-group-select":
             group, node = request.get("group"), request.get("node")
             if not all(
-                isinstance(value, str) and 1 <= len(value) <= 256
-                for value in (group, node)
+                isinstance(value, str) and 1 <= len(value) <= 256 for value in (group, node)
             ):
                 raise ValueError("Select a proxy group and node")
             connection.request(
@@ -60,13 +59,25 @@ def execute(request):
             if provider_response.status != 200 or len(provider_body) > 1024 * 1024:
                 raise OSError("Proxy provider inventory unavailable")
             providers = json.loads(provider_body).get("providers", {})
-            provider = next((name for name, entry in providers.items()
-                             if any(proxy.get("name") == node for proxy in entry.get("proxies", []))), None)
+            provider = next(
+                (
+                    name
+                    for name, entry in providers.items()
+                    if any(proxy.get("name") == node for proxy in entry.get("proxies", []))
+                ),
+                None,
+            )
             if provider is None:
                 raise ValueError("Unknown provider node")
-            connection.request("GET", "/providers/proxies/" + quote(provider, safe="")
-                               + "/" + quote(node, safe="") + "/healthcheck?timeout=2000&url="
-                               + quote("https://www.gstatic.com/generate_204", safe=""))
+            connection.request(
+                "GET",
+                "/providers/proxies/"
+                + quote(provider, safe="")
+                + "/"
+                + quote(node, safe="")
+                + "/healthcheck?timeout=2000&url="
+                + quote("https://www.gstatic.com/generate_204", safe=""),
+            )
             response = connection.getresponse()
             body = response.read(1024 * 1024 + 1)
         if response.status not in (200, 204) or len(body) > 1024 * 1024:

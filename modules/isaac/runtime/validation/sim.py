@@ -1,4 +1,5 @@
 """Finite Isaac Sim startup/physics check using a falling cube and ground plane."""
+
 import argparse
 import json
 from pathlib import Path
@@ -41,9 +42,13 @@ try:
     cube = RigidPrim("/World/Cube")
     if args.gui:
         from omni.kit.viewport.utility import get_active_viewport
+
         camera = UsdGeom.Camera.Define(stage, "/World/Camera")
-        camera.AddTransformOp().Set(Gf.Matrix4d().SetLookAt(
-            Gf.Vec3d(2, 2, 1.5), Gf.Vec3d(0, 0, 0.2), Gf.Vec3d(0, 0, 1)).GetInverse())
+        camera.AddTransformOp().Set(
+            Gf.Matrix4d()
+            .SetLookAt(Gf.Vec3d(2, 2, 1.5), Gf.Vec3d(0, 0, 0.2), Gf.Vec3d(0, 0, 1))
+            .GetInverse()
+        )
         get_active_viewport().camera_path = "/World/Camera"
     timeline = omni.timeline.get_timeline_interface()
     timeline.play()
@@ -61,6 +66,7 @@ try:
     assert max(heights[-30:]) - min(heights[-30:]) < 0.02
     if args.screenshot:
         from omni.kit.viewport.utility import capture_viewport_to_file, get_active_viewport
+
         args.screenshot.parent.mkdir(parents=True, exist_ok=True)
         capture_viewport_to_file(get_active_viewport(), str(args.screenshot))
         for _ in range(120):
@@ -69,13 +75,24 @@ try:
                 break
         assert args.screenshot.exists(), "Viewport capture did not complete"
         from PIL import Image
+
         with Image.open(args.screenshot) as frame:
             frame.load()
             pixels = np.asarray(frame.convert("RGB")).reshape(-1, 3)
             assert pixels.std(axis=0).max() > 1, "Viewport capture has no visible content"
-    print(json.dumps({"stage": "gui" if args.gui else "sim", "status": "passed", "steps": len(heights),
-                      "initialHeight": heights[0], "finalHeight": heights[-1],
-                      "screenshot": str(args.screenshot) if args.screenshot else None}), flush=True)
+    print(
+        json.dumps(
+            {
+                "stage": "gui" if args.gui else "sim",
+                "status": "passed",
+                "steps": len(heights),
+                "initialHeight": heights[0],
+                "finalHeight": heights[-1],
+                "screenshot": str(args.screenshot) if args.screenshot else None,
+            }
+        ),
+        flush=True,
+    )
 finally:
     if "timeline" in globals():
         timeline.stop()

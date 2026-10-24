@@ -39,6 +39,7 @@ jq --arg account "$(id -un)" --arg home "$HOME" --argjson uid "$(id -u)" \
   '.users=[{name:$account,home:$home,uid:$uid,groups:[],"login-shell":"bash"}] | .origin="isolated-build-fixture"' \
   "$bootstrap/system-descriptor.json" >"$test_root/bootstrap/system-descriptor.json"
 cp -R "$repository/modules" "$repository/flake.nix" "$repository/flake.lock" "$test_root/source/"
+if [[ -d "$repository/configuration" ]]; then cp -R "$repository/configuration" "$test_root/source/"; fi
 bootstrap=$test_root/bootstrap
 folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
 start_subscriber() {

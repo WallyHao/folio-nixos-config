@@ -4,9 +4,12 @@
 context:
 { config, lib, ... }:
 let
-  settings = context.settings."folio-input:input" or { };
-  seed = import ./package.nix { inherit pkgs; candidateCount = settings.candidate-count or 7; };
-  colors = context.theme or (import ../../appearance/lib { preferences = context.globals; });
+  settings = context.settings;
+  seed = import ./package.nix {
+    inherit pkgs;
+    candidateCount = settings.candidate-count or 7;
+  };
+  colors = context.theme;
   palette = colors.palettes.${context.globals.appearance};
   panelSvg = pkgs.writeText "folio-input-panel.svg" ''
     <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
@@ -14,20 +17,31 @@ let
       <rect x="3" y="3" width="74" height="74" rx="12" ry="12" fill="none" stroke="${colors.semantic.accent}" stroke-width="2"/>
     </svg>
   '';
-  panel = pkgs.runCommand "folio-input-panel.png" { nativeBuildInputs = [ pkgs.librsvg ]; }
-    "rsvg-convert -w 80 -h 80 ${panelSvg} -o $out";
-in {
-  assertions = [{
-    assertion = !(settings.wayland-frontend or true) || config.gtk.enable;
-    message = "Wayland input integration requires the appearance module's GTK settings";
-  }];
+  panel = pkgs.runCommand "folio-input-panel.png" {
+    nativeBuildInputs = [ pkgs.librsvg ];
+  } "rsvg-convert -w 80 -h 80 ${panelSvg} -o $out";
+in
+{
+  assertions = [
+    {
+      assertion = !(settings.wayland-frontend or true) || config.gtk.enable;
+      message = "Wayland input integration requires the appearance module's GTK settings";
+    }
+  ];
   i18n.inputMethod = {
     enable = true;
     type = "fcitx5";
     fcitx5 = {
       systemd.enable = true;
       waylandFrontend = settings.wayland-frontend or true;
-      addons = [ (pkgs.fcitx5-rime.override { rimeDataPkgs = [ pkgs.rime-data pkgs.rime-ice ]; }) ];
+      addons = [
+        (pkgs.fcitx5-rime.override {
+          rimeDataPkgs = [
+            pkgs.rime-data
+            pkgs.rime-ice
+          ];
+        })
+      ];
       sessionVariables = {
         XMODIFIERS = lib.mkDefault "@im=fcitx";
         SDL_IM_MODULE = lib.mkDefault "fcitx";
@@ -36,9 +50,11 @@ in {
       };
     };
   };
-  home.activation.folioInputDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ]
-    (lib.optionalString (settings.seed-defaults or true) "run ${seed}/bin/folio-input-seed");
-  xdg.configFile."autostart/org.fcitx.Fcitx5.desktop".text = "[Desktop Entry]\nType=Application\nName=Fcitx 5\nHidden=true\n";
+  home.activation.folioInputDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+    lib.optionalString (settings.seed-defaults or true) "run ${seed}/bin/folio-input-seed"
+  );
+  xdg.configFile."autostart/org.fcitx.Fcitx5.desktop".text =
+    "[Desktop Entry]\nType=Application\nName=Fcitx 5\nHidden=true\n";
   xdg.configFile."fcitx5/conf/keyboard.conf".text = ''
     EnableHintByDefault=False
     [Hint Trigger]

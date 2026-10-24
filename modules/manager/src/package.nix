@@ -1,4 +1,9 @@
-{ pkgs, lib, cliCommands ? { } }:
+{
+  pkgs,
+  lib,
+  cliCommands ? { },
+  bootstrapPreferences,
+}:
 let
   normalizer = pkgs.callPackage ./normalizer.nix { };
   prepareInput = pkgs.writeShellApplication {
@@ -16,12 +21,22 @@ let
     repository = pkgs.folio.repository;
   };
   client = import ./cli.nix {
-    inherit pkgs cliCommands runtime;
+    inherit
+      pkgs
+      cliCommands
+      runtime
+      bootstrapPreferences
+      ;
     repository = pkgs.folio.repository;
   };
 in
 {
-  inherit normalizer prepareInput runtime client;
+  inherit
+    normalizer
+    prepareInput
+    runtime
+    client
+    ;
   packages = {
     inherit normalizer runtime;
     cli = client.cli;
@@ -34,13 +49,27 @@ in
   };
   commands = lib.mapAttrs (name: adapter: {
     path = "${adapter}/bin/${adapter.meta.mainProgram}";
-    help = "${(
-      if name == "theme" then ../cli/commands/theme/help.txt
-      else if name == "config" then ../cli/commands/config/help.txt
-      else if name == "modules" then ../cli/commands/modules/help.txt
-      else if name == "rollback" || name == "cleanup" then ../cli/commands/rollback/help.txt
-      else ../cli/commands/deploy/help.txt
-    )}";
-    scopes = if name == "theme" then [ "system" ] else [ "user" "system" ];
+    help = "${
+      (
+        if name == "theme" then
+          ../cli/commands/theme/help.txt
+        else if name == "config" then
+          ../cli/commands/config/help.txt
+        else if name == "modules" then
+          ../cli/commands/modules/help.txt
+        else if name == "rollback" || name == "cleanup" then
+          ../cli/commands/rollback/help.txt
+        else
+          ../cli/commands/deploy/help.txt
+      )
+    }";
+    scopes =
+      if name == "theme" then
+        [ "system" ]
+      else
+        [
+          "user"
+          "system"
+        ];
   }) client.adapters;
 }

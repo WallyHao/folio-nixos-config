@@ -3,14 +3,54 @@
 {
   pkgs,
   inputs,
-  bootstrap,
   catalogue,
   collection,
-  adapters,
   userPackages,
-  userHome,
   catalogueLib,
+  identities,
+  system,
+  initialBootstrap,
 }:
+let
+  # Stable behavior fixtures are independent of the installation's module and
+  # preference choices. Frozen guest sources carry these same defaults.
+  composition = import ../src/configuration.nix {
+    inherit
+      pkgs
+      collection
+      catalogueLib
+      identities
+      ;
+    lib = pkgs.lib;
+    inputs = inputs // {
+      self.outPath = ./fixtures;
+    };
+    initialConfiguration = import ./fixtures/defaults.nix;
+  };
+  inherit (composition) adapters;
+  bootstrap = import ../src/bootstrap.nix {
+    inherit
+      pkgs
+      collection
+      identities
+      system
+      ;
+    lib = pkgs.lib;
+    targetName = "portable";
+    inherit (composition) defaults context;
+  };
+  userHome = import ../src/home.nix {
+    inherit inputs bootstrap composition;
+    pkgs = userPackages;
+  };
+  source = pkgs.runCommand "folio-acceptance-source" { } ''
+    mkdir $out
+    cp -R ${pkgs.folio.sourceTree}/. $out/
+    chmod -R u+w $out
+    cp ${./fixtures/defaults.nix} $out/modules/manager/configuration/defaults.nix
+    cp ${bootstrap}/target.json $out/folio-target.json
+  '';
+in
 catalogueLib.exclusive "check names" [
   collection.checks
   {
@@ -42,7 +82,7 @@ catalogueLib.exclusive "check names" [
       homeManager = inputs.home-manager.lib;
       runtime = collection.packages.manager-runtime;
       prepareInput = collection.packages.manager-input;
-      source = pkgs.folio.source;
+      inherit source;
       inherit inputs;
       switcher = userPackages.sd-switch;
     };
@@ -69,7 +109,7 @@ catalogueLib.exclusive "check names" [
           plans
           ;
         integrated = true;
-        source = pkgs.folio.source;
+        inherit source;
         modules = adapters "system";
         prepareInput = collection.packages.manager-input;
       }
@@ -77,24 +117,24 @@ catalogueLib.exclusive "check names" [
     recovery = import ./system-deployment.nix {
       inherit pkgs inputs bootstrap;
       recovery = true;
-      source = pkgs.folio.source;
+      inherit source;
       modules = adapters "system";
       prepareInput = collection.packages.manager-input;
     };
     system-deployment = import ./system-deployment.nix {
       inherit pkgs inputs bootstrap;
-      source = pkgs.folio.sourceTree;
+      inherit source;
       modules = adapters "system";
       prepareInput = collection.packages.manager-input;
     };
     system-scope = import ./system-scope.nix {
       inherit pkgs inputs bootstrap;
-      source = pkgs.folio.sourceTree;
+      inherit source;
       modules = adapters "system";
     };
     user-deployment = import ./user-deployment.nix {
       inherit pkgs inputs bootstrap;
-      source = pkgs.folio.sourceTree;
+      inherit source;
       runtime = collection.packages.manager-runtime;
       cli = collection.packages.manager-cli;
       repository = collection.packages.sysrepo-tools;
@@ -102,8 +142,9 @@ catalogueLib.exclusive "check names" [
     };
     applications-native = import ../../applications/tests/native.nix {
       inherit pkgs inputs bootstrap;
-      source = pkgs.folio.source;
+      inherit source;
       prepareInput = collection.packages.manager-input;
+      palette = (composition.context "user").theme.palette;
     };
     applications = pkgs.lib.makeOverridable (
       {
@@ -118,7 +159,7 @@ catalogueLib.exclusive "check names" [
           cache
           plans
           ;
-        source = pkgs.folio.source;
+        inherit source;
         prepareInput = collection.packages.manager-input;
         modules = adapters "system";
       }
@@ -140,7 +181,7 @@ catalogueLib.exclusive "check names" [
           plans
           drm
           ;
-        source = pkgs.folio.source;
+        inherit source;
         prepareInput = collection.packages.manager-input;
         runtime = collection.packages.manager-runtime;
         cli = collection.packages.manager-cli;
@@ -160,7 +201,7 @@ catalogueLib.exclusive "check names" [
     };
     network = import ../../network/tests/acceptance.nix {
       inherit pkgs inputs bootstrap;
-      source = pkgs.folio.source;
+      inherit source;
       runtime = collection.packages.manager-runtime;
       cli = collection.packages.manager-cli;
       prepareInput = collection.packages.manager-input;
@@ -178,7 +219,7 @@ catalogueLib.exclusive "check names" [
           bootstrap
           legacySource
           ;
-        source = pkgs.folio.source;
+        inherit source;
         prepareInput = collection.packages.manager-input;
         runtime = collection.packages.manager-runtime;
         cli = collection.packages.manager-cli;
@@ -193,7 +234,8 @@ catalogueLib.exclusive "check names" [
     };
     catalogue = import ./catalogue.nix { inherit pkgs catalogueLib; };
     foundation = import ../../sysrepo/tests/foundation.nix {
-      inherit pkgs bootstrap;
+      inherit pkgs;
+      bootstrap = initialBootstrap;
       tools = collection.packages.sysrepo-tools;
       normalizer = collection.packages.manager-normalizer;
       sysrepo = collection.packages.sysrepo-library;

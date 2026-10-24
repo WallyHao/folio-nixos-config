@@ -7,8 +7,7 @@ import shlex
 def user(command, timeout=90):
     return machine.succeed(
         "runuser -u folio -- env HOME=/home/folio XDG_RUNTIME_DIR=/run/user/1000 "
-        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c "
-        + shlex.quote(command),
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c " + shlex.quote(command),
         timeout=datetime.timedelta(seconds=timeout),
     )
 
@@ -18,9 +17,7 @@ def native(program, request, code=0):
     # never as program arguments. No real host connection is used.
     machine.succeed("install -o folio -m 0600 /dev/null /run/user/1000/fixture-request")
     machine.succeed(
-        "printf %s "
-        + shlex.quote(json.dumps(request))
-        + " >/run/user/1000/fixture-request"
+        "printf %s " + shlex.quote(json.dumps(request)) + " >/run/user/1000/fixture-request"
     )
     output = user(
         "code=0; "
@@ -32,9 +29,7 @@ def native(program, request, code=0):
     result = json.loads(output)
     if request.get("password"):
         assert request["password"] not in output, "Credential leaked in a backend reply"
-    assert result["status"] == {0: "success", 2: "invalid", 3: "unavailable"}[code], (
-        result
-    )
+    assert result["status"] == {0: "success", 2: "invalid", 3: "unavailable"}[code], result
     return result["data"]
 
 
@@ -51,9 +46,7 @@ def rpc(action, **fields):
         + " >/tmp/panel-rpc.json; chmod 0644 /tmp/panel-rpc.json"
     )
     result = json.loads(
-        user(
-            "folio-repository system cfg --rpc=/tmp/panel-rpc.json --format json --timeout 30"
-        )
+        user("folio-repository system cfg --rpc=/tmp/panel-rpc.json --format json --timeout 30")
     )
     record = next(iter(result.values()))
     assert "result-json" in record, record
@@ -64,14 +57,10 @@ machine.start()
 machine.wait_for_unit("multi-user.target")
 machine.wait_for_unit("NetworkManager.service")
 machine.succeed("systemctl start polkit.service wpa_supplicant.service")
-machine.wait_until_succeeds(
-    "nmcli -t -f DEVICE,STATE device status | grep '^wlan0:disconnected$'"
-)
+machine.wait_until_succeeds("nmcli -t -f DEVICE,STATE device status | grep '^wlan0:disconnected$'")
 machine.wait_for_unit("folio-network.service")
 machine.wait_for_unit("folio-mihomo.service")
-machine.wait_until_succeeds(
-    "test -d /sys/class/net/wlan0; test -d /sys/class/net/wlan1"
-)
+machine.wait_until_succeeds("test -d /sys/class/net/wlan0; test -d /sys/class/net/wlan1")
 machine.succeed("ip link set wlan1 up")
 machine.succeed("ip address add 192.168.70.1/24 dev wlan1")
 machine.succeed(
@@ -103,9 +92,7 @@ with subtest("native Wi-Fi scan, new credential connection, saved profile and fo
     )
     adapter = next(a for a in observed["adapters"] if a["interface"] == "wlan0")
     assert any(a["active"] for a in adapter["networks"]), observed
-    profile = next(
-        p["uuid"] for p in adapter["profiles"] if p["ssid"] == "FolioFixture"
-    )
+    profile = next(p["uuid"] for p in adapter["profiles"] if p["ssid"] == "FolioFixture")
     assert "folio" in user(
         "nmcli -g connection.permissions connection show " + shlex.quote(profile)
     )
@@ -118,12 +105,8 @@ with subtest("native Wi-Fi scan, new credential connection, saved profile and fo
     native("@wifi@", {"action": "disconnect", "interface": "wlan0"})
     native("@wifi@", {"action": "connect", "interface": "wlan0", "uuid": profile})
     native("@wifi@", {"action": "disconnect", "interface": "wlan0"})
-    observed = native(
-        "@wifi@", {"action": "forget", "interface": "wlan0", "uuid": profile}
-    )
-    assert all(
-        p["uuid"] != profile for a in observed["adapters"] for p in a["profiles"]
-    )
+    observed = native("@wifi@", {"action": "forget", "interface": "wlan0", "uuid": profile})
+    assert all(p["uuid"] != profile for a in observed["adapters"] for p in a["profiles"])
     assert native("@wifi@", {"action": "radio", "enabled": False})["enabled"] is False
     assert native("@wifi@", {"action": "radio", "enabled": True})["enabled"] is True
 
@@ -175,9 +158,7 @@ with subtest("wrong password fails, then hidden personal network connects"):
     native("@wifi@", {"action": "forget", "interface": "wlan0", "uuid": profile})
 
 with subtest("credentials remain outside Folio exports, service logs and frontend"):
-    user(
-        "folio-repository system cfg --export --format json >/run/user/1000/fixture-export.json"
-    )
+    user("folio-repository system cfg --export --format json >/run/user/1000/fixture-export.json")
     machine.succeed(
         "journalctl -u NetworkManager -u wpa_supplicant -u folio-network --no-pager -o cat >/tmp/panel-service-journal"
     )
@@ -190,9 +171,7 @@ with subtest("credentials remain outside Folio exports, service logs and fronten
 with subtest("real proxy inventory and authorized selection, bounded delay failure"):
     # Exercise the installed async transport too, not only fixture RPC helpers.
     script = "import asyncio,json; from folio_panel.client import Client; print(json.dumps(asyncio.run(Client().proxy('proxy-groups'))))"
-    assert json.loads(
-        user("PYTHONPATH=@panel@/lib @python@ -c " + shlex.quote(script))
-    )["groups"]
+    assert json.loads(user("PYTHONPATH=@panel@/lib @python@ -c " + shlex.quote(script)))["groups"]
     for mode in ("direct", "global", "rule"):
         assert rpc("proxy-mode", mode=mode)["status"] == "success"
         assert rpc("status")["data"]["proxy"]["mode"] == mode
@@ -200,19 +179,12 @@ with subtest("real proxy inventory and authorized selection, bounded delay failu
     assert groups["status"] == "success", groups
     group = next(g for g in groups["data"]["groups"] if g["name"] == "PROXY")
     assert "DIRECT" in group["nodes"] and "REJECT" in group["nodes"]
+    assert rpc("proxy-group-select", group="PROXY", node="REJECT")["status"] == "success"
     assert (
-        rpc("proxy-group-select", group="PROXY", node="REJECT")["status"] == "success"
-    )
-    assert (
-        next(g for g in rpc("proxy-groups")["data"]["groups"] if g["name"] == "PROXY")[
-            "selected"
-        ]
+        next(g for g in rpc("proxy-groups")["data"]["groups"] if g["name"] == "PROXY")["selected"]
         == "REJECT"
     )
-    assert (
-        rpc("proxy-group-select", group="PROXY", node="missing")["status"]
-        == "unavailable"
-    )
+    assert rpc("proxy-group-select", group="PROXY", node="missing")["status"] == "unavailable"
     machine.succeed("iptables -A OUTPUT -p tcp --dport 443 -j REJECT")
     assert rpc("proxy-delay", node="DIRECT")["status"] == "unavailable"
     denied = machine.execute(
@@ -224,24 +196,17 @@ with subtest("real proxy inventory and authorized selection, bounded delay failu
 
 with subtest("real audio output, volume, mute and unavailable backlight"):
     user("systemctl --user start pipewire pipewire-pulse wireplumber")
-    machine.wait_until_succeeds(
-        "runuser -u folio -- env XDG_RUNTIME_DIR=/run/user/1000 pactl info"
-    )
+    machine.wait_until_succeeds("runuser -u folio -- env XDG_RUNTIME_DIR=/run/user/1000 pactl info")
     user("pactl load-module module-null-sink sink_name=folio_fixture")
     user("pactl load-module module-null-sink sink_name=folio_second")
     native("@devices@", {"action": "output", "name": "folio_fixture"})
     observed = native("@devices@", {"action": "volume", "level": 47})
     assert observed["audio"]["default"] == "folio_fixture"
     assert (
-        next(s for s in observed["audio"]["sinks"] if s["name"] == "folio_fixture")[
-            "volume"
-        ]
-        == 47
+        next(s for s in observed["audio"]["sinks"] if s["name"] == "folio_fixture")["volume"] == 47
     )
     observed = native("@devices@", {"action": "mute"})
-    assert next(s for s in observed["audio"]["sinks"] if s["name"] == "folio_fixture")[
-        "mute"
-    ]
+    assert next(s for s in observed["audio"]["sinks"] if s["name"] == "folio_fixture")["mute"]
     assert observed["backlights"] == []
     native("@devices@", {"action": "output", "name": "folio_second"})
     user("pactl unload-module module-null-sink")

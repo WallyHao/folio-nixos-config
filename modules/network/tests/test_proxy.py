@@ -1,4 +1,5 @@
 """Controller routing for subscription nodes without changing proxy selections."""
+
 import importlib.util
 import json
 import os
@@ -22,24 +23,40 @@ class Response:
 
 def controller(monkeypatch, responses):
     calls = []
+
     class Connection:
         def request(self, *args):
             calls.append(args)
+
         def getresponse(self):
             return responses.pop(0)
+
         def close(self):
             pass
+
     monkeypatch.setattr(proxy, "Controller", Connection)
     return calls
 
 
 def test_provider_node_latency_uses_provider_route(monkeypatch):
     node, provider = "🇯🇵 日本 | IEPL", "我的订阅"
-    calls = controller(monkeypatch, [Response(404, {}), Response(200, {"providers": {
-        provider: {"proxies": [{"name": node}]}}}), Response(200, {"delay": 37})])
+    calls = controller(
+        monkeypatch,
+        [
+            Response(404, {}),
+            Response(200, {"providers": {provider: {"proxies": [{"name": node}]}}}),
+            Response(200, {"delay": 37}),
+        ],
+    )
     assert proxy.execute({"action": "proxy-delay", "node": node}) == {"node": node, "delay": 37}
     assert calls[1] == ("GET", "/providers/proxies")
-    assert calls[2][1].startswith("/providers/proxies/" + quote(provider, safe="") + "/" + quote(node, safe="") + "/healthcheck?")
+    assert calls[2][1].startswith(
+        "/providers/proxies/"
+        + quote(provider, safe="")
+        + "/"
+        + quote(node, safe="")
+        + "/healthcheck?"
+    )
     assert all(call[0] == "GET" for call in calls)
 
 

@@ -2,7 +2,10 @@
 # The frozen source imports exactly the same instrumentation as the booted guest.
 { pkgs }:
 { lib, ... }: {
-  imports = [ ./system-guest.nix (import ../../desktop/tests/guest.nix { inherit pkgs; }) ];
+  imports = [
+    ./system-guest.nix
+    (import ../../desktop/tests/guest.nix { inherit pkgs; })
+  ];
   # UEFI's auto-sized base image needs its partition and filesystem grown to
   # the disposable overlay capacity before copying the offline Flatpak cache.
   boot.growPartition = true;

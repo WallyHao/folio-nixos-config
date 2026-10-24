@@ -1,4 +1,5 @@
 """Keep the pinned Yazi icon glyphs and rules, recoloring every icon consistently."""
+
 from pathlib import Path
 import sys
 import tomllib

@@ -1,11 +1,17 @@
-Usage: folio config show|edit|import FILE|export FILE
+Usage: folio config show|edit|import FILE|export FILE|get PATH|explain PATH|set PATH JSON|unset PATH
 Read or durably commit desired configuration.
 
   config get /preferences/font-size
+  config explain /preferences/font-size
   config set /preferences/font-size 18
-  config set /preferences/appearance '"light"'
+  config set /modules/terminal/foot/padding '"15x15"'
+  --system config set /modules/system/time-zone '"Asia/Shanghai"'
   config unset /preferences/font-size
   config import FILE --expected-digest DIGEST
 
-Named module paths use /modules/NAME/SETTING. Values are JSON.
+Named module paths use /modules/NAME/SETTING; the model namespace is resolved automatically.
+Explicit namespaced paths remain supported. Values are JSON; unset removes an override.
+show includes effective global preferences, their origins and observed deployment state.
+explain describes a setting's resolved path, value, origin and deployment state.
 Saved changes take effect after plan/build/apply. Identity fields are read-only.
+Themes are system-wide: use folio theme list and folio theme set THEME.

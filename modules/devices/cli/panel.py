@@ -11,9 +11,7 @@ from pathlib import Path
 
 
 def command(arguments):
-    result = subprocess.run(
-        arguments, capture_output=True, text=True, timeout=5, check=False
-    )
+    result = subprocess.run(arguments, capture_output=True, text=True, timeout=5, check=False)
     if result.returncode:
         raise OSError("Device service rejected the operation")
     return result.stdout
@@ -98,9 +96,7 @@ def information():
                         device.name,
                         text(device / "vendor") + ":" + text(device / "device"),
                     ),
-                    "driver": driver.resolve().name
-                    if driver.is_symlink()
-                    else "Unavailable",
+                    "driver": driver.resolve().name if driver.is_symlink() else "Unavailable",
                 }
             )
     displays = [
@@ -123,9 +119,7 @@ def information():
     target = "Unavailable"
     try:
         metadata = json.loads(Path("/run/current-system/folio-system.json").read_text())
-        target = json.loads(Path(metadata["bootstrap"], "target.json").read_text())[
-            "name"
-        ]
+        target = json.loads(Path(metadata["bootstrap"], "target.json").read_text())["name"]
     except (OSError, ValueError, KeyError):
         pass
     os_name = "Unavailable"
@@ -180,9 +174,7 @@ def execute(request):
                 or not Path("/sys/class/backlight", device).is_dir()
             ):
                 raise ValueError("Select an available backlight")
-            command(
-                ["brightnessctl", "--device", device, "--quiet", "set", f"{level}%"]
-            )
+            command(["brightnessctl", "--device", device, "--quiet", "set", f"{level}%"])
     elif action == "mute":
         command(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
     elif action == "output":

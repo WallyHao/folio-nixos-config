@@ -17,9 +17,24 @@ let
   '';
   tools = pkgs.symlinkJoin {
     name = "isaac-tools";
-    paths = map (action: pkgs.writeShellApplication {
-      name = "isaac-${if action == "run" then "lab" else action}";
-      text = launcher action;
-    }) [ "setup" "doctor" "status" "run" "sim" ];
+    paths =
+      map
+        (
+          action:
+          pkgs.writeShellApplication {
+            name = "isaac-${if action == "run" then "lab" else action}";
+            text = launcher action;
+          }
+        )
+        [
+          "setup"
+          "doctor"
+          "status"
+          "run"
+          "sim"
+        ];
   };
-in { inherit shell tools; }
+in
+{
+  inherit shell tools;
+}

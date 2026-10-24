@@ -4,34 +4,59 @@ let
   # the full user-owned theme through the Home Manager option.
   defaultTheme.colors = import ../../appearance/lib { };
 
-  renderPrompt = lib: theme:
+  renderPrompt =
+    lib: theme:
     let
       paletteName = theme.colors.appearance or "dark";
       palette = theme.colors.palettes.${paletteName} or theme.colors.palettes.dark;
       roles = theme.colors.roles or { };
-      rawColor = role:
+      rawColor =
+        role:
         let
           paletteKey = roles.${role} or (if role == "accent" then "green" else "fg");
           color = palette.${paletteKey} or palette.fg;
         in
-        if builtins.isString color && builtins.match "#[0-9A-Fa-f]{6}" color != null
-        then color
-        else throw "folio-zsh: theme role ${role} must resolve to a six-digit hexadecimal color";
+        if builtins.isString color && builtins.match "#[0-9A-Fa-f]{6}" color != null then
+          color
+        else
+          throw "folio-zsh: theme role ${role} must resolve to a six-digit hexadecimal color";
       hexDigit = {
-        "0" = 0; "1" = 1; "2" = 2; "3" = 3; "4" = 4;
-        "5" = 5; "6" = 6; "7" = 7; "8" = 8; "9" = 9;
-        a = 10; b = 11; c = 12; d = 13; e = 14; f = 15;
-        A = 10; B = 11; C = 12; D = 13; E = 14; F = 15;
+        "0" = 0;
+        "1" = 1;
+        "2" = 2;
+        "3" = 3;
+        "4" = 4;
+        "5" = 5;
+        "6" = 6;
+        "7" = 7;
+        "8" = 8;
+        "9" = 9;
+        a = 10;
+        b = 11;
+        c = 12;
+        d = 13;
+        e = 14;
+        f = 15;
+        A = 10;
+        B = 11;
+        C = 12;
+        D = 13;
+        E = 14;
+        F = 15;
       };
-      byte = color: offset:
+      byte =
+        color: offset:
         let
           pair = builtins.substring offset 2 (lib.toLower color);
           digits = lib.stringToCharacters pair;
         in
         builtins.foldl' (value: digit: value * 16 + hexDigit.${digit}) 0 digits;
-      ansi = role:
-        let color = rawColor role;
-        in "38;2;${toString (byte color 1)};${toString (byte color 3)};${toString (byte color 5)}m";
+      ansi =
+        role:
+        let
+          color = rawColor role;
+        in
+        "38;2;${toString (byte color 1)};${toString (byte color 3)};${toString (byte color 5)}m";
     in
     ''
       typeset -g FOLIO_ZSH_PROMPT_VERSION=1
@@ -54,7 +79,14 @@ let
       PROMPT="%{$_folio_accent%}%n%{$_folio_muted%}@%m %{$_folio_foreground%}%~%{$_folio_accent%} %#%{$_folio_reset%} "
     '';
 
-  shellSetup = { prompt, historySize ? 10000, historySave ? 10000, completion ? true, pluginSetup ? "" }:
+  shellSetup =
+    {
+      prompt,
+      historySize ? 10000,
+      historySave ? 10000,
+      completion ? true,
+      pluginSetup ? "",
+    }:
     ''
       # Inspect directories with Zsh builtins so warm startup needs no mkdir,
       # chmod, or external stat process. Never follow a private-dir symlink or
@@ -89,16 +121,22 @@ let
       if [ -n "$XDG_CACHE_HOME" ]; then _folio_cache_home="$XDG_CACHE_HOME"; fi
       _folio_private_dir "$_folio_cache_home/zsh" || { unfunction _folio_private_dir; return; }
       unfunction _folio_private_dir
-      ${if completion then ''
-        autoload -Uz compinit
-        compinit -d "$_folio_cache_home/zsh/zcompdump"
-      '' else ""}
+      ${
+        if completion then
+          ''
+            autoload -Uz compinit
+            compinit -d "$_folio_cache_home/zsh/zcompdump"
+          ''
+        else
+          ""
+      }
 
       ${prompt}
       ${pluginSetup}
     '';
 
-  renderPlugins = pkgs: settings:
+  renderPlugins =
+    pkgs: settings:
     let
       theme = settings.theme or defaultTheme;
       p = theme.colors.palettes.${theme.colors.appearance or "dark"};
@@ -124,12 +162,16 @@ let
         CONTEXT_ROOT_TEMPLATE = "%F{${color "fg"}}%n%f%F{${color "grey1"}}@%m%f";
         CONTEXT_TEMPLATE = "%F{${color "grey1"}}%n@%m%f";
       };
-    in pkgs.lib.optionalString (settings.promptStyle == "powerlevel10k") ''
+    in
+    pkgs.lib.optionalString (settings.promptStyle == "powerlevel10k") ''
       # Keep startup noninteractive; users may override these upstream variables.
       source ${../cli/resources/p10k.zsh}
       typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
-      ${pkgs.lib.concatStringsSep "\n" (pkgs.lib.mapAttrsToList
-        (key: value: "typeset -g POWERLEVEL9K_${key}=${pkgs.lib.escapeShellArg value}") colors)}
+      ${pkgs.lib.concatStringsSep "\n" (
+        pkgs.lib.mapAttrsToList (
+          key: value: "typeset -g POWERLEVEL9K_${key}=${pkgs.lib.escapeShellArg value}"
+        ) colors
+      )}
       source ${pkgs.zsh-powerlevel10k}/share/zsh-powerlevel10k/powerlevel10k.zsh-theme
     ''
     + pkgs.lib.optionalString settings.autosuggestions ''
@@ -140,4 +182,12 @@ let
       source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
     '';
 
-in { inherit defaultTheme renderPrompt renderPlugins shellSetup; }
+in
+{
+  inherit
+    defaultTheme
+    renderPrompt
+    renderPlugins
+    shellSetup
+    ;
+}

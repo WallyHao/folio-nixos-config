@@ -44,7 +44,8 @@ let
     /* Niri owns the focus highlight; avoid duplicate client-side borders. */
     decoration, window.csd { border: none; box-shadow: none; }
   '';
-in {
+in
+{
   gtk3 = css;
   # Since libadwaita 1.6, named colors alone no longer recolor its widgets.
   # Keep this separate: GTK 3 cannot parse CSS custom properties.

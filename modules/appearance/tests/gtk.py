@@ -50,13 +50,19 @@ assert font.get_family() == "Maple Mono NF CN", font.to_string()
 # CSS point sizes resolve to absolute pixels at Xvfb's default 96 DPI.
 expected_size = 16 * Pango.SCALE * (96 / 72 if font.get_size_is_absolute() else 1)
 assert abs(font.get_size() - expected_size) <= 1, font.to_string()
-color = label.get_style_context().get_color() if version == "4" else label.get_style_context().get_color(Gtk.StateFlags.NORMAL)
+color = (
+    label.get_style_context().get_color()
+    if version == "4"
+    else label.get_style_context().get_color(Gtk.StateFlags.NORMAL)
+)
 palette = json.load(open(os.environ["FOLIO_TEST_PALETTE"]))["palettes"][appearance]
 expected = palette["fg"]
 
 
 def rgb(value):
-    return "#" + "".join(f"{round(channel * 255):02x}" for channel in (value.red, value.green, value.blue))
+    return "#" + "".join(
+        f"{round(channel * 255):02x}" for channel in (value.red, value.green, value.blue)
+    )
 
 
 assert rgb(color) == expected, (rgb(color), expected)

@@ -1,3 +1,5 @@
 Usage: folio modules list|enable NAME|disable NAME
 Change desired module selection; use plan/build/apply to deploy it.
 List includes all catalogue modules applicable to this scope, their selection and prerequisites.
+For a newly added module, deploy its source with the existing selection first.
+The running manager must recognize the new catalogue before the module can be enabled.

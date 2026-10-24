@@ -42,9 +42,7 @@ def asynchronous(start, finish, scan_diagnostic=False, timeout=25):
             result.append(
                 (
                     False,
-                    error.message
-                    if scan_diagnostic
-                    else f"{error.domain}:{error.code}",
+                    error.message if scan_diagnostic else f"{error.domain}:{error.code}",
                 )
             )
 
@@ -126,12 +124,8 @@ class Wifi:
                 {
                     "interface": device.get_iface(),
                     "state": device.get_state().value_nick,
-                    "addresses": [a.get_address() for a in ip.get_addresses()]
-                    if ip
-                    else [],
-                    "networks": sorted(
-                        networks, key=lambda ap: (-ap["signal"], ap["path"])
-                    ),
+                    "addresses": [a.get_address() for a in ip.get_addresses()] if ip else [],
+                    "networks": sorted(networks, key=lambda ap: (-ap["signal"], ap["path"])),
                     "profiles": profiles,
                 }
             )
@@ -173,9 +167,7 @@ class Wifi:
             )
             wait_until(lambda: device.get_last_scan() != previous, 25)
         elif action == "disconnect":
-            asynchronous(
-                lambda c, cb: device.disconnect_async(c, cb), device.disconnect_finish
-            )
+            asynchronous(lambda c, cb: device.disconnect_async(c, cb), device.disconnect_finish)
             wait_until(lambda: device.get_state() == NM.DeviceState.DISCONNECTED, 5)
         elif action == "forget":
             connection = self.client.get_connection_by_uuid(request.get("uuid", ""))
@@ -186,9 +178,7 @@ class Wifi:
                 or not connection.get_setting_wireless()
             ):
                 raise Unavailable("The selected saved wireless profile is unavailable")
-            asynchronous(
-                lambda c, cb: connection.delete_async(c, cb), connection.delete_finish
-            )
+            asynchronous(lambda c, cb: connection.delete_async(c, cb), connection.delete_finish)
         elif action == "connect":
             self.connect(device, request)
         else:
@@ -201,11 +191,7 @@ class Wifi:
         if not isinstance(password, str):
             raise TypeError("Invalid network password")
         ap = next(
-            (
-                a
-                for a in device.get_access_points()
-                if a.get_path() == request.get("ap")
-            ),
+            (a for a in device.get_access_points() if a.get_path() == request.get("ap")),
             None,
         )
         if profile:
@@ -219,9 +205,7 @@ class Wifi:
             if password:
                 secure = connection.get_setting_wireless_security()
                 if secure is None or secure.props.key_mgmt not in ("wpa-psk", "sae"):
-                    raise Unavailable(
-                        "Saved profile does not support personal WPA credentials"
-                    )
+                    raise Unavailable("Saved profile does not support personal WPA credentials")
                 secure.props.psk = password
                 asynchronous(
                     lambda c, cb: connection.commit_changes_async(True, c, cb),
@@ -239,10 +223,7 @@ class Wifi:
                 raise ValueError("Hidden network state must be a boolean")
             if hidden:
                 name = request.get("ssid", "")
-                if (
-                    not isinstance(name, str)
-                    or not 1 <= len(name.encode("utf-8")) <= 32
-                ):
+                if not isinstance(name, str) or not 1 <= len(name.encode("utf-8")) <= 32:
                     raise ValueError("SSID must contain 1 through 32 UTF-8 bytes")
                 network_ssid = name.encode("utf-8")
                 kind = request.get("security")
@@ -250,9 +231,7 @@ class Wifi:
                 network_ssid = ssid_bytes(ap)
                 kind = security(ap)
             else:
-                raise Unavailable(
-                    "The selected access point disappeared; refresh the list"
-                )
+                raise Unavailable("The selected access point disappeared; refresh the list")
             if kind not in ("Open", "WPA Personal", "WPA3"):
                 raise Unavailable("Only open and personal WPA networks are supported")
             connection = NM.SimpleConnection.new()
@@ -274,9 +253,7 @@ class Wifi:
                     8 <= len(password.encode("utf-8")) <= 63
                     or re.fullmatch(r"[0-9a-fA-F]{64}", password)
                 ):
-                    raise ValueError(
-                        "WPA password must be 8–63 bytes or 64 hexadecimal digits"
-                    )
+                    raise ValueError("WPA password must be 8–63 bytes or 64 hexadecimal digits")
                 secure = NM.SettingWirelessSecurity.new()
                 secure.props.key_mgmt = "sae" if kind == "WPA3" else "wpa-psk"
                 secure.props.psk = password
@@ -304,17 +281,13 @@ class Wifi:
             # the background. Preserve the saved profile for an explicit retry.
             if active.get_state() != NM.ActiveConnectionState.DEACTIVATED:
                 asynchronous(
-                    lambda c, cb: self.client.deactivate_connection_async(
-                        active, c, cb
-                    ),
+                    lambda c, cb: self.client.deactivate_connection_async(active, c, cb),
                     self.client.deactivate_connection_finish,
                     timeout=5,
                 )
             raise
         if active.get_state() != NM.ActiveConnectionState.ACTIVATED:
-            raise Unavailable(
-                "Connection failed: " + device.get_state_reason().value_nick
-            )
+            raise Unavailable("Connection failed: " + device.get_state_reason().value_nick)
 
 
 def main():
@@ -332,8 +305,7 @@ def main():
             "status": "invalid",
             "data": None,
             "error": str(error)
-            if isinstance(error, ValueError)
-            and not isinstance(error, json.JSONDecodeError)
+            if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError)
             else "Invalid wireless request",
         }
         code = 2

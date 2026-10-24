@@ -2,9 +2,16 @@
 pkgs.testers.runNixOSTest {
   name = "folio-account-migration";
   nodes.machine = { ... }: {
-    users.users.sylphy = { isNormalUser = true; uid = 1000; initialPassword = "fixture-only"; };
+    users.users.sylphy = {
+      isNormalUser = true;
+      uid = 1000;
+      initialPassword = "fixture-only";
+    };
     services.getty.autologinUser = "sylphy";
-    environment.systemPackages = [ migration pkgs.jq ];
+    environment.systemPackages = [
+      migration
+      pkgs.jq
+    ];
     system.stateVersion = "26.05";
     virtualisation.memorySize = 1024;
     virtualisation.additionalPaths = [ pkgs.hello ];

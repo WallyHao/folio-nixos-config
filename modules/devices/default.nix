@@ -1,6 +1,9 @@
 { pkgs, lib }:
-let packages = import ./src/package.nix { inherit pkgs; };
-in {
+let
+  packages = import ./src/package.nix { inherit pkgs; };
+in
+{
+  provides.system = [ "devices-provisioned" ];
   requirements.user.capabilities = [ "devices-provisioned" ];
   targetModules.folio = import ./src/folio.nix;
   inherit packages;

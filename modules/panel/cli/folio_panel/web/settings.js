@@ -5,6 +5,11 @@
   function render() {
     if (!current) return;
     $("system-theme").textContent = current.effective.scheme + "-" + current.effective.appearance;
+    const deployment = current.deployment || {};
+    $("settings-deployment").textContent = deployment.recoveryRequired ? "Configuration persistence or deployment requires recovery. Open Diagnostics for the next step." :
+      deployment.pending === true ? "Saved settings await deployment. Run folio plan to review the changes." :
+      deployment.pending === false ? "Saved configuration matches the recorded deployment. Some changes may still require reopening an application or starting a new session." :
+      "Deployment state is unavailable. Open Diagnostics to inspect the services.";
     for (const key of fields) {
       $("setting-" + key).value = current.effective[key];
       $("inherit-" + key).checked = !(key in current.preferences);

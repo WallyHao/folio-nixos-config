@@ -248,7 +248,7 @@ if [[ "$action" == rollback ]]; then
     mkdir "$work/frozen-composition"
     # Composition and defaults must continue to describe the retained module
     # inventory, including sources from before optional modules were introduced.
-    for component in outputs.nix catalogue.nix defaults.nix prepared.nix configuration.nix; do
+    for component in outputs.nix catalogue.nix defaults.nix targets.nix prepared.nix configuration.nix bootstrap.nix home.nix development.nix; do
       if [[ -f "$work/rebuilt-source/modules/manager/src/$component" ]]; then
         cp "$work/rebuilt-source/modules/manager/src/$component" "$work/frozen-composition/$component"
       fi

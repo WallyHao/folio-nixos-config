@@ -1,10 +1,16 @@
 { pkgs, lib }:
-let packages = import ./src/package.nix { inherit pkgs; };
-in {
+let
+  packages = import ./src/package.nix { inherit pkgs; };
+in
+{
+  provides.system = [ "network-provisioned" ];
   inherit packages;
   checks.proxy = import ./tests/proxy.nix { inherit pkgs; };
   migrations = import ./theme-migrations.nix { inherit pkgs; };
-  models.system = [ ./model/folio-network.yang ./model/folio-network-panel.yang ];
+  models.system = [
+    ./model/folio-network.yang
+    ./model/folio-network-panel.yang
+  ];
   subscribers.system = [ "folio-network.service" ];
   commands.network = {
     path = "${packages.client}/bin/folio-network";

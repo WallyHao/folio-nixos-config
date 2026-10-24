@@ -133,3 +133,28 @@ expect_code 2 folio --json theme set unknown
 expect_code 2 folio --json theme status
 expect_code 2 folio --json theme inherit
 echo 'Global-only theme schema and two-command CLI passed'
+
+# A new client cannot make an old subscriber accept a newly added catalogue
+# entry. Deploying the manager with the new catalogue resolves this without
+# relaxing server validation or changing schema identity.
+folio --json config show | jq '.data.configuration |
+  ."folio-environment:environment".modules |= map(select(.name != "workspace"))' >without-workspace.json
+folio --json config import without-workspace.json | jq -e '.status=="success"'
+stop_subscriber
+new_bootstrap=$bootstrap
+legacy_bootstrap=$TMPDIR/legacy-bootstrap
+mkdir "$legacy_bootstrap"
+cp -RL "$bootstrap"/. "$legacy_bootstrap"/
+chmod -R u+w "$legacy_bootstrap"
+jq 'del(.workspace)' "$bootstrap/catalogue.json" >"$legacy_bootstrap/catalogue.json"
+bootstrap=$legacy_bootstrap
+start_subscriber
+expect_code 2 folio --json modules enable workspace
+jq -e '.status=="invalid" and (.error | contains("running manager catalogue"))' result.json
+folio --json config show | jq -e 'all(.data.configuration."folio-environment:environment".modules[]; .name!="workspace")'
+stop_subscriber
+bootstrap=$new_bootstrap
+start_subscriber
+folio --json modules enable workspace | jq -e '.status=="success"'
+folio --json config show | jq -e 'any(.data.configuration."folio-environment:environment".modules[]; .name=="workspace" and .enabled)'
+echo 'Catalogue update precedes new module selection; legacy subscriber rejects until restarted with the new catalogue'

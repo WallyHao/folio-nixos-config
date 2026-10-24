@@ -58,6 +58,7 @@ System configuration also requires membership in `folio-operators`.
 folio modules list
 folio config show
 folio config get /preferences/font-size
+folio config explain /preferences/font-size
 folio config set /preferences/font-size 18
 folio theme set everforest-light
 folio config unset /preferences/font-size
@@ -66,6 +67,13 @@ folio panel
 ```
 
 Field paths use `/preferences/FIELD` or `/modules/NAME/SETTING`; values are JSON.
+Module paths resolve the module's model namespace automatically, for example
+`/modules/terminal/foot/padding` or `/modules/system/time-zone` with `--system`.
+Explicit namespaced paths remain supported. `get` reads the desired document;
+`explain` also resolves inherited global preferences and reports their origins.
+`show` includes the same preference metadata used by the panel and observed
+deployment state. An unavailable observation is reported as unknown rather than
+as a successful deployment.
 `unset` removes an override so the applicable default can take effect. Use
 `folio config edit` for a complete document, or `config export FILE` and
 `config import FILE` for explicit review and transfer.
@@ -131,7 +139,7 @@ folio rollback PLAN_ID
 
 A plan binds desired configuration, source, models, tool versions, the system
 descriptor, selected profiles and timeouts. Source capture includes the root
-Flake/lock, modules and optional assets; it excludes runtime/output metadata and
+Flake/lock, modules, the configuration entry and optional assets/development settings; it excludes runtime/output metadata and
 rejects escaping symlinks. Evaluation uses immutable Nix-store bytes.
 
 Builds do not publish applied state. Apply requires successful builds, checks both
@@ -198,6 +206,7 @@ There are no separate host/home trees or nested module Flakes.
 
 ```text
 flake.nix / flake.lock
+configuration/     initial defaults and target overrides (link into manager)
 modules/
   <capability>/
     default.nix     public exports
@@ -218,6 +227,13 @@ The manager owns identity, module selection, shared preferences, configuration
 commits and deployment records. Each capability owns its settings and actions.
 Sysrepo provides modeled storage, validation and subscription dispatch. The
 manager's deployment callback is not a generic router for arbitrary module actions.
+
+The [configuration guide](development.md) separates initial installation choices,
+saved desired configuration and module implementation. `configuration/` links to
+`modules/manager/configuration/`; the authoritative files remain inside the module
+source captured by older installed managers. Modules merge by name in target
+overrides, nested objects merge recursively and other lists are replaced explicitly.
+Initial defaults never replace an existing repository during startup or deployment.
 
 ### From desired data to observed effects
 
@@ -304,6 +320,7 @@ contributions, rather than claiming every module is enabled by default.
 | `sysrepo` | Repository initialization and models | Repository initialization and models |
 | `system` | Boot, storage, accounts, locale, time, console, logging, zram and Nix | — |
 | `network` | NetworkManager, DNS, firewall, SSH and optional Mihomo | — |
+| `workspace` | Fixed network preparation, mount checks and explicit repairs | Interactive session preparation and health checks |
 | `devices` | Hardware access, Bluetooth and power policy | Audio session, device controls and observations |
 | `vm` | KVM access | Disposable VM lifecycle |
 | `desktop` | Login session and portal prerequisites | Niri, Waybar, Mako, launcher, clipboard and screenshots |
@@ -333,12 +350,16 @@ the collected public command map. Optional exports include:
 | `models` | System/user YANG paths, including the required import closure. |
 | `commands` | Command roots with executable paths, supported scopes and optional help. |
 | `requirements` | Per-scope prerequisites and system capabilities. |
+| `provides` | Per-scope capability names, collected from enabled modules; duplicate providers are rejected. |
+| `settingsKey` | Modeled settings container, defaulting to `folio-<name>:<name>`. |
 | `impacts` | Public activation hints for deployment review. |
 | `nixosModule` / `homeManagerModule` | Context-to-module constructors for each scope. |
 | `migrations` / `subscribers` | Hash-bound schema transitions and registered consumers for paired maintenance. |
 
-Adapters receive identity, resolved globals, their own settings and public
-capabilities. They never query a mutable repository during evaluation. See
+Adapters receive identity, resolved globals/theme, their own unwrapped `settings`,
+the original `selection`, `moduleName` and public capabilities. The manager resolves
+the namespace once; adapters do not repeat that lookup or independently resolve
+the global theme. They never query a mutable repository during evaluation. See
 [the catalogue collector](../modules/manager/src/catalogue.nix) and
 [configuration composition](../modules/manager/src/configuration.nix) for the exact
 contract. Additional target-specific exports remain owned by their modules.
@@ -346,7 +367,9 @@ contract. Additional target-specific exports remain owned by their modules.
 Public root outputs include `nixosConfigurations.portable`,
 `nixosConfigurations.folio`, `homeConfigurations.folio`,
 `packages.x86_64-linux.*`, `checks.x86_64-linux.*`, the development shell,
-`lib.folio.targets` and `lib.folio.identities`. Standalone builds use bootstrap
+`lib.folio.targets`, `lib.folio.identities`, `lib.folio.initialConfiguration`,
+`lib.folio.checkGroups`, `apps.x86_64-linux.check` and the repository formatter.
+Standalone builds use bootstrap
 defaults unless the source contains a prepared `folio-input.json`.
 
 ## Desktop and developer environment
@@ -539,6 +562,151 @@ An optional `proxy.provider-file` references target-local YAML under `/run` or
 read its contents. The proxy listener binds loopback; TUN is separately opt-in.
 Do not put provider secrets in tracked source or frozen configuration.
 
+### Workspace preparation
+
+The `workspace` module is selected in both default scopes. Its system side
+requires `network`; its user side requires `desktop` and system workspace
+provisioning. After deploying both scopes, `folio-workspace.service` opens a Foot
+terminal at the first graphical login of each boot. The terminal keeps the
+results visible until Enter is pressed. `folio prepare` runs the same workflow
+manually, including after an error. All messages are English; colors follow the
+existing CLI convention and respect `NO_COLOR`, redirected output and `TERM=dumb`.
+
+Network initialization starts without confirmation:
+
+1. Stop Mihomo temporarily so TUN cannot affect direct Wi-Fi measurements. Enable
+   the Wi-Fi radio and allow NetworkManager up to 20 seconds to auto-connect.
+2. Test currently active Wi-Fi first. If it fails, activate previously used saved
+   profiles, newest connection timestamp first, with 25 seconds per activation.
+   Stored credentials remain in NetworkManager. Profiles that have never been
+   used are excluded; unavailable saved networks are tried and reported.
+3. Test verified HTTPS downloads from Baidu and QQ, bound to the Wi-Fi interface,
+   bypassing environment proxies. A test succeeds with HTTP 200, at least 1 KiB
+   downloaded and at least 16 KiB/s (about 0.13 Mbps). Each endpoint has a 10-second
+   limit. The displayed Mbps is a small transfer estimate, not a saturation
+   bandwidth benchmark. Redirects and typical captive portals fail the test.
+4. Start Mihomo, discover actual nodes from its inventory and providers, and test
+   only names labeled Hong Kong / United States (`HK`, `US`, `USA`, country names,
+   Chinese names or flags). Labels are subscription metadata, not geolocation
+   verification. Manual selector paths from `GLOBAL` must reach the node;
+   automatic groups cannot guarantee the chosen region and are excluded.
+5. Measure latency against the existing fixed Google HTTPS 204 endpoint, with a
+   2000 ms timeout and at most six concurrent probes. Pin the lowest-latency
+   successful node through its selector path, enable global mode and TUN routing,
+   then verify the route, retest node latency and fetch the Google HTTPS 204
+   endpoint through the system route with environment proxies bypassed. This
+   deliberately overrides runtime rule/direct mode; private subscription files
+   are unchanged. Mihomo
+   must already be provisioned with TUN privileges and subscription credentials.
+
+Wi-Fi exhaustion, no eligible node or all node timeouts stops preparation with
+an error after displaying the independent local health results. Repairs and
+cleanup are not offered after network initialization failure. If Wi-Fi
+initialization fails, a VPN service that was previously running is restarted.
+
+The four health categories are automatic and read-only. Optional mutations run
+after their results have been displayed, with an independent `[y/N]` confirmation
+for each action:
+
+| Category | Automatic checks | Scheduling | Optional action |
+| --- | --- | --- | --- |
+| Storage and mounts | Space, inode availability, declared mount/device/filesystem/subvolume, read-only state for `/`, `/home`, `/nix`, `/boot` | Runs alongside network initialization, services and clock status | Confirmed Nix cleanup; mount problems require manual repair |
+| Service health | Failed system and user services, exit result/code, log commands | Runs alongside storage, clock status and network initialization | Restart the displayed failed services after confirmation, then recheck |
+| Time synchronization | NTP enabled state, kernel synchronization state, timezone | Initial status runs alongside local checks; if unsynchronized, recheck with an eight-second grace period after network setup | Restart `systemd-timesyncd` and wait up to 15 seconds after confirmation; disabled NTP is not enabled automatically |
+| DNS and work endpoints | IPv4 resolution for Baidu/GitHub/Nix cache; HTTPS for Google 204, GitHub and Nix cache | Six probes run concurrently after successful Wi-Fi/VPN setup; also overlaps the clock grace period | Diagnostics only; no DNS or proxy configuration changes |
+
+Results print in consistent category order, with individual findings and a final
+`PASS` / `WARN` / `FAIL` summary. Worker threads do not print interleaved output.
+An unavailable check warns without hiding the other results. DNS commands time
+out after five seconds and HTTPS probes after eight seconds. Endpoint failures
+are warnings: an unavailable GitHub or cache does not prevent an otherwise
+working desktop. Mount errors, critically low space and failed repair operations
+produce a nonzero exit status; declining an optional action is not an error.
+Repairs trigger service/time and endpoint rechecks; successful cleanup triggers a
+new space/mount check so resolved errors do not remain in the final summary.
+
+Storage warnings begin below 10% free or 5 GiB; critical findings begin below 3%
+or 1 GiB. `/boot` uses 128 MiB / 32 MiB absolute thresholds instead. Filesystems
+reporting inode counts warn below 5% free and fail below 1%; Btrfs filesystems
+without a fixed inode total skip that calculation. Low space permits confirmed
+cleanup, while missing/wrong/read-only mounts or unavailable mount verification
+block it. The root cleanup helper repeats mount verification before deleting
+anything. Devices, filesystem types and subvolumes come from the active NixOS
+`fileSystems` declarations in `/etc/folio/workspace-checks.json`; `/home` and
+`/nix` may correctly share `/` when no separate mounts are declared. The disk
+check uses a fixed privileged read-only action so private EFI directories can
+be inspected without misreporting permission failures as missing mounts.
+
+Service restarts preserve system/user scope. The root helper accepts a bounded
+list of service names on stdin and rechecks the current failed-service inventory
+before restarting. Healthy services, arbitrary unit types and unit name patterns
+are not restarted. User services are restarted as the logged-in user. Each
+restart has a 30-second limit; logs can be inspected with the printed commands.
+Clock checks use systemd's
+[`NTPSynchronized` observation](https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.timedate1.html),
+not an independent measurement of clock offset against an external server.
+
+Domestic direct HTTPS was measured before Mihomo was enabled. Later DNS and
+HTTPS checks explicitly use the prepared system VPN/TUN route and bypass
+environment proxy variables. They do not claim to measure direct Internet access
+while TUN is active. GitHub and the public Nix cache are fixed read-only endpoint
+checks; they do not download repositories, update channels or build packages.
+
+After network success, `Run storage cleanup? [y/N]` defaults to No. Only `y` or
+`yes` from an interactive terminal starts cleanup; redirected input cannot
+approve it. Cleanup takes the manager's system queue/mutation locks, retains
+three system profile generations, refreshes boot entries, and runs `nix-store
+--gc`. Current profile, running and booted generations take priority within the
+three slots, followed by the newest remaining generations. Fewer than three
+existing generations are all retained. The Folio hardware target also displays
+up to three system generations in its boot menu.
+
+This removes specific generations rather than relying on Nix's relative `+3`
+semantics, which also retain generations newer than the current one after a
+rollback. See the [Nix generation deletion reference](https://nix.dev/manual/nix/2.33/command-ref/nix-env/delete-generations).
+Home Manager generations, personal files and Folio deployment/recovery roots are
+preserved. These roots can keep older closures alive after system generation
+pruning. Existing `folio cleanup` continues to manage unreferenced deployment
+records separately; it does not prune system generations.
+
+The installed root helper accepts only `network`, `disk-check`,
+`repair-services --apply`, `sync-time --apply` or `cleanup --apply`, through exact
+passwordless sudo rules for `folio-operators`. Read-only disk checks can overlap
+network setup. Network, repairs and cleanup share a nonblocking system lock;
+cleanup also refuses to overlap manager system mutations. There is no background
+cleanup timer. Redirected input cannot approve repairs or cleanup.
+
+For an existing datastore whose installed manager catalogue predates `workspace`,
+first deploy this source with the current module selections. Running a new CLI
+does not update the active manager's catalogue: it will reject `modules enable
+workspace` until that first deployment has completed. No schema upgrade is needed
+when the source and installed model/tool identities are unchanged.
+
+```sh
+# Phase 1: update the manager catalogue without selecting workspace yet.
+nix run path:.#folio -- plan --source "$PWD"
+nix run path:.#folio -- build FIRST_PLAN_ID
+nix run path:.#folio -- apply FIRST_PLAN_ID
+
+# Phase 2: enable workspace, then deploy its system and user configuration.
+nix run path:.#folio -- --system modules enable workspace
+nix run path:.#folio -- --user modules enable workspace
+nix run path:.#folio -- plan --source "$PWD"
+nix run path:.#folio -- build SECOND_PLAN_ID
+nix run path:.#folio -- apply SECOND_PLAN_ID
+```
+
+Replace each placeholder with the ID returned by its preceding plan command.
+After the second deployment, run `folio prepare` manually or log in after the
+next boot. Neither planning nor building activates the workspace tasks.
+
+Verification: `nix build path:.#checks.x86_64-linux.workspace-preparation` covers
+saved-profile failover, transfer rejection, allowed-region selection, nested
+private selectors, all-node timeout, repair/cleanup consent, once-per-boot
+behavior, generation preservation, mount/source/subvolume mismatches, low
+space/inodes, time synchronization, endpoint errors and parallel scheduling
+without changing host networking, services, clock or store contents.
+
 The `system` module models locale, time synchronization, console policy, bounded
 journal storage, zram and Nix settings. Physical storage requires explicit stable
 root/EFI paths and account policy; no adapter partitions disks.
@@ -691,7 +859,7 @@ no fixed PRIME addresses or DRM card numbering.
 
 Storage uses the inspected USB root/EFI UUIDs and Btrfs `root`, `home` and `nix`
 subvolumes. Internal disks are not configured or partitioned. The boot menu is
-visible for three seconds and retains up to ten generations; EFI variable writes
+visible for three seconds and retains generations according to the target's configured limit; EFI variable writes
 are disabled. Secure Boot enrollment/signing is not provided. Shut down normally
 before moving the disk between machines; moving it alone requires no rebuild.
 
@@ -954,6 +1122,9 @@ not establish successful system activation on the actual host.
 
 ## Development and verification
 
+See [the development guide](development.md) for configuration ownership, formatting,
+stable fixtures, execution groups and the deployment protocol invariants.
+
 ### Isolated development
 
 Use the root development shell and temporary XDG paths for repository experiments:
@@ -991,6 +1162,12 @@ Self-contained checks are exported by their owning module as
 test wiring out of production output composition. Existing short check names,
 including `cli-workflow`, `panel`, `appearance` and `account-migration`, remain
 aliases for the same derivations.
+
+Behavior and deployment fixtures use
+`modules/manager/tests/fixtures/defaults.nix`, independently of personal installation
+choices. Their frozen sources carry those same defaults. The existing `foundation`
+check validates the actual installation defaults and compares normalized documents
+rather than assuming one personal font size.
 
 The shared `tools` check exercises the generated developer environment across
 terminal, agents and Emacs; its fixture lives with manager integration tests.

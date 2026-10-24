@@ -1,4 +1,5 @@
 """Show the active Niri bindings in a compact, theme-aware reference window."""
+
 import json
 import os
 from pathlib import Path
@@ -13,18 +14,22 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango
 
 
 def bindings(path):
-    groups = {name: [] for name in ("Apps & Desktop", "Windows & Layout", "Workspaces", "Capture & Session")}
+    groups = {
+        name: []
+        for name in ("Apps & Desktop", "Windows & Layout", "Workspaces", "Capture & Session")
+    }
     workspace = set()
     for key, title, action in re.findall(
         r'^\s*([\w+]+)\s+[^\n]*?hotkey-overlay-title="([^"]+)"\s*\{([^\n]+)\}',
-        path.read_text(), re.M,
+        path.read_text(),
+        re.M,
     ):
-        if "workspace" in action and re.search(r'\+(?:[0-9])$', key):
+        if "workspace" in action and re.search(r"\+(?:[0-9])$", key):
             shifted = "+Shift+" in key
             if shifted in workspace:
                 continue
             workspace.add(shifted)
-            key = re.sub(r'[0-9]$', '1…9 / 0', key)
+            key = re.sub(r"[0-9]$", "1…9 / 0", key)
             title = "Move window to workspace 1–10" if shifted else "Focus workspace 1–10"
             group = "Workspaces"
         elif "screenshot" in action or "session" in action or "quit;" in action:
@@ -33,7 +38,7 @@ def bindings(path):
             group = "Apps & Desktop"
         else:
             group = "Windows & Layout"
-        key = re.sub(r'^(Super|Mod|Win)', 'Win', key)
+        key = re.sub(r"^(Super|Mod|Win)", "Win", key)
         key = key.replace("Return", "Enter").replace("Slash", "/")
         for word, arrow in (("Left", "←"), ("Right", "→"), ("Up", "↑"), ("Down", "↓")):
             key = key.replace(word, arrow)
@@ -69,7 +74,9 @@ LABELS = {
 
 class Shortcuts(Gtk.Application):
     def __init__(self, theme):
-        super().__init__(application_id="org.folio.Shortcuts", flags=Gio.ApplicationFlags.FLAGS_NONE)
+        super().__init__(
+            application_id="org.folio.Shortcuts", flags=Gio.ApplicationFlags.FLAGS_NONE
+        )
         self.theme = theme
 
     def do_activate(self):
@@ -78,7 +85,9 @@ class Shortcuts(Gtk.Application):
             return
         theme = self.theme
         css = Gtk.CssProvider()
-        css.load_from_data(('''
+        css.load_from_data(
+            (
+                """
             window { background: %(background)s; color: %(foreground)s; }
             * { font-family: %(font)s; font-size: %(size)spx; }
             .title { font-size: 22px; font-weight: bold; color: %(accent)s; }
@@ -87,10 +96,16 @@ class Shortcuts(Gtk.Application):
                     border-radius: 12px; padding: 16px; }
             .section { color: %(accent)s; font-weight: bold; margin-bottom: 10px; }
             .key { color: %(accent)s; font-weight: bold; }
-        ''' % theme).encode())
-        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        """
+                % theme
+            ).encode()
+        )
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         window = Gtk.ApplicationWindow(application=self, title="Shortcuts · Folio")
         window.set_default_size(640, 600)
+
         def fit_monitor(widget, event=None):
             monitor = widget.get_display().get_monitor_at_window(widget.get_window())
             area = monitor.get_workarea()
@@ -104,9 +119,13 @@ class Shortcuts(Gtk.Application):
             if current_width > width or current_height > height:
                 widget.resize(min(current_width, width), min(current_height, height))
             return False
+
         window.connect("map-event", fit_monitor)
         window.connect("configure-event", fit_monitor)
-        window.connect("key-press-event", lambda w, event: w.close() if event.keyval == Gdk.KEY_Escape else False)
+        window.connect(
+            "key-press-event",
+            lambda w, event: w.close() if event.keyval == Gdk.KEY_Escape else False,
+        )
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=16)
         window.add(outer)
         heading = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -126,7 +145,10 @@ class Shortcuts(Gtk.Application):
         outer.pack_start(scroll, True, True, 0)
         grid = Gtk.Grid(column_spacing=16, row_spacing=16, column_homogeneous=True)
         scroll.add(grid)
-        config = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "niri/config.kdl"
+        config = (
+            Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+            / "niri/config.kdl"
+        )
         cards = []
 
         def wrapped_label(value, style=None):

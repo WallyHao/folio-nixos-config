@@ -122,12 +122,21 @@ else
       fi
       [[ "$commit" =~ ^[0-9a-f]{64}$ ]] || fail invalid 'Invalid resolved application commit' 2
       plan_path=$app_state/prepared/$name-$commit.json
+      reusable_plan=false
+      if [[ "$action" != rollback && "$action" != update && "$action" != prepare && -f "$plan_path" ]]; then
+        cached_refs >"$work/cache.json"
+        # Uninstalling or pruning Flatpak content can leave a retained plan
+        # behind. Online requests must prepare it again when its refs changed.
+        if jq -e --slurpfile cache "$work/cache.json" '.operations | length>0 and all(.[]; . as $op | any($cache[0][]; .ref==$op.ref and .commit==$op.commit))' "$plan_path" >/dev/null; then
+          reusable_plan=true
+        fi
+      fi
       if [[ "$action" == rollback ]]; then
         revision=$(jq -er .request.revision "$record")
         [[ "$revision" =~ ^a-[a-f0-9]{32}$ && -f "$app_state/revisions/$revision.json" ]] || fail unavailable 'Application rollback revision is unavailable' 3
         plan=$(jq -ce --arg name "$name" '.applications[$name].plan' "$app_state/revisions/$revision.json") || fail unavailable 'Rollback has no retained application plan' 3
         commit=$(jq -er .commit <<<"$plan")
-      elif [[ "$offline" == true || ( "$action" != update && "$action" != prepare && -f "$plan_path" ) ]]; then
+      elif [[ "$offline" == true || "$reusable_plan" == true ]]; then
         [[ -f "$plan_path" ]] || fail unavailable 'Complete prepared application content is unavailable' 3
         plan=$(jq -c . "$plan_path")
       else

@@ -1,4 +1,5 @@
 """Run the upstream RSL-RL playback entrypoint with a finite, checked rollout loop."""
+
 import argparse
 import json
 from pathlib import Path
@@ -52,8 +53,14 @@ def bounded_loop(step, *, dt, args_cli, env_cfg):
             step()
     assert stats["steps"] == 1200, stats
     assert stats["completedEpisodes"] > 0, stats
-    result = {"stage": "rollout", "status": "passed", "task": args.task,
-              "checkpoint": args.checkpoint, "backend": "isaacsim_physx", **stats}
+    result = {
+        "stage": "rollout",
+        "status": "passed",
+        "task": args.task,
+        "checkpoint": args.checkpoint,
+        "backend": "isaacsim_physx",
+        **stats,
+    }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result), flush=True)
@@ -66,8 +73,23 @@ common.create_isaaclab_env = checked_environment
 common.run_playback = bounded_loop
 from isaaclab_rl.entrypoints import run_play_cli
 
-code = run_play_cli(["--rl_library", "rsl_rl", "--task", args.task, "--checkpoint", args.checkpoint,
-                     "--num_envs", "4", "--seed", "42", "--viz", "none", "physics=isaacsim_physx"])
+code = run_play_cli(
+    [
+        "--rl_library",
+        "rsl_rl",
+        "--task",
+        args.task,
+        "--checkpoint",
+        args.checkpoint,
+        "--num_envs",
+        "4",
+        "--seed",
+        "42",
+        "--viz",
+        "none",
+        "physics=isaacsim_physx",
+    ]
+)
 if code:
     raise SystemExit(code)
 assert args.output.exists(), "Playback returned without completing its rollout"

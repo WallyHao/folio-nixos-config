@@ -40,16 +40,26 @@ let
       *) exit 2 ;;
     esac
   '';
-in pkgs.testers.runNixOSTest {
+in
+pkgs.testers.runNixOSTest {
   name = "folio-legacy-retirement-files";
   nodes.machine = { ... }: {
     networking.hostName = "folio";
-    users.users.folio = { isNormalUser = true; uid = 1000; };
+    users.users.folio = {
+      isNormalUser = true;
+      uid = 1000;
+    };
     systemd.services.folio-mihomo.serviceConfig = {
       ExecStart = "${pkgs.coreutils}/bin/sleep infinity";
       LoadCredential = [ "provider.yaml:/var/lib/folio-mihomo-private/provider.yaml" ];
     };
-    environment.systemPackages = [ pkgs.jq pkgs.util-linux pkgs.getent pkgs.diffutils pkgs.inetutils ];
+    environment.systemPackages = [
+      pkgs.jq
+      pkgs.util-linux
+      pkgs.getent
+      pkgs.diffutils
+      pkgs.inetutils
+    ];
     environment.etc."folio-test/retire-legacy.sh".source = ../runtime/retire-legacy.sh;
     virtualisation.memorySize = 1024;
   };
@@ -64,7 +74,12 @@ in pkgs.testers.runNixOSTest {
     machine.succeed("printf retained-fixture >/etc/sylphy/fixture; printf '{}' >/var/lib/folio-mihomo/config.json")
     configuration = {"folio-environment:environment": {"modules": [{"name":"network", "folio-network:network": {"proxy": {"provider-file":"/var/lib/sylphy-mihomo-private/provider.yaml"}}}]}}
     machine.succeed("printf %s " + shlex.quote(json.dumps(configuration)) + " >/var/lib/fixture-desired.json")
-    runner = "env PATH=${pkgs.lib.makeBinPath [ client services ]}:$PATH bash /etc/folio-test/retire-legacy.sh"
+    runner = "env PATH=${
+      pkgs.lib.makeBinPath [
+        client
+        services
+      ]
+    }:$PATH bash /etc/folio-test/retire-legacy.sh"
 
     with subtest("unvalidated backup paths remain untouched"):
         machine.fail(runner + " resume /etc")

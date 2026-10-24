@@ -41,8 +41,9 @@ first_runtime=$XDG_RUNTIME_DIR
 export XDG_STATE_HOME=$TMPDIR/second-state XDG_RUNTIME_DIR=$TMPDIR/second-run
 mkdir -p "$XDG_RUNTIME_DIR"
 folio-repository user init "$models" "$bootstrap/user.json"
-folio-repository user cfg --export --module folio-environment --format json --defaults report-all |
-  jq -e '."folio-environment:environment".preferences."font-size" == 16'
+folio-repository user cfg --export --module folio-environment --format json --defaults report-all >second.json
+folio-normalize "$models" second.json >second-normalized.json
+cmp normalized.json second-normalized.json
 export XDG_STATE_HOME=$first_state XDG_RUNTIME_DIR=$first_runtime
 folio-repository user cfg --export --module folio-environment --format json --defaults report-all |
   jq -e '."folio-environment:environment".preferences."font-size" == 18'

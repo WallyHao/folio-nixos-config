@@ -4,11 +4,18 @@ let
   theme = import ./theme.nix { inherit context; };
   cursor = import ./cursor.nix { inherit pkgs theme; };
   css = import ./gtk-style.nix { inherit theme; };
-in {
-  home.packages = [ cursor pkgs.maple-mono.NF-CN ];
+in
+{
+  home.packages = [
+    cursor
+    pkgs.maple-mono.NF-CN
+  ];
   gtk = {
     enable = true;
-    font = { name = theme.font-family; size = theme.font-size; };
+    font = {
+      name = theme.font-family;
+      size = theme.font-size;
+    };
     colorScheme = theme.colors.appearance;
     # adw-gtk3 consumes the same named colors as our GTK 4 overrides.
     gtk3.theme = {
@@ -46,7 +53,12 @@ in {
     scheme = theme.colors.scheme;
     palette = theme.colors.palettes.${theme.colors.appearance};
     roles = theme.colors.roles;
-    inherit (theme) font-family font-size cursor-size origins;
+    inherit (theme)
+      font-family
+      font-size
+      cursor-size
+      origins
+      ;
     cursor = cursor.cursorName;
   };
 }

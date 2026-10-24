@@ -11,18 +11,11 @@ let
 in
 {
   checks = {
-    account-migration = import ./tests/account-migration.nix { inherit pkgs; migration = power.migration; };
-    legacy-retirement-files = import ./tests/legacy-retirement-files.nix { inherit pkgs; };
-  };
-  targetSettings.folio = {
-    "folio-system:system" = {
-      time-zone = "Asia/Shanghai";
-      storage-profile = "physical";
-      prototype-password = false;
-      root-filesystem = "btrfs";
-      root-device = "/dev/disk/by-uuid/4e59b522-0ecc-4bc7-b6d0-edc4531e4a00";
-      boot-device = "/dev/disk/by-uuid/767D-8E97";
+    account-migration = import ./tests/account-migration.nix {
+      inherit pkgs;
+      migration = power.migration;
     };
+    legacy-retirement-files = import ./tests/legacy-retirement-files.nix { inherit pkgs; };
   };
   targetModules.folio = import ./src/folio.nix;
   migrationModule = import ./src/migration.nix { migration = power.migration; };
@@ -40,12 +33,15 @@ in
     scopes = [ "system" ];
   };
   models.system = [ currentModel ];
-  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
-    module = "folio-system";
-    from = "2026-10-18"; to = "2026-10-19";
-    fromSha256 = builtins.hashFile "sha256" oldModel;
-    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-19/folio-system.yang;
-    transform = "${migration}/bin/folio-system-add-policy";
-  }];
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [
+    {
+      module = "folio-system";
+      from = "2026-10-18";
+      to = "2026-10-19";
+      fromSha256 = builtins.hashFile "sha256" oldModel;
+      toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-19/folio-system.yang;
+      transform = "${migration}/bin/folio-system-add-policy";
+    }
+  ];
   nixosModule = import ./src/system.nix { inherit power; };
 }

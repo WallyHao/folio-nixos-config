@@ -24,9 +24,7 @@ async def process(arguments, request=None, timeout=65):
     )
     try:
         output, _ = await asyncio.wait_for(
-            child.communicate(
-                json.dumps(request).encode() if request is not None else None
-            ),
+            child.communicate(json.dumps(request).encode() if request is not None else None),
             timeout,
         )
         if len(output) > 2 * 1024 * 1024:
@@ -35,9 +33,7 @@ async def process(arguments, request=None, timeout=65):
     except TimeoutError:
         raise BackendError("Backend timed out", code="backend-timeout") from None
     except ValueError:
-        raise BackendError(
-            "Backend timed out or returned an invalid response"
-        ) from None
+        raise BackendError("Backend timed out or returned an invalid response") from None
     finally:
         if child.returncode is None:
             child.kill()
@@ -48,7 +44,9 @@ def result(reply):
     if not isinstance(reply, dict) or reply.get("status") != "success":
         message = reply.get("error") if isinstance(reply, dict) else None
         status = reply.get("status", "unavailable") if isinstance(reply, dict) else "unavailable"
-        code = {"conflict": "configuration-conflict", "invalid": "invalid-configuration"}.get(status, "backend-unavailable")
+        code = {"conflict": "configuration-conflict", "invalid": "invalid-configuration"}.get(
+            status, "backend-unavailable"
+        )
         raise BackendError(message or "Backend rejected the operation", status, code)
     return reply["data"]
 
@@ -59,32 +57,49 @@ class Client:
 
     async def settings(self):
         data = result(await process([paths.LEGACY, "--json", "config", "show"]))
-        preferences = {key: value for key, value in
-                       data["configuration"]["folio-environment:environment"].get("preferences", {}).items()
-                       if key not in {"scheme", "appearance"}}
-        defaults = {"appearance": "dark", "scheme": "everforest", "font-family": "Maple Mono NF CN", "font-size": 16}
-        origin = "bootstrap default"
-        descriptor = Path("/run/folio/public/system-descriptor.json")
-        try:
-            record = json.loads(descriptor.read_text())
-            defaults.update({k: v for k, v in record["preferences"].items() if k in defaults})
-            origin = "system default"
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
-        return {"digest": data["digest"], "preferences": preferences, "defaults": defaults,
-                "effective": {**defaults, **preferences},
-                "origins": {key: "user override" if key in preferences else origin for key in defaults}}
+        preferences = {
+            key: value
+            for key, value in data["configuration"]["folio-environment:environment"]
+            .get("preferences", {})
+            .items()
+            if key not in {"scheme", "appearance"}
+        }
+        resolved = data["preferences"]
+        labels = {
+            "user-configuration": "user override",
+            "system-configuration": "system setting",
+            "system-default": "system default",
+            "bootstrap-default": "bootstrap default",
+        }
+        return {
+            "digest": data["digest"],
+            "preferences": preferences,
+            "defaults": resolved["defaults"],
+            "effective": resolved["values"],
+            "deployment": data["deployment"],
+            "origins": {
+                key: labels.get(origin, origin) for key, origin in resolved["origins"].items()
+            },
+        }
 
     async def save_settings(self, digest, preferences):
         # The full desired document stays private; the API exposes public preferences only.
         data = result(await process([paths.LEGACY, "--json", "config", "show"]))
         if data["digest"] != digest:
-            raise BackendError("Configuration changed. Reload settings before saving.", "conflict", "configuration-conflict")
+            raise BackendError(
+                "Configuration changed. Reload settings before saving.",
+                "conflict",
+                "configuration-conflict",
+            )
         document = data["configuration"]
         target = document["folio-environment:environment"].setdefault("preferences", {})
         for key, value in preferences.items():
             if key not in {"font-family", "font-size"}:
-                raise BackendError("Theme selection is system-wide. Use folio theme set.", "invalid", "invalid-configuration")
+                raise BackendError(
+                    "Theme selection is system-wide. Use folio theme set.",
+                    "invalid",
+                    "invalid-configuration",
+                )
             if value is None:
                 target.pop(key, None)
             else:
@@ -93,7 +108,19 @@ class Client:
             path = Path(directory) / "draft.json"
             path.write_text(json.dumps(document, ensure_ascii=False))
             path.chmod(0o600)
-            return result(await process([paths.LEGACY, "--json", "config", "import", str(path), "--expected-digest", digest]))
+            return result(
+                await process(
+                    [
+                        paths.LEGACY,
+                        "--json",
+                        "config",
+                        "import",
+                        str(path),
+                        "--expected-digest",
+                        digest,
+                    ]
+                )
+            )
 
     async def wifi(self, action="status", **fields):
         return result(await process([paths.WIFI], {"action": action, **fields}))
@@ -111,7 +138,10 @@ class Client:
         with tempfile.TemporaryDirectory(prefix="folio-panel-") as directory:
             request = Path(directory, "request.json")
             # libyang rejects escaped UTF-16 surrogate pairs in emoji node names.
-            request.write_text(json.dumps({root: {"action": action, **fields}}, ensure_ascii=False), encoding="utf-8")
+            request.write_text(
+                json.dumps({root: {"action": action, **fields}}, ensure_ascii=False),
+                encoding="utf-8",
+            )
             request.chmod(0o600)
             reply = await process(
                 [

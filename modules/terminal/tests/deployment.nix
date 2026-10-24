@@ -1,19 +1,40 @@
-{ pkgs, inputs, source, bootstrap, prepareInput, modules, runtime, cli, editor, legacySource ? null }:
+{
+  pkgs,
+  inputs,
+  source,
+  bootstrap,
+  prepareInput,
+  modules,
+  runtime,
+  cli,
+  editor,
+  legacySource ? null,
+}:
 let
-  legacy = if legacySource == null then null else import (legacySource + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = legacySource; };
-  };
+  legacy =
+    if legacySource == null then
+      null
+    else
+      import (legacySource + "/modules/manager/src/outputs.nix") {
+        inputs = inputs // {
+          self.outPath = legacySource;
+        };
+      };
   oldBootstrap = if legacy == null then bootstrap else legacy.packages.x86_64-linux.manager-bootstrap;
   descriptor = pkgs.runCommand "folio-tools-test-descriptor" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
   '';
-  prepared = name: base: config: modelBootstrap: pkgs.runCommand name { nativeBuildInputs = [ prepareInput ]; } ''
-    mkdir $out
-    cp -R ${base}/. $out/
-    chmod -R u+w $out
-    folio-prepare-input ${config} ${modelBootstrap} ${descriptor} >$out/folio-input.json
-  '';
-  old = prepared "folio-tools-old-source" (if legacy == null then source else legacySource) "${oldBootstrap}/user.json" oldBootstrap;
+  prepared =
+    name: base: config: modelBootstrap:
+    pkgs.runCommand name { nativeBuildInputs = [ prepareInput ]; } ''
+      mkdir $out
+      cp -R ${base}/. $out/
+      chmod -R u+w $out
+      folio-prepare-input ${config} ${modelBootstrap} ${descriptor} >$out/folio-input.json
+    '';
+  old = prepared "folio-tools-old-source" (
+    if legacy == null then source else legacySource
+  ) "${oldBootstrap}/user.json" oldBootstrap;
   upgraded = prepared "folio-tools-schema-upgrade" source "${oldBootstrap}/user.json" bootstrap;
   selected = prepared "folio-tools-selected" source "${bootstrap}/user.json" bootstrap;
   disabledConfig = pkgs.runCommand "folio-tools-disabled.json" { nativeBuildInputs = [ pkgs.jq ]; } ''
@@ -24,10 +45,15 @@ let
       ${bootstrap}/user.json >$out
   '';
   disabled = prepared "folio-tools-disabled" source disabledConfig bootstrap;
-  generation = seed: (import (seed + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = seed; };
-  }).homeConfigurations.folio.activationPackage;
-in pkgs.testers.runNixOSTest {
+  generation =
+    seed:
+    (import (seed + "/modules/manager/src/outputs.nix") {
+      inputs = inputs // {
+        self.outPath = seed;
+      };
+    }).homeConfigurations.folio.activationPackage;
+in
+pkgs.testers.runNixOSTest {
   name = "folio-tools-deployment";
   nodes.machine = { lib, ... }: {
     imports = modules;
@@ -41,11 +67,26 @@ in pkgs.testers.runNixOSTest {
     environment.systemPackages = [ pkgs.jq ];
     nix.settings.substituters = lib.mkForce [ ];
     virtualisation = {
-      memorySize = 4096; cores = 2; diskSize = 12288;
+      memorySize = 4096;
+      cores = 2;
+      diskSize = 12288;
       writableStoreUseTmpfs = false;
-      additionalPaths = [ old upgraded selected disabled
-        (generation old) (generation upgraded) (generation selected) (generation disabled)
-        inputs.nixpkgs inputs.home-manager pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ];
+      additionalPaths = [
+        old
+        upgraded
+        selected
+        disabled
+        (generation old)
+        (generation upgraded)
+        (generation selected)
+        (generation disabled)
+        inputs.nixpkgs
+        inputs.home-manager
+        pkgs.stdenvNoCC
+        pkgs.shellcheck-minimal
+        pkgs.lndir
+        pkgs.perl
+      ];
     };
   };
   testScript = ''
@@ -76,9 +117,9 @@ in pkgs.testers.runNixOSTest {
     machine.wait_for_unit("folio-manager.service", user="folio")
     apply("${old}")
     ${pkgs.lib.optionalString (legacy != null) ''
-    with subtest("paired terminal revision and new tool model upgrade"):
-        user("${runtime}/bin/folio-manager-maintain user ${oldBootstrap} upgrade developer-models ${upgraded}", 600)
-        user("folio-repository user ctl --list | grep folio-emacs")
+      with subtest("paired terminal revision and new tool model upgrade"):
+          user("${runtime}/bin/folio-manager-maintain user ${oldBootstrap} upgrade developer-models ${upgraded}", 600)
+          user("folio-repository user ctl --list | grep folio-emacs")
     ''}
     configure("${bootstrap}/user.json")
     apply("${selected}")

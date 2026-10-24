@@ -1,4 +1,5 @@
 """The catalogue delegates mutations and ownership to the applications backend."""
+
 import json
 from pathlib import Path
 import sys
@@ -12,7 +13,9 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.delenv("FLATPAK_USER_DIR", raising=False)
     executable = tmp_path / "flatpak"
-    executable.write_text(f'#!{sys.executable}\n' + r'''import pathlib, sys
+    executable.write_text(
+        f"#!{sys.executable}\n"
+        + r"""import pathlib, sys
 args = sys.argv[1:]
 root = pathlib.Path(__file__).parent
 if args[0] == "remotes": print("flathub")
@@ -21,10 +24,13 @@ elif args[0] == "search": print("com.valvesoftware.Steam\tSteam\tGames <script>\
 elif args[0] == "list":
     if (root / "installed").exists(): print("com.valvesoftware.Steam/x86_64/stable\tSteam\t1.0\tflathub")
 else: raise SystemExit(2)
-''')
+"""
+    )
     executable.chmod(0o755)
     cli = tmp_path / "folio"
-    cli.write_text(f'#!{sys.executable}\n' + r'''import json, pathlib, sys
+    cli.write_text(
+        f"#!{sys.executable}\n"
+        + r"""import json, pathlib, sys
 root = pathlib.Path(__file__).parent
 args = sys.argv[1:]
 with (root / "calls").open("a") as f: f.write(json.dumps(args) + "\n")
@@ -46,7 +52,8 @@ else:
     tasks = root / "state/tasks"; tasks.mkdir(parents=True, exist_ok=True)
     (tasks / (data["id"]+".json")).write_text(json.dumps(data))
 print(json.dumps({"status":"success", "data":data, "taskId":data.get("id")}))
-''')
+"""
+    )
     cli.chmod(0o755)
     return Store(str(executable), str(cli), tmp_path / "state")
 
@@ -62,7 +69,10 @@ def test_install_uses_shared_backend_and_removal_preserves_ownership(store):
     assert not system["managed"] and not system["removable"]
     assert Store(store.executable, store.client, store.directory).task == task
     store.start("remove", {"ref": user["ref"]})
-    calls = [json.loads(line) for line in (Path(store.executable).parent / "calls").read_text().splitlines()]
+    calls = [
+        json.loads(line)
+        for line in (Path(store.executable).parent / "calls").read_text().splitlines()
+    ]
     assert ["--json", "--no-wait", "apps", "install", app["id"], "--ref", user["ref"]] in calls
     assert ["--json", "--no-wait", "apps", "remove", app["id"]] in calls
     assert not store.status()["applications"]
@@ -72,8 +82,9 @@ def test_external_app_requires_explicit_adoption(store):
     (Path(store.executable).parent / "installed").touch()
     app = next(a for a in store.installed() if a["scope"] == "user")
     assert not app["managed"] and not app["removable"]
-    with pytest.raises(ValueError): store.start("remove", {"ref": app["ref"]})
-    store.start("adopt", {"id": app["id"], "remote":"flathub", "branch":"stable"})
+    with pytest.raises(ValueError):
+        store.start("remove", {"ref": app["ref"]})
+    store.start("adopt", {"id": app["id"], "remote": "flathub", "branch": "stable"})
     assert next(a for a in store.installed() if a["scope"] == "user")["managed"]
 
 
@@ -81,28 +92,40 @@ def test_backend_errors_and_restart_observation(store):
     (Path(store.executable).parent / "fail").touch()
     with pytest.raises(StoreError, match="Model upgrade"):
         store.start("refresh", {})
-    tasks = store.directory / "tasks"; tasks.mkdir(parents=True)
-    task = {"id":"a-"+"b"*32,"phase":"deploying","request":{"action":"install"},"createdAt":"2026-10-22"}
-    path = tasks / (task["id"]+".json"); path.write_text(json.dumps(task))
+    tasks = store.directory / "tasks"
+    tasks.mkdir(parents=True)
+    task = {
+        "id": "a-" + "b" * 32,
+        "phase": "deploying",
+        "request": {"action": "install"},
+        "createdAt": "2026-10-22",
+    }
+    path = tasks / (task["id"] + ".json")
+    path.write_text(json.dumps(task))
     assert Store(store.executable, store.client, store.directory).task["phase"] == "running"
     assert json.loads(path.read_text())["phase"] == "deploying"
 
 
-@pytest.mark.parametrize("action,fields", [
-    ("install", {"id":"--help", "remote":"flathub", "branch":"stable"}),
-    ("install", {"id":"org.test.App;touch /tmp/x", "remote":"flathub", "branch":"stable"}),
-    ("install", {"id":"org.test.App", "remote":"untrusted", "branch":"stable"}),
-    ("remove", {"ref":"runtime/org.test.App/x86_64/stable"}),
-    ("setup", {"url":"https://untrusted.example"}),
-    ("launch", {}),
-])
+@pytest.mark.parametrize(
+    "action,fields",
+    [
+        ("install", {"id": "--help", "remote": "flathub", "branch": "stable"}),
+        ("install", {"id": "org.test.App;touch /tmp/x", "remote": "flathub", "branch": "stable"}),
+        ("install", {"id": "org.test.App", "remote": "untrusted", "branch": "stable"}),
+        ("remove", {"ref": "runtime/org.test.App/x86_64/stable"}),
+        ("setup", {"url": "https://untrusted.example"}),
+        ("launch", {}),
+    ],
+)
 def test_invalid_targets_have_no_effect(store, action, fields):
-    with pytest.raises(ValueError): store.start(action, fields)
+    with pytest.raises(ValueError):
+        store.start(action, fields)
     assert not (Path(store.executable).parent / "calls").exists()
 
 
 def test_readonly_icon_export_is_replaced_without_changing_source(tmp_path, monkeypatch):
     import os
+
     monkeypatch.setenv("FLATPAK_USER_DIR", str(tmp_path))
     source = tmp_path / "source.theme"
     source.write_text("[Icon Theme]\nName=Hicolor\n")

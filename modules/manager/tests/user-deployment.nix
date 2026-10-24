@@ -93,8 +93,13 @@ pkgs.testers.runNixOSTest {
         disabled
         # Reviewed snapshots can change source-bound wrapper identities. Keep
         # native build tools in the offline guest for those small rebuilds.
-        pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl
-        pkgs.python3 pkgs.makeWrapper pkgs.makeBinaryWrapper
+        pkgs.stdenvNoCC
+        pkgs.shellcheck-minimal
+        pkgs.lndir
+        pkgs.perl
+        pkgs.python3
+        pkgs.makeWrapper
+        pkgs.makeBinaryWrapper
       ];
     };
     system.stateVersion = "26.05";

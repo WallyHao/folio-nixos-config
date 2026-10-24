@@ -3,7 +3,8 @@
 let
   ui = import ./palette.nix { inherit theme; };
   c = ui.colors;
-in ''
+in
+''
   @-moz-document url-prefix("about:preferences"), url-prefix("about:addons"),
                  url-prefix("about:config"), url-prefix("about:downloads"),
                  url-prefix("about:profiles"), url-prefix("about:logins"),

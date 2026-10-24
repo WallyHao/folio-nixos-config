@@ -4,6 +4,7 @@ let
   runtime = import ./src/package.nix { inherit pkgs tools; };
 in
 {
+  provides.system = [ "kvm-access-configured" ];
   subscribers.user = [ "folio-vm.service" ];
   packages = {
     inherit tools;

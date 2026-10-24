@@ -1,4 +1,5 @@
 """Explicit local Isaac installation and execution inside the Nix FHS environment."""
+
 import argparse
 import datetime
 import fcntl
@@ -61,10 +62,16 @@ def validate(state, name, commands, cwd=None):
                     value = json.loads(line)
                 except ValueError:
                     continue
-                if isinstance(value, dict) and value.get("stage") == name and value.get("status") == "passed":
+                if (
+                    isinstance(value, dict)
+                    and value.get("stage") == name
+                    and value.get("status") == "passed"
+                ):
                     markers.append(value)
             if not markers:
-                raise ValueError(f"{name} exited without its successful validation marker; inspect {log_file}")
+                raise ValueError(
+                    f"{name} exited without its successful validation marker; inspect {log_file}"
+                )
             result["evidence"] = markers[-1]
         result["status"] = "passed"
     except subprocess.CalledProcessError as error:
@@ -80,12 +87,17 @@ def main():
         raise ValueError("Expected setup, run, sim, doctor or status")
     action = sys.argv[1]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--accept-eula", action="store_true",
-                        help="Accept https://docs.omniverse.nvidia.com/eula for this installation")
-    parser.add_argument("--workspace", type=Path,
-                        default=Path.home() / "Workspace/isaac/IsaacLab")
-    parser.add_argument("--stage", choices=["preflight", "cuda", "sim", "gui", "cartpole", "quadruped"],
-                        default="preflight")
+    parser.add_argument(
+        "--accept-eula",
+        action="store_true",
+        help="Accept https://docs.omniverse.nvidia.com/eula for this installation",
+    )
+    parser.add_argument("--workspace", type=Path, default=Path.home() / "Workspace/isaac/IsaacLab")
+    parser.add_argument(
+        "--stage",
+        choices=["preflight", "cuda", "sim", "gui", "cartpole", "quadruped"],
+        default="preflight",
+    )
     if action in {"run", "sim"}:
         parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args(sys.argv[2:])
@@ -111,25 +123,49 @@ def main():
                 raise ValueError("Use an absolute workspace directory without a symlink")
             if not workspace.exists():
                 workspace.parent.mkdir(parents=True, exist_ok=True)
-                run(["git", "clone", "--branch", "v" + version["isaaclab"], "--depth", "1",
-                     version["repository"], str(workspace)])
-            actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
-            if actual != version["commit"] or digest(workspace / "uv.lock") != version["lockSha256"]:
-                raise ValueError("Source commit/lock differs from the reviewed profile; refusing to overwrite it")
-            dirty = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"],
-                                            cwd=workspace, text=True).strip()
+                run(
+                    [
+                        "git",
+                        "clone",
+                        "--branch",
+                        "v" + version["isaaclab"],
+                        "--depth",
+                        "1",
+                        version["repository"],
+                        str(workspace),
+                    ]
+                )
+            actual = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=workspace, text=True
+            ).strip()
+            if (
+                actual != version["commit"]
+                or digest(workspace / "uv.lock") != version["lockSha256"]
+            ):
+                raise ValueError(
+                    "Source commit/lock differs from the reviewed profile; refusing to overwrite it"
+                )
+            dirty = subprocess.check_output(
+                ["git", "status", "--porcelain", "--untracked-files=no"], cwd=workspace, text=True
+            ).strip()
             if dirty:
-                raise ValueError("Source checkout has modifications; use a separate checkout for installation")
+                raise ValueError(
+                    "Source checkout has modifications; use a separate checkout for installation"
+                )
             # A failed candidate can be resumed; another version always gets another directory.
             candidate_name = version["profile"]
             if active and active.get("environment") == str(data / "environments" / candidate_name):
-                candidate_name += "-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+                candidate_name += "-" + datetime.datetime.now(datetime.timezone.utc).strftime(
+                    "%Y%m%dT%H%M%S%f"
+                )
             environment = data / "environments" / candidate_name
             if environment.is_symlink():
                 raise ValueError("Environment directory must not be a symlink")
             os.environ["UV_PROJECT_ENVIRONMENT"] = str(environment)
             command = ["uv", "sync", "--frozen", "--python", "/usr/bin/python3.12"]
-            kit_wheel = cache / "wheels/isaacsim_extscache_kit-6.2.0.0-cp312-none-manylinux_2_35_x86_64.whl"
+            kit_wheel = (
+                cache / "wheels/isaacsim_extscache_kit-6.2.0.0-cp312-none-manylinux_2_35_x86_64.whl"
+            )
             local_kit = kit_wheel.is_file() and not Path(str(kit_wheel) + ".aria2").exists()
             if local_kit:
                 if digest(kit_wheel) != version["kitWheelSha256"]:
@@ -143,41 +179,94 @@ def main():
                 run(command, cwd=workspace, stdout=log, stderr=subprocess.STDOUT)
             python = str(environment / "bin/python")
             if local_kit:
-                run(["uv", "pip", "install", "--python", python, "--no-deps", "--no-index", str(kit_wheel)])
+                run(
+                    [
+                        "uv",
+                        "pip",
+                        "install",
+                        "--python",
+                        python,
+                        "--no-deps",
+                        "--no-index",
+                        str(kit_wheel),
+                    ]
+                )
             compatibility = Path(os.environ["ISAAC_COMPATIBILITY"])
             if digest(compatibility) != version["compatibilitySha256"]:
                 raise ValueError("Compatibility overlay digest differs from the reviewed profile")
             run(["uv", "pip", "uninstall", "--python", python, "onnxruntime"])
-            run(["uv", "pip", "install", "--python", python, "--no-deps", "--require-hashes",
-                 "-r", str(compatibility)])
+            run(
+                [
+                    "uv",
+                    "pip",
+                    "install",
+                    "--python",
+                    python,
+                    "--no-deps",
+                    "--require-hashes",
+                    "-r",
+                    str(compatibility),
+                ]
+            )
             # Keep the raw metadata report. Isaac Lab intentionally overrides several
             # exact Sim requirements; validate those against its reviewed overrides.
             with (state / "dependency-metadata.log").open("w") as log:
-                subprocess.run(["uv", "pip", "check", "--python", python],
-                               stdout=log, stderr=subprocess.STDOUT, check=False)
-            validate(state, "dependencies", [[python, os.environ["ISAAC_VALIDATION_SCRIPTS"] + "/dependencies.py"]],
-                     cwd=workspace)
+                subprocess.run(
+                    ["uv", "pip", "check", "--python", python],
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
+            validate(
+                state,
+                "dependencies",
+                [[python, os.environ["ISAAC_VALIDATION_SCRIPTS"] + "/dependencies.py"]],
+                cwd=workspace,
+            )
             validate(state, "cuda", [[python, os.environ["ISAAC_VALIDATION_SCRIPTS"] + "/cuda.py"]])
             if not args.accept_eula:
-                raise ValueError("Dependencies prepared. Re-run setup --accept-eula after reviewing the NVIDIA EULA;"
-                                 " the active environment has not been changed")
+                raise ValueError(
+                    "Dependencies prepared. Re-run setup --accept-eula after reviewing the NVIDIA EULA;"
+                    " the active environment has not been changed"
+                )
             os.environ["OMNI_KIT_ACCEPT_EULA"] = "yes"
-            validate(state, "sim", [[python, os.environ["ISAAC_VALIDATION_SCRIPTS"] + "/sim.py"]], cwd=workspace)
-            manifest = {"profile": version, "workspace": str(workspace), "environment": str(environment),
-                        "acceptedEula": "https://docs.omniverse.nvidia.com/eula",
-                        "runtime": os.environ["ISAAC_RUNTIME"],
-                        "validatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "stages": ["cuda", "sim"]}
+            validate(
+                state,
+                "sim",
+                [[python, os.environ["ISAAC_VALIDATION_SCRIPTS"] + "/sim.py"]],
+                cwd=workspace,
+            )
+            manifest = {
+                "profile": version,
+                "workspace": str(workspace),
+                "environment": str(environment),
+                "acceptedEula": "https://docs.omniverse.nvidia.com/eula",
+                "runtime": os.environ["ISAAC_RUNTIME"],
+                "validatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "stages": ["cuda", "sim"],
+            }
             roots = data / "roots"
             roots.mkdir(parents=True, exist_ok=True)
-            run(["nix-store", "--add-root", str(roots / candidate_name), "--indirect",
-                 "--realise", os.environ["ISAAC_RUNTIME"]])
+            run(
+                [
+                    "nix-store",
+                    "--add-root",
+                    str(roots / candidate_name),
+                    "--indirect",
+                    "--realise",
+                    os.environ["ISAAC_RUNTIME"],
+                ]
+            )
             save(data / "manifests" / (candidate_name + ".json"), manifest)
             save(active_file, manifest)
             print(f"Validated active environment: {environment}")
             return
     if action == "doctor" and args.stage == "preflight":
-        validate(state, "preflight", [["/run/current-system/sw/bin/nvidia-smi"], ["vulkaninfo", "--summary"]])
+        validate(
+            state,
+            "preflight",
+            [["/run/current-system/sw/bin/nvidia-smi"], ["vulkaninfo", "--summary"]],
+        )
         return
     if active is None:
         raise ValueError("No validated environment. Run isaac-setup first")
@@ -185,17 +274,26 @@ def main():
         raise ValueError("Active environment profile differs from this launcher")
     workspace = Path(active["workspace"])
     if digest(workspace / "uv.lock") != version["lockSha256"]:
-        raise ValueError("Active environment lock changed; verify the research environment explicitly")
+        raise ValueError(
+            "Active environment lock changed; verify the research environment explicitly"
+        )
     os.environ.update(UV_PROJECT_ENVIRONMENT=active["environment"], OMNI_KIT_ACCEPT_EULA="yes")
     if action == "doctor":
         script = "training" if args.stage in {"cartpole", "quadruped"} else args.stage
         if args.stage == "gui":
             script = "sim"
-        command = [active["environment"] + "/bin/python", os.environ["ISAAC_VALIDATION_SCRIPTS"] + f"/{script}.py"]
+        command = [
+            active["environment"] + "/bin/python",
+            os.environ["ISAAC_VALIDATION_SCRIPTS"] + f"/{script}.py",
+        ]
         if script == "training":
             command.append(args.stage)
         if args.stage == "gui":
-            capture = state / "validation" / (datetime.datetime.now().strftime("%Y%m%dT%H%M%S") + "-viewport.png")
+            capture = (
+                state
+                / "validation"
+                / (datetime.datetime.now().strftime("%Y%m%dT%H%M%S") + "-viewport.png")
+            )
             command.extend(["--gui", "--screenshot", str(capture)])
         validate(state, args.stage, [command], cwd=workspace)
         return

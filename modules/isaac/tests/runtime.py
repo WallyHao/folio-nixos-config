@@ -1,4 +1,5 @@
 """Check failure isolation and exact argument forwarding without installing Isaac."""
+
 import hashlib
 import importlib.util
 import json
@@ -14,8 +15,13 @@ with tempfile.TemporaryDirectory() as temporary:
     (workspace / "uv.lock").write_text("fixture lock\n")
     version = {"profile": "fixture", "lockSha256": hashlib.sha256(b"fixture lock\n").hexdigest()}
     (root / "versions.json").write_text(json.dumps(version))
-    env = dict(os.environ, XDG_STATE_HOME=str(root / "state"), XDG_DATA_HOME=str(root / "data"),
-               XDG_CACHE_HOME=str(root / "cache"), ISAAC_VERSIONS=str(root / "versions.json"))
+    env = dict(
+        os.environ,
+        XDG_STATE_HOME=str(root / "state"),
+        XDG_DATA_HOME=str(root / "data"),
+        XDG_CACHE_HOME=str(root / "cache"),
+        ISAAC_VERSIONS=str(root / "versions.json"),
+    )
     command = [os.environ["PYTHON"], os.environ["ISAAC_CLI"]]
 
     def invoke(*arguments):
@@ -32,7 +38,9 @@ with tempfile.TemporaryDirectory() as temporary:
     fake_bin = root / "bin"
     fake_bin.mkdir()
     uv = fake_bin / "uv"
-    uv.write_text("#!" + os.environ["PYTHON"] + "\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n")
+    uv.write_text(
+        "#!" + os.environ["PYTHON"] + "\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n"
+    )
     uv.chmod(0o755)
     env["PATH"] = str(fake_bin) + os.pathsep + env["PATH"]
     arguments = ["train", "--task", "task with spaces", "physics=isaacsim_physx"]
@@ -58,12 +66,24 @@ with tempfile.TemporaryDirectory() as temporary:
         raise AssertionError("Zero exit without a completed simulation must not pass")
     failed = list((root / "reports/validation").glob("*.json"))
     assert len(failed) == 1 and json.loads(failed[0].read_text())["status"] == "failed"
-    module.validate(root / "reports", "sim", [[os.environ["PYTHON"], "-c",
-                    'print(\'{"stage":"sim","status":"passed","steps":180}\')']])
+    module.validate(
+        root / "reports",
+        "sim",
+        [[os.environ["PYTHON"], "-c", 'print(\'{"stage":"sim","status":"passed","steps":180}\')']],
+    )
     try:
-        module.validate(root / "reports", "sim", [[os.environ["PYTHON"], "-c",
-                        'print("Failed to startup python extension"); '
-                        'print(\'{"stage":"sim","status":"passed"}\')']])
+        module.validate(
+            root / "reports",
+            "sim",
+            [
+                [
+                    os.environ["PYTHON"],
+                    "-c",
+                    'print("Failed to startup python extension"); '
+                    'print(\'{"stage":"sim","status":"passed"}\')',
+                ]
+            ],
+        )
     except ValueError:
         pass
     else:

@@ -1,5 +1,6 @@
 { pkgs, lib }:
-let implementation = import ./src/package.nix { inherit pkgs lib; };
+let
+  implementation = import ./src/package.nix { inherit pkgs lib; };
 in
 {
   inherit (implementation) packages;

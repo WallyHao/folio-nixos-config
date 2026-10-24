@@ -13,15 +13,19 @@ let
         else . end)'
     '';
   };
-in {
+in
+{
   models.user = [ current ];
-  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [{
-    module = "folio-emacs";
-    from = "2026-10-19"; to = "2026-10-20";
-    fromSha256 = builtins.hashFile "sha256" previous;
-    toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-20/folio-emacs.yang;
-    transform = "${migration}/bin/folio-emacs-library-directory";
-  }];
+  migrations = (import ./theme-migrations.nix { inherit pkgs; }) ++ [
+    {
+      module = "folio-emacs";
+      from = "2026-10-19";
+      to = "2026-10-20";
+      fromSha256 = builtins.hashFile "sha256" previous;
+      toSha256 = builtins.hashFile "sha256" ./model/revisions/2026-10-20/folio-emacs.yang;
+      transform = "${migration}/bin/folio-emacs-library-directory";
+    }
+  ];
   packages.editor = package;
   homeManagerModule = import ./src/user.nix { inherit pkgs lib package; };
 }

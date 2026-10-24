@@ -12,7 +12,12 @@ if [[ "$action" == list ]]; then
     ($config[0]."folio-environment:environment".modules | map({key:.name,value:.}) | from_entries) as $selected |
     [$catalogue[0] | to_entries[] | select(.value.scopes | index($scope)) | .key as $name |
       {name:$name,enabled:($selected[$name].enabled // false),selected:($selected | has($name)),
-       scopes:.value.scopes,requirements:(.value.requirements[$scope] // {})}]')"
+       scopes:.value.scopes,requirements:(.value.requirements[$scope] // {}),
+       provides:(.value.provides[$scope] // []),impacts:(.value.impacts // [])}]')"
+fi
+if ! jq -e --arg name "$1" --arg scope "$FOLIO_SCOPE" \
+    '(.[$name].scopes // [] | index($scope)) != null' "$FOLIO_CATALOGUE" >/dev/null; then
+  finish invalid null 'Unknown module or unsupported scope'
 fi
 enabled=false
 [[ "$action" != enable ]] || enabled=true

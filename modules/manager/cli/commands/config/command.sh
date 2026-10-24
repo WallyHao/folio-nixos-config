@@ -25,21 +25,29 @@ fi
 case "$action" in
   show|edit) (( $# == 0 )) || finish invalid null 'Unexpected arguments' ;;
   import|export) (( $# == 1 )) || finish invalid null 'Expected one file path' ;;
-  get|unset) (( $# == 1 )) || finish invalid null 'Expected one setting path' ;;
+  get|explain|unset) (( $# == 1 )) || finish invalid null 'Expected one setting path' ;;
   set) (( $# == 2 )) || finish invalid null 'Expected a setting path and JSON value' ;;
-  *) finish invalid null 'Usage: folio config show|edit|import FILE|export FILE|get PATH|set PATH JSON|unset PATH' ;;
+  *) finish invalid null 'Usage: folio config show|edit|import FILE|export FILE|get PATH|explain PATH|set PATH JSON|unset PATH' ;;
 esac
 load_configuration
 [[ -z "$expected_digest" || "$expected_digest" == "$configuration_digest" ]] || finish conflict null 'Desired configuration changed; reload before saving'
 case "$action" in
   get)
-    value=$(python3 @fields@ get "$1" <"$work/normalized.json") || finish invalid null 'Setting is unavailable; use /preferences/FIELD or /modules/NAME/SETTING'
+    value=$(python3 @fields@ get "$1" <"$work/normalized.json" 2>"$work/field-error") ||
+      finish invalid null "$(cat "$work/field-error")"
     finish success "$value" ;;
   set|unset)
-    python3 @fields@ "$action" "$@" <"$work/normalized.json" >"$work/draft.json" || finish invalid null 'Invalid setting path or JSON value' ;;
-  show)
-    finish success "$(jq -cn --slurpfile configuration "$work/normalized.json" --arg digest "$configuration_digest" \
-      '{configuration:$configuration[0],digest:$digest}')" ;;
+    python3 @fields@ "$action" "$@" <"$work/normalized.json" >"$work/draft.json" 2>"$work/field-error" ||
+      finish invalid null "$(cat "$work/field-error")" ;;
+  show|explain)
+    # Observation is optional: reads remain useful while subscribers are down.
+    if ! timeout --kill-after=2 8 folio-repository "$FOLIO_SCOPE" cfg --export --datastore operational \
+        --module folio-environment --format json --timeout 5 >"$work/observed.json" 2>"$work/observation-error"; then
+      printf '{}\n' >"$work/observed.json"
+    fi
+    value=$(python3 @describe@ "$action" "$configuration_digest" "$work/observed.json" "$@" \
+      <"$work/normalized.json" 2>"$work/field-error") || finish invalid null "$(cat "$work/field-error")"
+    finish success "$value" ;;
   export)
     if ! jq --indent 2 . "$work/normalized.json" >"$1"; then finish failure null 'Export could not be written'; fi
     finish success "$(jq -cn --arg path "$1" '{path:$path}')" ;;

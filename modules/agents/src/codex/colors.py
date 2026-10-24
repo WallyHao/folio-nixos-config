@@ -45,9 +45,15 @@ class ColorFilter:
             if code in (b"", b"0"):
                 self.selected = False
                 self.foreground = [b"39"]
-            elif code == b"39" or code.isdigit() and (30 <= int(code) <= 37 or 90 <= int(code) <= 97):
+            elif (
+                code == b"39" or code.isdigit() and (30 <= int(code) <= 37 or 90 <= int(code) <= 97)
+            ):
                 self.foreground = [code]
-            elif code == b"49" or code.isdigit() and (40 <= int(code) <= 47 or 100 <= int(code) <= 107):
+            elif (
+                code == b"49"
+                or code.isdigit()
+                and (40 <= int(code) <= 47 or 100 <= int(code) <= 107)
+            ):
                 self.selected = False
             if code in (b"38", b"48", b"58"):
                 if parts[index + 1 : index + 2] == [b"2"] and index + 4 < len(parts):
@@ -147,7 +153,10 @@ def run(command, colors):
         except ProcessLookupError:
             pass
 
-    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGWINCH, signal.SIGTERM, signal.SIGHUP, signal.SIGINT)}
+    previous = {
+        sig: signal.getsignal(sig)
+        for sig in (signal.SIGWINCH, signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
+    }
     signal.signal(signal.SIGWINCH, resize)
     for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
         signal.signal(sig, forward)

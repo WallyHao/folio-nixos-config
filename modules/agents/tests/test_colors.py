@@ -1,4 +1,5 @@
 """Focused regression checks for selection spans and streaming ANSI state."""
+
 import importlib.util
 import os
 from pathlib import Path
@@ -7,7 +8,11 @@ import sys
 import unittest
 
 sys.dont_write_bytecode = True
-source = Path(os.environ.get("FOLIO_CODEX_COLORS", Path(__file__).resolve().parents[1] / "src/codex/colors.py"))
+source = Path(
+    os.environ.get(
+        "FOLIO_CODEX_COLORS", Path(__file__).resolve().parents[1] / "src/codex/colors.py"
+    )
+)
 spec = importlib.util.spec_from_file_location("codex_colors", source)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -46,8 +51,10 @@ class SelectionColors(unittest.TestCase):
             with self.subTest(background=background):
                 f = color_filter()
                 f.feed(BLUE_BG + b"\x1b[38;2;68;43;57mSelected")
-                self.assertEqual(f.feed(b"\x1b[" + background + b"mNormal"),
-                                 b"\x1b[" + background + b";38;2;68;43;57mNormal")
+                self.assertEqual(
+                    f.feed(b"\x1b[" + background + b"mNormal"),
+                    b"\x1b[" + background + b";38;2;68;43;57mNormal",
+                )
 
     def test_reset_and_normal_error_colors(self):
         f = color_filter()
@@ -61,7 +68,11 @@ class SelectionColors(unittest.TestCase):
         expected = color_filter().feed(data)
         for width in (1, 2, 7, 19):
             f = color_filter()
-            self.assertEqual(b"".join(f.feed(data[i:i + width]) for i in range(0, len(data), width)) + f.finish(), expected)
+            self.assertEqual(
+                b"".join(f.feed(data[i : i + width]) for i in range(0, len(data), width))
+                + f.finish(),
+                expected,
+            )
 
     def test_osc_and_control_sequences_are_untouched(self):
         data = b"\x1b]0;title\x1b[30m\x07\x1b[2J\x1b[3;4H"
@@ -70,11 +81,23 @@ class SelectionColors(unittest.TestCase):
     def test_non_terminal_preserves_output_arguments_and_exit_status(self):
         data = b"\x1b[38;2;99;168;248m unchanged\n"
         result = subprocess.run(
-            [sys.executable, str(source), "--accent", "#a7c080",
-             "--selection", "#4c3743", "--selection-text", "#d3c6aa", "--",
-             sys.executable, "-c",
-             "import sys; assert sys.argv[1] == 'a b'; sys.stdout.buffer.write(sys.stdin.buffer.read()); sys.exit(7)",
-             "a b"], input=data, capture_output=True,
+            [
+                sys.executable,
+                str(source),
+                "--accent",
+                "#a7c080",
+                "--selection",
+                "#4c3743",
+                "--selection-text",
+                "#d3c6aa",
+                "--",
+                sys.executable,
+                "-c",
+                "import sys; assert sys.argv[1] == 'a b'; sys.stdout.buffer.write(sys.stdin.buffer.read()); sys.exit(7)",
+                "a b",
+            ],
+            input=data,
+            capture_output=True,
         )
         self.assertEqual(result.returncode, 7)
         self.assertEqual(result.stdout, data)

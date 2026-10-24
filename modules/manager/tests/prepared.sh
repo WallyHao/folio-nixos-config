@@ -7,6 +7,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/source"
 cp -R "$repository/modules" "$repository/flake.nix" "$repository/flake.lock" "$work/source/"
+if [[ -d "$repository/configuration" ]]; then cp -R "$repository/configuration" "$work/source/"; fi
 jq '."folio-environment:environment".preferences."font-size" = 18' "$bootstrap/user.json" >"$work/user.json"
 folio-prepare-input "$work/user.json" "$bootstrap" >"$work/source/folio-input.json"
 rendered=$(nix eval --offline --no-update-lock-file --raw \

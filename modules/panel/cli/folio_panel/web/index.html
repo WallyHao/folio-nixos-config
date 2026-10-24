@@ -57,6 +57,7 @@
       <form id="settings-form" class="card">
         <h2>Font preferences</h2><p class="footnote">Choose a personal override or inherit the system default. Saved changes require deployment.</p>
         <p>System theme: <strong id="system-theme"></strong></p>
+        <p id="settings-deployment" class="footnote" aria-live="polite"></p>
         <label class="field">Font family<input id="setting-font-family" maxlength="128" required></label><label class="checkbox"><input id="inherit-font-family" type="checkbox">Use system default</label><p id="origin-font-family" class="footnote"></p>
         <label class="field">Font size<input id="setting-font-size" type="number" min="6" max="72" step="1" required></label><label class="checkbox"><input id="inherit-font-size" type="checkbox">Use system default</label><p id="origin-font-size" class="footnote"></p>
         <div class="dialog-actions"><button id="reload-settings" type="button" class="subtle">Reload settings</button><button id="save-settings" type="submit" class="primary" disabled>Save settings</button></div>

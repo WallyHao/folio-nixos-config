@@ -37,19 +37,39 @@ FIELDS = {
 }
 
 ERRORS = {
-    "backend-unavailable": ("Service unavailable or access denied.", "Run folio doctor for service and permission checks."),
-    "configuration-conflict": ("Configuration changed while you were editing.", "Reload settings and review your changes before saving again."),
-    "invalid-configuration": ("Settings did not pass configuration validation.", "Check the values and module prerequisites with folio doctor."),
-    "backend-timeout": ("The service did not respond in time.", "Refresh current state before retrying the operation."),
-    "permission-denied": ("Your account cannot perform this operation.", "Run folio doctor to check the required services and permissions."),
-    "model-upgrade-required": ("Installed models do not match this client.", "Complete the paired model upgrade described in the Folio maintenance guide."),
+    "backend-unavailable": (
+        "Service unavailable or access denied.",
+        "Run folio doctor for service and permission checks.",
+    ),
+    "configuration-conflict": (
+        "Configuration changed while you were editing.",
+        "Reload settings and review your changes before saving again.",
+    ),
+    "invalid-configuration": (
+        "Settings did not pass configuration validation.",
+        "Check the values and module prerequisites with folio doctor.",
+    ),
+    "backend-timeout": (
+        "The service did not respond in time.",
+        "Refresh current state before retrying the operation.",
+    ),
+    "permission-denied": (
+        "Your account cannot perform this operation.",
+        "Run folio doctor to check the required services and permissions.",
+    ),
+    "model-upgrade-required": (
+        "Installed models do not match this client.",
+        "Complete the paired model upgrade described in the Folio maintenance guide.",
+    ),
 }
 
 
 def validate_settings(request):
     if not isinstance(request, dict) or set(request) != {"digest", "preferences"}:
         raise ValueError("Invalid settings request")
-    if not isinstance(request["digest"], str) or not re.fullmatch(r"[a-f0-9]{64}", request["digest"]):
+    if not isinstance(request["digest"], str) or not re.fullmatch(
+        r"[a-f0-9]{64}", request["digest"]
+    ):
         raise ValueError("Invalid configuration digest")
     preferences = request["preferences"]
     if not isinstance(preferences, dict) or not set(preferences) <= {"font-size", "font-family"}:
@@ -57,9 +77,12 @@ def validate_settings(request):
     for key, value in preferences.items():
         if value is None:
             continue
-        valid = ((key == "font-size" and type(value) is int and 6 <= value <= 72)
-                 or (key == "font-family" and isinstance(value, str) and 1 <= len(value) <= 128
-                     and not any(c in value for c in "\r\n\0")))
+        valid = (key == "font-size" and type(value) is int and 6 <= value <= 72) or (
+            key == "font-family"
+            and isinstance(value, str)
+            and 1 <= len(value) <= 128
+            and not any(c in value for c in "\r\n\0")
+        )
         if not valid:
             raise ValueError("Invalid preference value")
     return request["digest"], preferences
@@ -74,7 +97,9 @@ def validate(request):
     allowed = FIELDS.get((domain, action))
     if allowed is None or not isinstance(fields, dict) or not set(fields) <= allowed:
         raise ValueError("Unsupported operation or fields")
-    optional = {"password", "ap", "uuid", "hidden", "ssid", "security"} if action == "connect" else set()
+    optional = (
+        {"password", "ap", "uuid", "hidden", "ssid", "security"} if action == "connect" else set()
+    )
     if not allowed - optional <= set(fields):
         raise ValueError("Missing operation fields")
     for key, value in fields.items():
@@ -107,10 +132,21 @@ def theme_css():
         family, size, appearance = "Maple Mono NF CN", 16, "dark"
     appearance = "light" if appearance == "light" else "dark"
     colors = settings.get("palette", defaults["palettes"][appearance])
-    roles = {"bg": "bg0", "surface": "bg1", "raised": "bg2", "fg": "fg",
-             "muted": "grey1", "line": "bg3", "accent": "yellow", "green": "green", "red": "red"}
-    if not isinstance(colors, dict) or not all(isinstance(colors.get(key), str) and
-            re.fullmatch(r"#[0-9a-fA-F]{6}", colors[key]) for key in roles.values()):
+    roles = {
+        "bg": "bg0",
+        "surface": "bg1",
+        "raised": "bg2",
+        "fg": "fg",
+        "muted": "grey1",
+        "line": "bg3",
+        "accent": "yellow",
+        "green": "green",
+        "red": "red",
+    }
+    if not isinstance(colors, dict) or not all(
+        isinstance(colors.get(key), str) and re.fullmatch(r"#[0-9a-fA-F]{6}", colors[key])
+        for key in roles.values()
+    ):
         colors = defaults["palettes"][appearance]
     palette = "".join(f"--{role}:{colors[key]};" for role, key in roles.items())
     semantic = settings.get("roles", defaults["roles"])
@@ -132,12 +168,12 @@ class PanelServer(ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.origin = f"http://127.0.0.1:{self.server_port}"
 
-
     @property
     def store(self):
         with self.operation:
             if self._store is None:
                 from .paths import FLATPAK, LEGACY
+
                 self._store = Store(FLATPAK, LEGACY)
             return self._store
 
@@ -146,8 +182,10 @@ class Handler(BaseHTTPRequestHandler):
     def backend_error(self, error):
         code = getattr(error, "code", "backend-unavailable")
         message, hint = ERRORS.get(code, ERRORS["backend-unavailable"])
-        self.send(409 if code == "configuration-conflict" else 503,
-                  {"error": message, "code": code, "hint": hint})
+        self.send(
+            409 if code == "configuration-conflict" else 503,
+            {"error": message, "code": code, "hint": hint},
+        )
 
     def setup(self):
         super().setup()
@@ -165,7 +203,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        )
         self.end_headers()
         try:
             self.wfile.write(data)
@@ -181,7 +222,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send(403, {"error": "Invalid origin"})
             return False
         expected = "Bearer " + self.server.token
-        if not hmac.compare_digest(self.headers.get("Authorization", "").encode(), expected.encode()):
+        if not hmac.compare_digest(
+            self.headers.get("Authorization", "").encode(), expected.encode()
+        ):
             self.send(403, {"error": "Open the panel using folio panel"})
             return False
         return True
@@ -191,6 +234,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self.authorized():
                 return
             try:
+
                 async def read():
                     client = self.server.client
                     if self.path == "/api/doctor":
@@ -200,7 +244,9 @@ class Handler(BaseHTTPRequestHandler):
                     if self.path == "/api/apps":
                         return self.server.store.status()
                     if urlsplit(self.path).path == "/api/apps/search":
-                        return self.server.store.search(parse_qs(urlsplit(self.path).query).get("q", [""])[0])
+                        return self.server.store.search(
+                            parse_qs(urlsplit(self.path).query).get("q", [""])[0]
+                        )
                     if self.path == "/api/ping":
                         return {"source": str(Path(__file__).resolve())}
                     if self.path == "/api/wifi":
@@ -215,6 +261,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise BackendError("Mihomo is unavailable")
                         return {**status, **await client.proxy("proxy-groups")}
                     raise ValueError("Unknown endpoint")
+
                 self.send(200, {"data": asyncio.run(read())})
             except ValueError:
                 self.send(404, {"error": "Unknown endpoint"})
@@ -231,8 +278,18 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/theme.css":
             self.send(200, theme_css(), "text/css")
             return
-        assets = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"), "/style.css": ("style.css", "text/css")}
-        assets.update({"/store.js": ("store.js", "text/javascript"), "/store.css": ("store.css", "text/css"), "/settings.js": ("settings.js", "text/javascript")})
+        assets = {
+            "/": ("index.html", "text/html"),
+            "/app.js": ("app.js", "text/javascript"),
+            "/style.css": ("style.css", "text/css"),
+        }
+        assets.update(
+            {
+                "/store.js": ("store.js", "text/javascript"),
+                "/store.css": ("store.css", "text/css"),
+                "/settings.js": ("settings.js", "text/javascript"),
+            }
+        )
         if self.path not in assets:
             self.send(404, {"error": "Not found"})
             return
@@ -280,7 +337,12 @@ class Handler(BaseHTTPRequestHandler):
             self.backend_error(error)
         except Exception:
             # A backend diagnostic must never echo a credential-bearing request.
-            self.send(503, {"error": "Operation failed. Refresh state and check service availability or permissions."})
+            self.send(
+                503,
+                {
+                    "error": "Operation failed. Refresh state and check service availability or permissions."
+                },
+            )
         finally:
             fields.pop("password", None)
             self.server.operation.release()
@@ -301,15 +363,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send(409, {"error": "Another operation is running"})
             return
         try:
-            self.send(200, {"data": asyncio.run(self.server.client.save_settings(digest, preferences))})
+            self.send(
+                200, {"data": asyncio.run(self.server.client.save_settings(digest, preferences))}
+            )
         except (BackendError, OSError) as error:
             self.backend_error(error)
         except Exception:
-            self.send(500, {"error": "Unable to save settings", "code": "backend-invalid-response",
-                            "hint": "Run folio doctor before retrying."})
+            self.send(
+                500,
+                {
+                    "error": "Unable to save settings",
+                    "code": "backend-invalid-response",
+                    "hint": "Run folio doctor before retrying.",
+                },
+            )
         finally:
             self.server.operation.release()
-
 
     def store_action(self):
         if self.headers.get("Content-Type") != "application/json":
@@ -320,7 +389,12 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < length <= 4096:
                 raise ValueError("Invalid request size")
             request = json.loads(self.rfile.read(length))
-            if not isinstance(request, dict) or set(request) != {"action", "fields"} or not isinstance(request["action"], str) or not isinstance(request["fields"], dict):
+            if (
+                not isinstance(request, dict)
+                or set(request) != {"action", "fields"}
+                or not isinstance(request["action"], str)
+                or not isinstance(request["fields"], dict)
+            ):
                 raise ValueError("Invalid operation")
             self.send(202, {"data": self.server.store.start(request["action"], request["fields"])})
         except (ValueError, TypeError) as error:
@@ -353,8 +427,15 @@ def serve():
         with PanelServer() as server:
             record = directory / "session.json"
             temporary = directory / "session.tmp"
-            temporary.write_text(json.dumps({"origin": server.origin, "token": server.token,
-                                             "source": str(Path(__file__).resolve())}))
+            temporary.write_text(
+                json.dumps(
+                    {
+                        "origin": server.origin,
+                        "token": server.token,
+                        "source": str(Path(__file__).resolve()),
+                    }
+                )
+            )
             temporary.chmod(0o600)
             temporary.replace(record)
             server.serve_forever()
@@ -366,7 +447,9 @@ def session(directory):
         origin = record["origin"]
         if not origin.startswith("http://127.0.0.1:") or not origin[17:].isdigit():
             return None
-        request = Request(origin + "/api/ping", headers={"Authorization": "Bearer " + record["token"]})
+        request = Request(
+            origin + "/api/ping", headers={"Authorization": "Bearer " + record["token"]}
+        )
         with urlopen(request, timeout=1) as response:
             if response.status == 200:
                 return record
@@ -381,8 +464,11 @@ def launch(page="/"):
     directory = runtime()
     record = session(directory)
     if record and record.get("source") != str(Path(__file__).resolve()):
-        request = Request(record["origin"] + "/api/shutdown", data=b"",
-                          headers={"Authorization": "Bearer " + record["token"]})
+        request = Request(
+            record["origin"] + "/api/shutdown",
+            data=b"",
+            headers={"Authorization": "Bearer " + record["token"]},
+        )
         try:
             with urlopen(request, timeout=2):
                 pass
@@ -393,9 +479,13 @@ def launch(page="/"):
             time.sleep(0.7)
             record = None
     if record is None:
-        subprocess.Popen([sys.executable, "-m", "folio_panel", "--serve"],
-                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, start_new_session=True)
+        subprocess.Popen(
+            [sys.executable, "-m", "folio_panel", "--serve"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
         for _ in range(50):
             time.sleep(0.1)
             record = session(directory)
@@ -405,8 +495,12 @@ def launch(page="/"):
         print("Unable to start the local panel service", file=sys.stderr)
         return 1
     url = record["origin"] + page + "#" + record["token"]
-    subprocess.Popen([OPENER, url], stdin=subprocess.DEVNULL,
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     start_new_session=True)
+    subprocess.Popen(
+        [OPENER, url],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
     print("Panel opened in your browser.")
     return 0

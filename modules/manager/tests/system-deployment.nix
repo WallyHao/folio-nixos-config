@@ -12,10 +12,18 @@
 }:
 let
   guest = if integrated then import ./release-guest.nix { inherit pkgs; } else ./system-guest.nix;
-  guestImport = if integrated then ''(import ./modules/manager/tests/release-guest.nix {
-    pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
-  })'' else "./modules/manager/tests/system-guest.nix";
-  testPython = pkgs.python3.withPackages (p: [ p.websocket-client p.pillow ]);
+  guestImport =
+    if integrated then
+      ''
+        (import ./modules/manager/tests/release-guest.nix {
+            pkgs = import inputs.nixpkgs { system = "x86_64-linux"; };
+          })''
+    else
+      "./modules/manager/tests/system-guest.nix";
+  testPython = pkgs.python3.withPackages (p: [
+    p.websocket-client
+    p.pillow
+  ]);
   fixtureFlake = pkgs.writeText "folio-system-test-flake.nix" ''
     {
       inputs = {
@@ -42,20 +50,28 @@ let
     cp ${fixtureFlake} $out/flake.nix
     ln -s ../runtime/lib/common.sh $out/modules/manager/tests/frozen-link
   '';
-  fixtureSource = if recovery then pkgs.runCommand "folio-legacy-schema-test-source" { } ''
-    mkdir $out
-    cp -R ${currentFixtureSource}/. $out/
-    chmod -R u+w $out
-    ${pkgs.lib.concatMapStringsSep "\n" (model: ''
-      cp ${model.path} "$out/modules/${model.owner}/model/${model.name}"
-    '') (import ./previous-theme-models.nix { inherit pkgs; })}
-    cp $out/modules/terminal/model/revisions/2026-10-18/folio-terminal.yang $out/modules/terminal/model/folio-terminal.yang
-  '' else currentFixtureSource;
-  fixtureBootstrap = if recovery then
-    (import (fixtureSource + "/modules/manager/src/outputs.nix") {
-      inputs = inputs // { self.outPath = fixtureSource; };
-    }).packages.${pkgs.stdenv.hostPlatform.system}.manager-bootstrap
-  else bootstrap;
+  fixtureSource =
+    if recovery then
+      pkgs.runCommand "folio-legacy-schema-test-source" { } ''
+        mkdir $out
+        cp -R ${currentFixtureSource}/. $out/
+        chmod -R u+w $out
+        ${pkgs.lib.concatMapStringsSep "\n" (model: ''
+          cp ${model.path} "$out/modules/${model.owner}/model/${model.name}"
+        '') (import ./previous-theme-models.nix { inherit pkgs; })}
+        cp $out/modules/terminal/model/revisions/2026-10-18/folio-terminal.yang $out/modules/terminal/model/folio-terminal.yang
+      ''
+    else
+      currentFixtureSource;
+  fixtureBootstrap =
+    if recovery then
+      (import (fixtureSource + "/modules/manager/src/outputs.nix") {
+        inputs = inputs // {
+          self.outPath = fixtureSource;
+        };
+      }).packages.${pkgs.stdenv.hostPlatform.system}.manager-bootstrap
+    else
+      bootstrap;
   descriptor = pkgs.runCommand "folio-system-test-descriptor" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '.origin="system-generation" | .capabilities += {"system-repository":true}' ${bootstrap}/system-descriptor.json >$out
   '';
@@ -103,39 +119,64 @@ let
       guest
     ];
   };
-  laterSource = pkgs.runCommand "folio-release-later-user" { nativeBuildInputs = [ prepareInput pkgs.jq ]; } ''
-    mkdir $out
-    cp -R ${fixtureSource}/. $out/
-    chmod -R u+w $out
-    jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
-    jq '."folio-environment:environment".preferences."font-size"=24' ${bootstrap}/user.json > configuration.json
-    folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
-  '';
-  laterUser = (import (laterSource + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = laterSource; };
-  }).homeConfigurations.folio.activationPackage;
+  laterSource =
+    pkgs.runCommand "folio-release-later-user"
+      {
+        nativeBuildInputs = [
+          prepareInput
+          pkgs.jq
+        ];
+      }
+      ''
+        mkdir $out
+        cp -R ${fixtureSource}/. $out/
+        chmod -R u+w $out
+        jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
+        jq '."folio-environment:environment".preferences."font-size"=24' ${bootstrap}/user.json > configuration.json
+        folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
+      '';
+  laterUser =
+    (import (laterSource + "/modules/manager/src/outputs.nix") {
+      inputs = inputs // {
+        self.outPath = laterSource;
+      };
+    }).homeConfigurations.folio.activationPackage;
   defaultUser =
     (import (fixtureSource + "/modules/manager/src/outputs.nix") {
       inputs = inputs // {
         self.outPath = fixtureSource;
       };
     }).homeConfigurations.folio.activationPackage;
-  migrationSource = pkgs.runCommand "folio-schema-upgrade-source" {
-    nativeBuildInputs = [ prepareInput pkgs.jq ];
-  } ''
-    mkdir $out
-    cp -R ${currentFixtureSource}/. $out/
-    chmod -R u+w $out
-    jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
-    jq '."folio-environment:environment".preferences."font-size"=18' ${bootstrap}/user.json > configuration.json
-    folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
-  '';
+  migrationSource =
+    pkgs.runCommand "folio-schema-upgrade-source"
+      {
+        nativeBuildInputs = [
+          prepareInput
+          pkgs.jq
+        ];
+      }
+      ''
+        mkdir $out
+        cp -R ${currentFixtureSource}/. $out/
+        chmod -R u+w $out
+        jq '.preferences."font-size"=20' ${descriptor} > descriptor.json
+        jq '."folio-environment:environment".preferences."font-size"=18' ${bootstrap}/user.json > configuration.json
+        folio-prepare-input configuration.json ${bootstrap} descriptor.json >$out/folio-input.json
+      '';
   migrationSeed = import (migrationSource + "/modules/manager/src/outputs.nix") {
-    inputs = inputs // { self.outPath = migrationSource; };
+    inputs = inputs // {
+      self.outPath = migrationSource;
+    };
   };
 in
 pkgs.testers.runNixOSTest {
-  name = if integrated then "folio-integrated-release" else if recovery then "folio-deployment-recovery" else "folio-system-deployment";
+  name =
+    if integrated then
+      "folio-integrated-release"
+    else if recovery then
+      "folio-deployment-recovery"
+    else
+      "folio-system-deployment";
   nodes.machine = { ... }: {
     imports = modules ++ [ guest ];
     _module.args.folioBootstrap = fixtureBootstrap;
@@ -145,28 +186,37 @@ pkgs.testers.runNixOSTest {
       inputs.home-manager
       userSeed.homeConfigurations.folio.activationPackage
       systemSeed.config.system.build.toplevel
-      pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl
-      pkgs.python3 pkgs.makeWrapper pkgs.makeBinaryWrapper
-      pkgs.stdenv pkgs.stdenv.cc pkgs.pkg-config pkgs.curl
-      pkgs.libxslt.bin pkgs.libxml2.bin pkgs.libcap-text-verifier
-      pkgs.curl.bin pkgs.curl.dev pkgs.libssh2.dev
-      pkgs.libxslt.dev pkgs.libxml2.dev pkgs.texinfo pkgs.python3Minimal
-      pkgs.jansson.dev pkgs.libyang.dev
-      # Font changes rebuild the GTK shortcut helper. Its build requires the
-      # development outputs, which are absent from an activated runtime closure.
-      pkgs.gtk3.dev pkgs.gobject-introspection.dev pkgs.wrapGAppsHook3
     ]
-    ++ pkgs.lib.optionals integrated [ laterUser testPython pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ]
+    ++ (import ./build-inputs.nix { inherit pkgs; })
+    ++ pkgs.lib.optionals integrated [
+      laterUser
+      testPython
+      pkgs.stdenvNoCC
+      pkgs.shellcheck-minimal
+      pkgs.lndir
+      pkgs.perl
+    ]
     ++ pkgs.lib.optional (cache != null) cache
     ++ pkgs.lib.optional (plans != null) plans
     ++ pkgs.lib.optionals recovery [
-      defaultUser migrationSource migrationSeed.homeConfigurations.folio.activationPackage
+      defaultUser
+      migrationSource
+      migrationSeed.homeConfigurations.folio.activationPackage
       # Rebuilding retained source may produce a new wrapper derivation even
       # when its runtime dependencies are unchanged. Keep the offline guest's
       # native build tools available rather than bootstrapping a compiler there.
-      pkgs.stdenv pkgs.stdenvNoCC pkgs.stdenv.cc pkgs.pkg-config
-      pkgs.shellcheck-minimal pkgs.makeWrapper pkgs.makeBinaryWrapper pkgs.curl
-      pkgs.lndir pkgs.perl pkgs.jansson.dev pkgs.libyang.dev
+      pkgs.stdenv
+      pkgs.stdenvNoCC
+      pkgs.stdenv.cc
+      pkgs.pkg-config
+      pkgs.shellcheck-minimal
+      pkgs.makeWrapper
+      pkgs.makeBinaryWrapper
+      pkgs.curl
+      pkgs.lndir
+      pkgs.perl
+      pkgs.jansson.dev
+      pkgs.libyang.dev
     ];
   };
   testScript = ''
@@ -191,7 +241,9 @@ pkgs.testers.runNixOSTest {
         user("printf %s " + shlex.quote(json.dumps(configuration)) + " >/home/folio/draft.json")
         assert folio(("--system " if system else "") + "config import /home/folio/draft.json")["status"] == "success"
 
-    assert ${if integrated && (cache == null || plans == null) then "False" else "True"}, "Integrated acceptance requires isolated Flatpak cache/plans overrides; see README"
+    assert ${
+      if integrated && (cache == null || plans == null) then "False" else "True"
+    }, "Integrated acceptance requires isolated Flatpak cache/plans overrides; see README"
     machine.start(allow_reboot=True)
     machine.wait_for_unit("multi-user.target")
     machine.succeed("test -d /sys/firmware/efi")
@@ -233,22 +285,30 @@ pkgs.testers.runNixOSTest {
         assert descriptor["preferences"]["font-size"] == 20
 
     ${pkgs.lib.optionalString recovery (
-      builtins.replaceStrings [ "@defaultGeneration@" "@migrationSource@" ] [ (toString defaultUser) (toString migrationSource) ] (
-        builtins.readFile ./recovery.py
-      )
+      builtins.replaceStrings
+        [ "@defaultGeneration@" "@migrationSource@" ]
+        [ (toString defaultUser) (toString migrationSource) ]
+        (builtins.readFile ./recovery.py)
     )}
 
     ${pkgs.lib.optionalString (integrated && cache != null && plans != null) ''
-    with subtest("module-owned cached Zen and OBS reconciliation"):
-        user("mkdir -p /home/folio/.local/share/flatpak /home/folio/.local/state/folio/applications/prepared; cp -R ${cache}/. /home/folio/.local/share/flatpak/; chmod -R u+w /home/folio/.local/share/flatpak; cp ${plans}/*.json /home/folio/.local/state/folio/applications/prepared/")
-        assert folio("apps install all --offline")["status"]=="success"
+      with subtest("module-owned cached Zen and OBS reconciliation"):
+          user("mkdir -p /home/folio/.local/share/flatpak /home/folio/.local/state/folio/applications/prepared; cp -R ${cache}/. /home/folio/.local/share/flatpak/; chmod -R u+w /home/folio/.local/share/flatpak; cp ${plans}/*.json /home/folio/.local/state/folio/applications/prepared/")
+          assert folio("apps install all --offline")["status"]=="success"
     ''}
 
     ${pkgs.lib.optionalString integrated (builtins.readFile ./release.py)}
 
-    ${pkgs.lib.optionalString integrated (import ../../desktop/tests/session-script.nix {
-      inherit pkgs cache plans testPython;
-    })}
+    ${pkgs.lib.optionalString integrated (
+      import ../../desktop/tests/session-script.nix {
+        inherit
+          pkgs
+          cache
+          plans
+          testPython
+          ;
+      }
+    )}
 
     with subtest("unauthorized and arbitrary activation requests have no effects"):
         profile = machine.succeed("readlink -f /run/current-system").strip()

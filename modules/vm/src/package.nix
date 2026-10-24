@@ -29,6 +29,8 @@
     text = ''
       source ${pkgs.folio.cliSupport}/share/folio/client-common.sh
     ''
-    + builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/vm/request.jq}" ] (builtins.readFile ../cli/commands/vm/command.sh);
+    + builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/vm/request.jq}" ] (
+      builtins.readFile ../cli/commands/vm/command.sh
+    );
   };
 }

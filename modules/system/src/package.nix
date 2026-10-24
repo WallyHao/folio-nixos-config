@@ -2,19 +2,43 @@
 let
   legacyCleanup = pkgs.writeShellApplication {
     name = "folio-retire-legacy";
-    runtimeInputs = with pkgs; [ coreutils getent jq util-linux systemd gnugrep diffutils inetutils
-      pkgs.folio.cli ];
+    runtimeInputs = with pkgs; [
+      coreutils
+      getent
+      jq
+      util-linux
+      systemd
+      gnugrep
+      diffutils
+      inetutils
+      pkgs.folio.cli
+    ];
     text = builtins.readFile ../runtime/retire-legacy.sh;
   };
-  retirementPython = pkgs.python3.withPackages (python: [ python.lz4 python.tomlkit ]);
+  retirementPython = pkgs.python3.withPackages (python: [
+    python.lz4
+    python.tomlkit
+  ]);
   retirement = pkgs.writeShellApplication {
     name = "folio-retire-home";
-    runtimeInputs = with pkgs; [ coreutils getent jq nix systemd util-linux
-      btrfs-progs gnugrep gnused procps shadow ];
-    text = builtins.replaceStrings
-      [ "@migration@" "@python@" "@pathsHelper@" ]
-      [ "${migration}" "${retirementPython}/bin/python3" "${../runtime/retire-home-paths.py}" ]
-      (builtins.readFile ../runtime/retire-home.sh);
+    runtimeInputs = with pkgs; [
+      coreutils
+      getent
+      jq
+      nix
+      systemd
+      util-linux
+      btrfs-progs
+      gnugrep
+      gnused
+      procps
+      shadow
+    ];
+    text =
+      builtins.replaceStrings
+        [ "@migration@" "@python@" "@pathsHelper@" ]
+        [ "${migration}" "${retirementPython}/bin/python3" "${../runtime/retire-home-paths.py}" ]
+        (builtins.readFile ../runtime/retire-home.sh);
   };
   keyringHelper = pkgs.stdenv.mkDerivation {
     pname = "folio-keyring-password";
@@ -30,13 +54,33 @@ let
   };
   keyring = pkgs.writeShellApplication {
     name = "folio-migrate-keyring";
-    runtimeInputs = [ pkgs.coreutils pkgs.getent keyringHelper ];
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.getent
+      keyringHelper
+    ];
     text = builtins.readFile ../runtime/migrate-keyring.sh;
   };
   migration = pkgs.writeShellApplication {
     name = "folio-migrate-account";
-    runtimeInputs = with pkgs; [ coreutils findutils gnugrep gnused gawk diffutils
-      jq util-linux shadow btrfs-progs nix systemd gnutar procps getent glibc.bin ];
+    runtimeInputs = with pkgs; [
+      coreutils
+      findutils
+      gnugrep
+      gnused
+      gawk
+      diffutils
+      jq
+      util-linux
+      shadow
+      btrfs-progs
+      nix
+      systemd
+      gnutar
+      procps
+      getent
+      glibc.bin
+    ];
     text = builtins.readFile ../runtime/migrate-account.sh;
   };
   runtime = pkgs.stdenv.mkDerivation {
@@ -70,9 +114,18 @@ let
     text = ''
       source ${pkgs.folio.cliSupport}/share/folio/client-common.sh
     ''
-    + builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/system/request.jq}" ] (builtins.readFile ../cli/commands/system/command.sh);
+    + builtins.replaceStrings [ "@requestFilter@" ] [ "${../cli/commands/system/request.jq}" ] (
+      builtins.readFile ../cli/commands/system/command.sh
+    );
   };
 in
 {
-  inherit runtime client migration keyring retirement legacyCleanup;
+  inherit
+    runtime
+    client
+    migration
+    keyring
+    retirement
+    legacyCleanup
+    ;
 }

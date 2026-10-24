@@ -1,21 +1,37 @@
-{ pkgs, bootstrap, repository, maintenance, agentsHistory, terminalHistory, applicationsHistory, systemModules,
-  homeManager, runtime, prepareInput, source, inputs, switcher }:
+{
+  pkgs,
+  bootstrap,
+  repository,
+  maintenance,
+  agentsHistory,
+  terminalHistory,
+  applicationsHistory,
+  systemModules,
+  homeManager,
+  runtime,
+  prepareInput,
+  source,
+  inputs,
+  switcher,
+}:
 let
   previousModels = import ../../manager/tests/previous-theme-models.nix { inherit pkgs; };
-  previousBootstrap = pkgs.lib.concatMapStringsSep "\n" (model: ''
-    for scope in user system; do
-      if [[ -f "$out/models/$scope/${model.name}" ]]; then cp ${model.path} "$out/models/$scope/${model.name}"; fi
-    done
-  '') previousModels + ''
-    for scope in user system; do
-      for model in "$out/models/$scope/"*.yang; do
-        hash=$(sha256sum <"$model"); hash=''${hash%% *}
-        jq --arg scope "$scope" --arg name "$(basename "$model")" --arg hash "$hash" \
-          '.models[$scope] |= map(if .name==$name then .sha256=$hash else . end)' $out/identities.json >identity.json
-        mv identity.json $out/identities.json
+  previousBootstrap =
+    pkgs.lib.concatMapStringsSep "\n" (model: ''
+      for scope in user system; do
+        if [[ -f "$out/models/$scope/${model.name}" ]]; then cp ${model.path} "$out/models/$scope/${model.name}"; fi
       done
-    done
-  '';
+    '') previousModels
+    + ''
+      for scope in user system; do
+        for model in "$out/models/$scope/"*.yang; do
+          hash=$(sha256sum <"$model"); hash=''${hash%% *}
+          jq --arg scope "$scope" --arg name "$(basename "$model")" --arg hash "$hash" \
+            '.models[$scope] |= map(if .name==$name then .sha256=$hash else . end)' $out/identities.json >identity.json
+          mv identity.json $out/identities.json
+        done
+      done
+    '';
   harness = pkgs.runCommand "folio-before-pi-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
     mkdir $out
     cp -RL ${bootstrap}/. $out/
@@ -31,46 +47,79 @@ let
       $out/identities.json >identities.json
     mv identities.json $out/identities.json
   '';
-  adoptionSource = pkgs.runCommand "folio-legacy-adoption-source" {
-    nativeBuildInputs = [ pkgs.jq pkgs.folio.normalizer prepareInput ];
-  } ''
-    mkdir $out
-    cp -R ${source}/. $out/
-    chmod -R u+w $out
-    folio-normalize ${old}/models/user ${old}/user.json >configuration.json
-    for module in folio-codex folio-agents folio-git; do
-      transform=$(jq -er --arg module "$module" '.[] | select(.module==$module and (.module!="folio-agents" or .from=="2026-10-22")) | .transform' ${bootstrap}/migrations.json)
-      "$transform" <configuration.json >next.json
-      mv next.json configuration.json
-    done
-    folio-prepare-input configuration.json ${bootstrap} >$out/folio-input.json
-  '';
-  adoptedHome = (import ../../manager/src/outputs.nix {
-    inputs = inputs // { self.outPath = adoptionSource; };
-  }).homeConfigurations.folio.activationPackage;
-  legacyHome = (homeManager.homeManagerConfiguration {
-    inherit pkgs;
-    modules = [{
-      home.username = "folio";
-      home.homeDirectory = "/home/folio";
-      home.stateVersion = "26.05";
-      programs.zsh = { enable = true; dotDir = "/home/folio/.config/zsh"; };
-      systemd.user.services.niri = {
-        Unit = {
-          Description = "Legacy session sentinel";
-          X-SwitchMethod = "keep-old";
-          BindsTo = [ "graphical-session.target" ];
-          Before = [ "graphical-session.target" ];
-        };
-        Service.ExecStart = "${pkgs.coreutils}/bin/sleep infinity";
-        Install.WantedBy = [ "default.target" ];
-      };
-      home.file.".config/folio-legacy-fixture".text = "retained legacy fixture\n";
-      home.extraBuilderCommands = ''
-        printf '%s\n' '{"protocolVersion":1,"schemaVersion":1,"user":"folio","home":"/home/folio"}' >$out/sylphy-home.json
+  adoptionSource =
+    pkgs.runCommand "folio-legacy-adoption-source"
+      {
+        nativeBuildInputs = [
+          pkgs.jq
+          pkgs.folio.normalizer
+          prepareInput
+          repository
+          maintenance
+          pkgs.nix
+        ];
+      }
+      ''
+        mkdir $out
+        cp -R ${source}/. $out/
+        chmod -R u+w $out
+        # Generate candidate data through the same complete, hash-bound chain
+        # used by maintenance, including shared model changes.
+        export HOME=$TMPDIR/home XDG_STATE_HOME=$TMPDIR/state XDG_RUNTIME_DIR=$TMPDIR/run
+        export NIX_REMOTE=local NIX_STATE_DIR=$TMPDIR/nix-state NIX_LOG_DIR=$TMPDIR/nix-log
+        export NIX_CONFIG='substituters ='
+        mkdir -p "$HOME" "$XDG_RUNTIME_DIR"
+        nix-store --load-db <${
+          pkgs.closureInfo {
+            rootPaths = [
+              old
+              bootstrap
+            ];
+          }
+        }/registration
+        jq --arg account "$(id -un)" '."folio-environment:environment".account=$account' ${old}/user.json >defaults.json
+        folio-repository user init ${old}/models/user defaults.json
+        folio-repository-maintain user snapshot adoption ${old} ${old} >snapshot.json
+        folio-repository-maintain user prepare adoption ${bootstrap} >prepared.json
+        jq '."folio-environment:environment".account="folio"' \
+          "$XDG_STATE_HOME/folio/backups/repositories/adoption/new-running.json" >configuration.json
+        folio-prepare-input configuration.json ${bootstrap} >$out/folio-input.json
       '';
-    }];
-  }).activationPackage;
+  adoptedHome =
+    (import ../../manager/src/outputs.nix {
+      inputs = inputs // {
+        self.outPath = adoptionSource;
+      };
+    }).homeConfigurations.folio.activationPackage;
+  legacyHome =
+    (homeManager.homeManagerConfiguration {
+      inherit pkgs;
+      modules = [
+        {
+          home.username = "folio";
+          home.homeDirectory = "/home/folio";
+          home.stateVersion = "26.05";
+          programs.zsh = {
+            enable = true;
+            dotDir = "/home/folio/.config/zsh";
+          };
+          systemd.user.services.niri = {
+            Unit = {
+              Description = "Legacy session sentinel";
+              X-SwitchMethod = "keep-old";
+              BindsTo = [ "graphical-session.target" ];
+              Before = [ "graphical-session.target" ];
+            };
+            Service.ExecStart = "${pkgs.coreutils}/bin/sleep infinity";
+            Install.WantedBy = [ "default.target" ];
+          };
+          home.file.".config/folio-legacy-fixture".text = "retained legacy fixture\n";
+          home.extraBuilderCommands = ''
+            printf '%s\n' '{"protocolVersion":1,"schemaVersion":1,"user":"folio","home":"/home/folio"}' >$out/sylphy-home.json
+          '';
+        }
+      ];
+    }).activationPackage;
   old = pkgs.runCommand "folio-before-agents-bootstrap" { nativeBuildInputs = [ pkgs.jq ]; } ''
     mkdir $out
     cp -RL ${bootstrap}/. $out/
@@ -99,7 +148,8 @@ let
       $out/identities.json >identities.json
     mv identities.json $out/identities.json
   '';
-in pkgs.testers.runNixOSTest {
+in
+pkgs.testers.runNixOSTest {
   name = "folio-agents-terminal-migration";
   nodes.machine = { lib, ... }: {
     imports = systemModules;
@@ -111,9 +161,27 @@ in pkgs.testers.runNixOSTest {
     virtualisation.memorySize = 4096;
     virtualisation.diskSize = 12288;
     virtualisation.writableStoreUseTmpfs = false;
-    virtualisation.additionalPaths = [ bootstrap old harness legacyHome adoptionSource adoptedHome
-      inputs.nixpkgs inputs.home-manager pkgs.stdenvNoCC pkgs.shellcheck-minimal pkgs.lndir pkgs.perl ];
-    environment.systemPackages = [ pkgs.jq repository maintenance runtime prepareInput ];
+    virtualisation.additionalPaths = [
+      bootstrap
+      old
+      harness
+      legacyHome
+      adoptionSource
+      adoptedHome
+      inputs.nixpkgs
+      inputs.home-manager
+      pkgs.stdenvNoCC
+      pkgs.shellcheck-minimal
+      pkgs.lndir
+      pkgs.perl
+    ];
+    environment.systemPackages = [
+      pkgs.jq
+      repository
+      maintenance
+      runtime
+      prepareInput
+    ];
   };
   testScript = ''
     import datetime
