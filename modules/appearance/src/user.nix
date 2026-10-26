@@ -8,8 +8,16 @@ in
 {
   home.packages = [
     cursor
+    (import ./font.nix { inherit pkgs; })
     pkgs.maple-mono.NF-CN
   ];
+  fonts.fontconfig = {
+    enable = true;
+    defaultFonts.monospace = [
+      theme.font-family
+      "Maple Mono NF CN"
+    ];
+  };
   gtk = {
     enable = true;
     font = {

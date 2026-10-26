@@ -78,7 +78,7 @@ backends, so improving usability can build on the existing configuration model.
 ## Desktop
 
 The desktop uses Niri's scrolling layout, a dark green Everforest palette and
-Maple Mono NF CN for mixed Chinese and Latin text. The current Everforest variant
+LXGW WenKai Mono GB for mixed Chinese and Latin text. The current Everforest variant
 has deeper backgrounds and brighter text for stronger contrast.
 
 Visual details follow the shared palette: the focused window ring, cursor
@@ -101,7 +101,7 @@ receive the selected colors.
 | Browser | Zen Browser Beta |
 | Documents and images | Zathura, imv and Typst |
 | Input method | Fcitx5 and Rime Ice |
-| Fonts and cursor | Maple Mono NF CN and a recolored GoogleDot cursor |
+| Fonts and cursor | LXGW WenKai Mono GB and a recolored GoogleDot cursor |
 | Desktop controls | Folio's local browser panel |
 | Optional tools | OBS Studio, Flatpak applications and Isaac Sim / Isaac Lab helpers |
 

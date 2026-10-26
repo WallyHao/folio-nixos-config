@@ -2,7 +2,7 @@
 :root {
   --control-height: 2.15rem; --action-width: 8rem; --control-gap: .5rem;
   --radius: .35rem; --card-radius: .5rem;
-  --font: "Maple Mono NF CN", monospace; --font-size: 16pt;
+  --font: "LXGW WenKai Mono GB", monospace; --font-size: 16pt;
   --border: color-mix(in srgb, var(--line) 75%, var(--surface));
   --tint: color-mix(in srgb, var(--accent) 9%, var(--surface));
   --shadow: 0 1px 3px #0000000d;

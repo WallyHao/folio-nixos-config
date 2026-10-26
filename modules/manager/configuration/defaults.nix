@@ -7,7 +7,7 @@
     platform = "x86_64-linux";
     inherit scope;
     preferences = {
-      font-family = "Maple Mono NF CN";
+      font-family = "LXGW WenKai Mono GB";
       font-size = 16;
     }
     // (

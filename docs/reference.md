@@ -30,7 +30,7 @@ recovery records describe what actually happened.
 | **Local desktop controls** | The browser panel uses module backends for networking, devices, software and settings, with no cloud service or external frontend assets. |
 
 Folio currently targets `x86_64-linux`. Its desktop combines Niri, Everforest,
-Maple Mono NF CN, Fcitx5/Rime, Foot and Zsh. A dedicated `folio` target supports the
+LXGW WenKai Mono GB, Fcitx5/Rime, Foot and Zsh. A dedicated `folio` target supports the
 existing USB installation; `portable` provides a disposable UEFI test environment.
 The physical target is specific to that installation, rather than a general installer.
 
@@ -374,7 +374,7 @@ defaults unless the source contains a prepared `folio-input.json`.
 ### Consistent appearance and session integration
 
 The desktop uses Niri, Waybar, Mako, Fuzzel, clipboard history and screenshots.
-Everforest and the custom Folio Graphite light/dark palettes, Maple Mono NF CN, a recolored GoogleDot cursor and
+Everforest and the custom Folio Graphite light/dark palettes, LXGW WenKai Mono GB, a recolored GoogleDot cursor and
 GTK resources share resolved preferences. Font and preference origins are recorded
 in `~/.config/folio/appearance.json`.
 

@@ -129,7 +129,7 @@ def theme_css():
         appearance = settings["appearance"]
     except (OSError, KeyError, ValueError, TypeError):
         settings = {}
-        family, size, appearance = "Maple Mono NF CN", 16, "dark"
+        family, size, appearance = "LXGW WenKai Mono GB", 16, "dark"
     appearance = "light" if appearance == "light" else "dark"
     colors = settings.get("palette", defaults["palettes"][appearance])
     roles = {

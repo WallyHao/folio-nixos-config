@@ -101,7 +101,7 @@ in
      `(org-block ((t (:background ,surface))))
      `(error ((t (:foreground ,red))))))
   (add-to-list 'default-frame-alist
-               `(font . ,(if (boundp 'folio-emacs-font) folio-emacs-font "Maple Mono NF CN-16")))
+               `(font . ,(if (boundp 'folio-emacs-font) folio-emacs-font "LXGW WenKai Mono GB-16")))
   (when (display-graphic-p)
     (set-frame-font (cdr (assq 'font default-frame-alist)) nil t))
   ${import ./dashboard.nix { }}
