@@ -2,297 +2,80 @@
 
 # Folio
 
-**A personal NixOS desktop, built around shared appearance and modeled configuration.**
+**一套注重统一外观与日常体验的个人 NixOS 桌面配置。**
 
-<sub>NixOS · Home Manager · Niri · YANG / sysrepo · MIT</sub>
+<sub>NixOS · Home Manager · Niri</sub>
 
-[The journey](#the-journey-to-folio) · [Design](#what-defines-folio) · [Desktop](#desktop) · [Themes](#themes)
-
-[Architecture](#architecture) · [Usability](#usability-and-management) · [Hardware](#hardware-and-portability) · [Limitations](#current-limitations)
+[项目演进](#项目演进) · [核心特点](#核心特点) · [桌面环境](#桌面环境) · [当前局限](#当前局限) · [参考资料](#参考资料)
 
 </div>
 
-[![Folio desktop in Everforest Dark, with Btop, Yazi and a Foot terminal](assets/screenshots/everforest-dark-desktop.png)](assets/screenshots/everforest-dark-desktop.png)
+[![Folio 桌面：Everforest 深色主题下的 Btop、Yazi 与 Foot 终端](assets/screenshots/everforest-dark-desktop.png)](assets/screenshots/everforest-dark-desktop.png)
 
-<p align="center"><sub>Everforest Dark · Niri · Foot · Yazi · Btop · Maple Mono NF CN</sub></p>
+<p align="center"><sub>Everforest 深色 · Niri · Foot · Yazi · Btop · 截图字体：Maple Mono NF CN</sub></p>
 
-Folio is my personal NixOS and standalone Home Manager configuration for
-`x86_64-linux`. It brings machine policy, the desktop and managed applications
-into one repository. This README explains the choices behind it, for people
-looking for ideas to adapt to their own configurations.
+Folio 是我的个人 NixOS 与独立 Home Manager 配置，面向 `x86_64-linux`。
+这个仓库记录了我的桌面选型与使用习惯，供参考和按需调整。
 
-## The journey to Folio
+## 项目演进
 
-**The first configuration — everything in one file.**
-My first NixOS configuration put everything into a single Nix file. That was easy
-to start with: every setting was in one place, and adding something meant finding
-a spot for it. As the configuration grew, the file became increasingly bloated.
-It became harder to see where one piece of configuration ended and another began.
+1. **最初：所有配置放在一个文件里。** 起步直接，但随着内容增加，配置逐渐臃肿，查找和维护都变得困难。
+2. **Koru：每个应用一个文件。** [Koru](https://github.com/WallyHao/koru-nixos-dotfiles) 是我第一次尝试模块化。目录更清楚了，但复杂应用仍会积累成一个大文件。
+3. **Sylphy：每个应用成为一个小项目。** 我把配置、脚本与资源集中管理，并引入更严格的规范。维护边界更明确，但添加模块的成本过高，最终放弃了这个项目。
+4. **Folio：重新平衡规范与使用成本。** 保留对一致性和可维护性的要求，同时更关注统一外观、工具搭配，以及命令行和面板在日常使用中的体验。
 
-**Koru — one file per application.**
-I built [Koru](https://github.com/WallyHao/koru-nixos-dotfiles) to address that.
-It was my first attempt at modularization, with a separate configuration file for
-each application. That made the repository easier to navigate, but the same
-problem returned inside the more complicated applications. One file per program
-was still a large file once that program needed enough configuration.
+## 核心特点
 
-**Sylphy — each application became a project.**
-In Sylphy, a configuration I have since deleted, I introduced stronger constraints
-and gave each application a small project directory of its own. Configuration,
-helpers and supporting files could be organized together. There were real
-benefits, but adding a module became much more expensive. The structure required
-so much work that I soon abandoned it.
-
-**Folio — shared rules, less repeated infrastructure.**
-Folio comes from reconsidering that trade-off. I still want clear boundaries,
-validation and predictable behavior, but I also want to be able to add and change
-modules without rebuilding the same management machinery each time. Here, YANG
-and sysrepo provide a common configuration framework that connects most modules.
-They give me shared rules for describing, validating and storing settings, while
-modules retain ownership of their implementation.
-
-That reduces the amount of infrastructure I have to write for each capability
-and preserves many of the guarantees I wanted from Sylphy's stricter structure.
-It also gives shared concerns, especially appearance, a place to be managed
-across the system. There is still complexity to maintain; this is the balance I
-am exploring in Folio.
-
-The same reconsideration extends to tool selection and the control panel. I am
-paying more attention to how the pieces work together in daily use. The CLI
-provides a common management interface, while the panel makes routine desktop
-controls accessible through a local graphical interface. Both use the same
-backends, so improving usability can build on the existing configuration model.
-
-## What defines Folio
-
-| Choice | What it provides |
+| 特点 | 使用体验 |
 | --- | --- |
-| **Shared appearance** | One global theme selection drives system, desktop, terminal and managed application colors. |
-| **Modeled configuration** | YANG describes settings and constraints; sysrepo validates and persists desired state. |
-| **Capability-owned modules** | Each capability keeps its schema, packages, commands, runtime and tests together. |
-| **Coordinated deployment** | Reviewed source and configuration are captured together, then applied through NixOS and Home Manager. |
-| **Recorded recovery** | Persistent workers, journals and retained revisions support inspection, resume and rollback. |
-| **Common controls** | The CLI and local panel expose module backends through consistent interfaces. |
-| **A movable installation** | One USB installation serves the supported laptop and desktop, with a separate disposable VM target for testing. |
+| **统一外观** | 一次选择主题，让桌面、终端和受管理的应用使用一致的配色。 |
+| **配置校验** | 常用设置提供类型与约束检查，保存配置和部署变更分开进行。 |
+| **部署与恢复** | 变更可以先审阅，再构建和应用；历史记录支持检查、继续执行与回滚。 |
+| **日常控制** | 命令行与本地面板提供网络、代理、音量、亮度及常用设置的管理入口。 |
+| **应用安装** | 通过面板搜索和安装 Flathub 应用，无需为每次安装重新构建系统；移除时保留个人数据。 |
+| **移动使用** | 同一套 USB 安装用于我的笔记本与主机，另有用于测试的一次性虚拟机环境。 |
 
-## Desktop
+## 桌面环境
 
-The desktop uses Niri's scrolling layout, a dark green Everforest palette and
-LXGW WenKai Mono GB for mixed Chinese and Latin text. The current Everforest variant
-has deeper backgrounds and brighter text for stronger contrast.
-
-Visual details follow the shared palette: the focused window ring, cursor
-outline and Yazi icons use the same accent, while file icons retain their
-individual shapes. Waybar, notifications, the launcher and local panel also
-receive the selected colors.
+桌面采用 Niri 的滚动布局，搭配霞鹜文楷等宽 GB（LXGW WenKai Mono GB）字体，兼顾中文与英文显示。
+提供 Everforest 和 Folio Graphite 两套配色，均支持深色与浅色；截图使用调整过对比度的 Everforest 深色主题。
+窗口焦点边框、光标、文件图标、状态栏与面板沿用统一配色。
 
 <details>
-<summary><strong>Desktop components</strong></summary>
+<summary><strong>展开桌面组件</strong></summary>
 
-| Area | Components |
+| 用途 | 组件 |
 | --- | --- |
-| Window management | Niri, with a patched focus-ring fade |
-| Bar, launcher and notifications | Waybar, Fuzzel and Mako |
-| Terminal and shell | Foot, Zsh and Powerlevel10k |
-| Files and navigation | Yazi, eza, fd, fzf, ripgrep and zoxide |
-| Monitoring | Btop |
-| Notes and editing | Emacs, Org and Org-roam; configuration is still preliminary |
-| Coding agents | Codex CLI and Pi |
-| Browser | Zen Browser Beta |
-| Documents and images | Zathura, imv and Typst |
-| Input method | Fcitx5 and Rime Ice |
-| Fonts and cursor | LXGW WenKai Mono GB and a recolored GoogleDot cursor |
-| Desktop controls | Folio's local browser panel |
-| Optional tools | OBS Studio, Flatpak applications and Isaac Sim / Isaac Lab helpers |
+| 窗口管理 | Niri，带焦点边框淡出补丁 |
+| 状态栏、启动器与通知 | Waybar、Fuzzel、Mako |
+| 终端与 Shell | Foot、Zsh、Powerlevel10k |
+| 文件与检索 | Yazi、eza、fd、fzf、ripgrep、zoxide |
+| 系统监控 | Btop |
+| 编辑与笔记 | Emacs、Org、Org-roam |
+| 编程助手 | Codex CLI、Pi |
+| 浏览器 | Zen Browser Beta |
+| 文档与图像 | Zathura、imv、Typst |
+| 输入法 | Fcitx5、Rime Ice |
+| 字体与光标 | 霞鹜文楷等宽 GB、重新配色的 GoogleDot 光标 |
+| 桌面控制 | Folio 本地浏览器面板 |
+| 可选工具 | OBS Studio、Flatpak 应用、Isaac Sim / Isaac Lab 辅助工具 |
 
 </details>
 
-Module and application selections determine which components are installed.
-Personal profiles, credentials, notes and sessions remain owned by their
-applications.
+实际安装的组件取决于配置选择，个人资料、凭据、笔记与会话由各应用管理。
 
-## Architecture
+## 当前局限
 
-Folio organizes code by capability. A module can contribute to the system, the
-user environment, or both, while keeping its schema and runtime behavior nearby.
-The root has one Flake and one dependency lock.
+- **硬件适配**：主要用于我的笔记本与主机。用于其他设备前，需要调整磁盘标识、账户及硬件相关设置。
+- **开发工具链**：组织和维护方式尚未稳定，目前还不是完整的开发环境。
+- **编辑器配置**：Emacs、Org 与 Org-roam 已接入，具体工作流仍处于初步配置阶段。
+- **验证范围**：构建和虚拟机检查无法覆盖所有实体硬件上的显卡、无线网络与休眠行为。
 
-```text
-.
-├── flake.nix                  # public outputs
-├── flake.lock                 # shared dependency lock
-├── assets/screenshots/        # desktop previews
-├── docs/reference.md          # detailed technical and operational reference
-└── modules/
-    ├── manager/configuration/ # initial choices and target overrides
-    └── <capability>/
-        ├── default.nix        # public exports and composition contract
-        ├── model/             # YANG models and retained revisions
-        ├── src/               # Nix packages and system/user configuration
-        ├── cli/               # command adapters
-        ├── runtime/           # subscribers, workers and operations
-        └── tests/             # checks owned by the module
-```
+## 参考资料
 
-Directories are present where the capability needs them. Module selection is
-explicit; keeping a module's source in the repository does not enable it.
+- [Koru](https://github.com/WallyHao/koru-nixos-dotfiles)：我的早期配置，也是这份 README 的展示参考。
+- [Flatpak](https://flatpak.org/)：用于安装桌面应用，与 Nix 管理的原生软件配合使用。
+- [配置与开发指南](docs/development.md)：配置入口、开发约定与检查方式。
+- [技术参考](docs/reference.md)：详细的操作说明与维护记录。
 
-Use [modules/manager/configuration/defaults.nix](modules/manager/configuration/defaults.nix) for initial module
-selections and preferences, and [modules/manager/configuration/targets](modules/manager/configuration/targets)
-for installation differences. Existing desired settings are edited through
-`folio config`; changing initial defaults does not overwrite a running repository.
-The [configuration and development guide](docs/development.md) explains where to
-make each kind of change and how to run the existing checks.
-
-### From configuration to a running system
-
-```mermaid
-flowchart LR
-    A[Settings] --> B[YANG validation]
-    B --> C[sysrepo]
-    C --> D[Immutable snapshot]
-    D --> E[Nix build]
-    E --> F[NixOS + Home Manager]
-```
-
-YANG defines the shape of settings, including types, defaults and constraints.
-Sysrepo stores the validated desired configuration. The manager captures that
-configuration with its source and model identities into immutable inputs for Nix.
-NixOS and Home Manager then build and activate the corresponding environments.
-Nix evaluation consumes the captured data without querying live sysrepo state.
-
-This separates saving a setting from applying it. A deployment can be reviewed
-before activation, and the recorded inputs explain what was applied. System and
-user activation are coordinated, while their repositories retain separate state
-and permissions.
-
-The shared framework handles configuration and deployment concerns across
-modules. Each capability still owns the behavior specific to its services and
-applications. The [module catalogue](docs/reference.md#module-catalogue) and
-[public Nix contract](docs/reference.md#public-nix-contract) describe those
-boundaries in detail.
-
-## Themes
-
-Shared appearance is one of the main reasons I introduced sysrepo. I want to
-choose a theme once and carry it through the system, desktop and managed
-applications, with coordinated switching from a single global selection.
-
-| Scheme | Character | Modes |
-| --- | --- | --- |
-| **Everforest** | Green surfaces, warm text and yellow emphasis; adapted for stronger contrast | Dark and light |
-| **Folio Graphite** | Neutral surfaces with blue emphasis | Dark and light |
-
-The [palette catalogue](modules/appearance/lib) defines shared colors and
-semantic roles such as background, foreground and accent. Components consume
-those roles so the same visual purpose stays consistent across applications.
-Resolved appearance metadata also lets the panel read the selected palette.
-
-Theme selection belongs to the system and applies across both system and user
-configuration. Switching coordinates the resulting deployment. Some running
-applications still need reopening to load their new styles.
-
-## Usability and management
-
-### One management interface
-
-The CLI brings module settings, deployment review, status and recovery into
-one interface. Accepted deployment work runs in persistent workers, so its
-lifetime does not depend on keeping a terminal open. History and journals make
-partial results available for inspection after an interruption.
-
-### A local control panel
-
-The local panel makes common tasks easier to reach: networking, proxy selection,
-audio, display controls, device information, software management and settings.
-It shares the CLI's backends and follows the desktop palette. This lets the
-graphical interface use the same validation and operation records as the rest
-of the system.
-
-### Easier application installation
-
-I introduced Flatpak to make installing desktop applications easier. Applications
-available through Flathub can be found and installed from the panel without
-writing a Nix package declaration or rebuilding the system for each installation.
-This complements the native packages managed by Nix and makes adding everyday
-software more approachable. Folio records which applications it manages and
-preserves personal data when removing them.
-
-Native packages follow Nix generations; managed Flatpak applications have their
-own recorded lifecycle. Retained deployment rollback covers recorded artifacts
-and configuration. Personal data and independently managed Flatpak revisions
-require their own recovery paths.
-
-## Hardware and portability
-
-The physical configuration runs from an existing USB installation shared between
-my laptop and desktop. It uses Btrfs subvolumes for root, home and the Nix store,
-with explicit root and EFI identities.
-
-| Target | Purpose |
-| --- | --- |
-| `folio` | Existing USB installation shared between the supported machines |
-| `portable` | Disposable x86_64 UEFI guest for development and acceptance |
-
-The supported machines are a Lenovo Legion Y7000 IRX9 with an i7-13650HX and
-RTX 4060, and an MSI MAG B650M MORTAR WIFI desktop with a Ryzen 7 9700X and
-RTX 3090. The graphics configuration includes Intel, AMD and NVIDIA support
-without fixed DRM card numbering in Niri.
-
-Hardware policy lives in the [system target](modules/system/src/folio.nix) and
-[device target](modules/devices/src/folio.nix), composed through
-[the target configuration](modules/manager/configuration/targets/folio.nix). This is a personal installation;
-its storage identities and account policy need adapting for other hardware.
-
-## Current limitations
-
-### Development toolchains
-
-This version does not yet have a settled approach to organizing and maintaining
-development toolchains. The presence of
-terminal utilities and optional simulation helpers does not make the repository
-a complete development environment.
-
-### Editor configuration
-
-Emacs, Org and Org-roam are present, but the editor has not received the detailed configuration needed
-to make it a finished part of the overall workflow.
-
-### Maintenance and verification
-
-The shared management framework also has a cost: models, migrations and runtime
-integration need maintenance. Folio reduces repeated work across modules, but
-adding a capability still requires deciding what belongs in that common model.
-
-Checks cover configuration, deployment coordination, the panel, applications and
-disposable UEFI guests. Successful builds and guest checks do not establish
-hardware behavior on every machine. The
-[verification reference](docs/reference.md#verification-map) records the scope
-and limits of that evidence.
-
-<a id="model-upgrades"></a>
-
-<details>
-<summary><strong>Model upgrades</strong></summary>
-
-Changes to YANG models or repository tools require paired maintenance of the
-configuration repository and its matching closure for each affected scope.
-The [model upgrade reference](docs/reference.md#model-upgrades) retains the
-technical procedure and recovery details.
-
-</details>
-
-## References
-
-- [Koru](https://github.com/WallyHao/koru-nixos-dotfiles) — my earlier configuration and the presentation reference for this README.
-- [Sysrepo](https://github.com/sysrepo/sysrepo) — the configuration datastore used to connect Folio's modules.
-- [YANG 1.1 — RFC 7950](https://www.rfc-editor.org/rfc/rfc7950.html) and [YANG JSON encoding — RFC 7951](https://www.rfc-editor.org/rfc/rfc7951.html) — the configuration modeling and encoding standards.
-- [Flatpak](https://flatpak.org/) — desktop application distribution alongside native Nix packages.
-
-The repository's [technical reference](docs/reference.md) preserves detailed
-architecture, operation and recovery notes.
-
-## License
-
-Folio's original code and documentation are licensed under the [MIT License](LICENSE).
-Third-party code and assets retain their respective licenses and notices.
+本仓库的原创代码与文档采用 [MIT 许可证](LICENSE)，第三方代码与资源保留各自的许可证及声明。

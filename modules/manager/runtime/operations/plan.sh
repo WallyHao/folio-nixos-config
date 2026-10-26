@@ -90,7 +90,7 @@ if nix_as_builder eval --no-update-lock-file --json "path:$snapshot#lib.folio.id
   if ! jq -e --arg scope "$scope" --slurpfile installed "$FOLIO_BOOTSTRAP/identities.json" \
       '.models[$scope] == $installed[0].models[$scope] and .tools == $installed[0].tools' \
       "$work/source-identities.json" >/dev/null; then
-    reply invalid "Source models or tools differ from the installed $scope repository; run the paired folio-manager-maintain $scope upgrade before planning (README: Model upgrades)"
+    reply invalid "Source models or tools differ from the installed $scope repository; run the paired folio-manager-maintain $scope upgrade before planning (docs/reference.md#model-upgrades)"
     exit 0
   fi
 fi
