@@ -39,7 +39,6 @@ if [[ ! -f "$source_path/flake.nix" || ! -f "$source_path/flake.lock" || ! -d "$
 fi
 mkdir "$work/source"
 entries=(flake.nix flake.lock modules)
-[[ ! -d "$source_path/configuration" ]] || entries+=(configuration)
 [[ ! -f "$source_path/ruff.toml" ]] || entries+=(ruff.toml)
 [[ ! -d "$source_path/assets" ]] || entries+=(assets)
 # Capture bytes before validation; never evaluate the editable checkout. Fixed

@@ -206,8 +206,8 @@ There are no separate host/home trees or nested module Flakes.
 
 ```text
 flake.nix / flake.lock
-configuration/     initial defaults and target overrides (link into manager)
 modules/
+  manager/configuration/  initial defaults and target overrides
   <capability>/
     default.nix     public exports
     model/          YANG schemas and revision history
@@ -229,8 +229,8 @@ Sysrepo provides modeled storage, validation and subscription dispatch. The
 manager's deployment callback is not a generic router for arbitrary module actions.
 
 The [configuration guide](development.md) separates initial installation choices,
-saved desired configuration and module implementation. `configuration/` links to
-`modules/manager/configuration/`; the authoritative files remain inside the module
+saved desired configuration and module implementation. Initial configuration
+lives in `modules/manager/configuration/`, inside the module
 source captured by older installed managers. Modules merge by name in target
 overrides, nested objects merge recursively and other lists are replaced explicitly.
 Initial defaults never replace an existing repository during startup or deployment.

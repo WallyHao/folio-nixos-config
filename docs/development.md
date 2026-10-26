@@ -5,13 +5,13 @@
 | Change | Entry | Effect |
 | --- | --- | --- |
 | Current font, timezone or application setting | `folio config` or the panel | Saves desired data; review, build and apply to activate. |
-| Initial module choices and personal preferences | `configuration/defaults.nix` | Used when initializing a repository or evaluating an unprepared checkout. |
-| Accounts, disk identities or target-specific module choices | `configuration/targets/folio.nix` | Supplies the installation's initial differences and NixOS target modules. |
+| Initial module choices and personal preferences | `modules/manager/configuration/defaults.nix` | Used when initializing a repository or evaluating an unprepared checkout. |
+| Accounts, disk identities or target-specific module choices | `modules/manager/configuration/targets/folio.nix` | Supplies the installation's initial differences and NixOS target modules. |
 | Field types, ranges or structural constraints | The capability's `model/` | Requires a versioned model migration when the model changes. |
 | Generated files, packages or service behavior | The capability's `src/` and `runtime/` | Rebuilt through the reviewed source workflow. |
 
-`configuration/` is a convenience link to `modules/manager/configuration/`.
-There is one authoritative copy. Keeping the files within `modules/` also lets
+Initial configuration lives in `modules/manager/configuration/`.
+Keeping the files within `modules/` also lets
 previously installed managers capture them before their source whitelist has
 been updated. Production composition imports the internal path directly.
 
@@ -42,7 +42,7 @@ configuration digests do not establish hardware or application health.
 
 ## Initial configuration and target overrides
 
-`configuration/defaults.nix` provides system and user documents. Target files
+`modules/manager/configuration/defaults.nix` provides system and user documents. Target files
 contain only their differences plus public, module-owned hardware adapters.
 
 - `environment.system` and `environment.user` select the scope.

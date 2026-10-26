@@ -49,7 +49,6 @@ let
           ../../../flake.nix
           ../../../flake.lock
           (lib.fileset.maybeMissing ../../../ruff.toml)
-          (lib.fileset.maybeMissing ../../../configuration)
           ../../../modules
         ];
       };

@@ -121,10 +121,10 @@ The root has one Flake and one dependency lock.
 .
 ├── flake.nix                  # public outputs
 ├── flake.lock                 # shared dependency lock
-├── configuration/             # initial choices and target overrides
 ├── assets/screenshots/        # desktop previews
 ├── docs/reference.md          # detailed technical and operational reference
 └── modules/
+    ├── manager/configuration/ # initial choices and target overrides
     └── <capability>/
         ├── default.nix        # public exports and composition contract
         ├── model/             # YANG models and retained revisions
@@ -137,8 +137,8 @@ The root has one Flake and one dependency lock.
 Directories are present where the capability needs them. Module selection is
 explicit; keeping a module's source in the repository does not enable it.
 
-Use [configuration/defaults.nix](configuration/defaults.nix) for initial module
-selections and preferences, and [configuration/targets](configuration/targets)
+Use [modules/manager/configuration/defaults.nix](modules/manager/configuration/defaults.nix) for initial module
+selections and preferences, and [modules/manager/configuration/targets](modules/manager/configuration/targets)
 for installation differences. Existing desired settings are edited through
 `folio config`; changing initial defaults does not overwrite a running repository.
 The [configuration and development guide](docs/development.md) explains where to
@@ -241,7 +241,7 @@ without fixed DRM card numbering in Niri.
 
 Hardware policy lives in the [system target](modules/system/src/folio.nix) and
 [device target](modules/devices/src/folio.nix), composed through
-[the target configuration](configuration/targets/folio.nix). This is a personal installation;
+[the target configuration](modules/manager/configuration/targets/folio.nix). This is a personal installation;
 its storage identities and account policy need adapting for other hardware.
 
 ## Current limitations

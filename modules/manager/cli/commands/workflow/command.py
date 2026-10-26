@@ -172,7 +172,7 @@ class Workflow:
         entries = ["flake.nix", "flake.lock", "modules"]
         entries += [
             name
-            for name in ("configuration", "assets", "folio-target.json", "ruff.toml")
+            for name in ("assets", "folio-target.json", "ruff.toml")
             if (source / name).exists()
         ]
         archive = Path(directory) / "source.tar"
