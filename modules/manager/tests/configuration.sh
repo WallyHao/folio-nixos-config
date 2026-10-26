@@ -32,7 +32,8 @@ expect_code() {
 }
 
 folio-repository user init "$bootstrap/models/user" "$bootstrap/user.json"
-folio doctor --help >/dev/null
+expect_code 2 folio --json doctor
+expect_code 2 folio --json doctor --help
 folio resume --help >/dev/null
 start_subscriber
 folio-repository user cfg --export --datastore operational --module folio-environment --format json |

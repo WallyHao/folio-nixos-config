@@ -119,19 +119,6 @@ class Client:
             ],
         }
 
-    async def doctor(self):
-        return {
-            "health": "degraded",
-            "findings": [
-                {
-                    "scope": "user",
-                    "code": "deployment-pending",
-                    "message": "Settings await deployment.",
-                    "nextCommand": "folio plan",
-                }
-            ],
-        }
-
     async def settings(self):
         values = {
             "appearance": "dark",
@@ -386,11 +373,11 @@ def test_no_standalone_store_page(panel):
     assert request(panel, "/apps", token=False)[0] == 404
 
 
-def test_settings_validation_conflict_and_diagnostics(panel):
+def test_settings_validation_and_conflict(panel):
     assert request(panel, "/api/settings", token=False)[0] == 403
     assert request(panel, "/api/doctor", token=False)[0] == 403
     assert request(panel, "/api/settings")[0] == 200
-    assert request(panel, "/api/doctor")[0] == 200
+    assert request(panel, "/api/doctor")[0] == 404
     assert request(panel, "/settings.js", token=False)[0] == 200
     for preferences in (
         {"font-size": True},

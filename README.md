@@ -196,7 +196,7 @@ applications still need reopening to load their new styles.
 
 ### One management interface
 
-The CLI brings module settings, deployment review, diagnostics and recovery into
+The CLI brings module settings, deployment review, status and recovery into
 one interface. Accepted deployment work runs in persistent workers, so its
 lifetime does not depend on keeping a terminal open. History and journals make
 partial results available for inspection after an interruption.

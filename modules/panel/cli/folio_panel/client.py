@@ -52,9 +52,6 @@ def result(reply):
 
 
 class Client:
-    async def doctor(self):
-        return result(await process([paths.LEGACY, "--json", "doctor"], timeout=75))
-
     async def settings(self):
         data = result(await process([paths.LEGACY, "--json", "config", "show"]))
         preferences = {

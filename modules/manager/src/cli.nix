@@ -93,9 +93,6 @@ let
       export FOLIO_MAINTENANCE_ADAPTER=${adapters.rollback}/bin/folio-maintenance
       export FOLIO_REVIEW_COMMAND=${../runtime/snapshot/review.py}
       export FOLIO_WORKFLOW_EXECUTABLE="$0"
-      export FOLIO_CATALOGUE=${pkgs.folio.catalogue}
-      export FOLIO_CONFIG_ADAPTER=${adapters.config}/bin/folio-config
-      export FOLIO_REQUIREMENTS_COMMAND=${../runtime/snapshot/requirements.py}
       exec python3 ${../cli/commands/workflow}/command.py "$@"
     '';
   };

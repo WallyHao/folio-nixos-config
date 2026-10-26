@@ -370,7 +370,7 @@ subprocess.Popen(sys.argv[position:], stdin=subprocess.DEVNULL, stdout=subproces
         result = self.run_cli("resume", job_id, env=env)
         self.assertEqual(result["data"]["phase"], "succeeded")
 
-    def test_partial_history_and_read_only_diagnostics(self):
+    def test_partial_history_is_read_only(self):
         identifier = self.plan()
         state = self.read()
         state["system"]["unavailable"] = True
@@ -378,9 +378,6 @@ subprocess.Popen(sys.argv[position:], stdin=subprocess.DEVNULL, stdout=subproces
         history = self.run_cli("history")["data"]
         self.assertEqual(history["plans"][0]["planId"], identifier)
         self.assertTrue(history["scopedHistory"]["system"]["unavailable"])
-        doctor = self.run_cli("doctor")["data"]
-        self.assertEqual(doctor["health"], "degraded")
-        self.assertTrue(any(f["code"] == "backend-unavailable" for f in doctor["findings"]))
         self.assertFalse(any(c[1] in ("apply", "rollback") for c in self.read()["calls"]))
 
     def test_resume_retries_failed_worker_only_after_effect_recovery(self):
@@ -473,27 +470,6 @@ subprocess.Popen(sys.argv[position:], stdin=subprocess.DEVNULL, stdout=subproces
         result = self.run_cli("build", identifier, code=1)
         self.assertEqual(result["data"]["reason"], "injected failure")
         self.assertEqual(result["error"], "Injected build failure")
-
-    def test_doctor_does_not_treat_recovered_application_history_as_pending(self):
-        identifier = self.plan()
-        self.run_cli("build", identifier)
-        self.run_cli("apply", identifier)
-        tasks = self.root / "state/folio/applications/tasks"
-        tasks.mkdir(parents=True)
-        (tasks / "old.json").write_text(
-            json.dumps({"id": "old", "phase": "failed", "createdAt": "1"})
-        )
-        (tasks / "new.json").write_text(
-            json.dumps({"id": "new", "phase": "succeeded", "createdAt": "2"})
-        )
-        self.assertEqual(self.run_cli("doctor")["data"]["health"], "healthy")
-        (tasks / "old.json").write_text(
-            json.dumps({"id": "old", "phase": "failed", "createdAt": "1", "recoveryRequired": True})
-        )
-        report = self.run_cli("doctor")["data"]
-        self.assertTrue(
-            any(f["code"] == "application-task-needs-attention" for f in report["findings"])
-        )
 
     def test_cancel_in_terminal_discards_drafts(self):
         master, slave = pty.openpty()

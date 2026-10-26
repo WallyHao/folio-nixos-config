@@ -6,10 +6,10 @@
     if (!current) return;
     $("system-theme").textContent = current.effective.scheme + "-" + current.effective.appearance;
     const deployment = current.deployment || {};
-    $("settings-deployment").textContent = deployment.recoveryRequired ? "Configuration persistence or deployment requires recovery. Open Diagnostics for the next step." :
+    $("settings-deployment").textContent = deployment.recoveryRequired ? "Configuration persistence or deployment requires recovery. Run folio status to inspect the recorded state." :
       deployment.pending === true ? "Saved settings await deployment. Run folio plan to review the changes." :
       deployment.pending === false ? "Saved configuration matches the recorded deployment. Some changes may still require reopening an application or starting a new session." :
-      "Deployment state is unavailable. Open Diagnostics to inspect the services.";
+      "Deployment state is unavailable. Run folio status to inspect the services.";
     for (const key of fields) {
       $("setting-" + key).value = current.effective[key];
       $("inherit-" + key).checked = !(key in current.preferences);
@@ -23,17 +23,6 @@
     loading = true;
     try {
       if (state.page === "settings" && !dirty) { current = await api("settings"); render(); }
-      if (state.page === "health") {
-        const report = await api("doctor");
-        $("health-state").textContent = report.health;
-        const container = $("health-findings"); container.replaceChildren();
-        for (const finding of report.findings) {
-          const card = element("article", "card");
-          card.append(element("h2", "", finding.scope), element("p", "", finding.message), element("code", "", finding.nextCommand));
-          container.append(card);
-        }
-        if (!report.findings.length) container.append(element("p", "", "Both configuration scopes are current. No deployment recovery is pending."));
-      }
     } catch (error) { message(error.message, true); }
     finally { loading = false; }
   }

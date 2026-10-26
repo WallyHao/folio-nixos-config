@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 import re
-import runpy
 import subprocess
 import sys
 import tempfile
@@ -92,8 +91,6 @@ class Workflow:
             FOLIO_NO_WAIT="true" if no_wait else "false",
         )
         executable = self.maintenance if command == "rollback" else self.deploy
-        if command == "config":
-            executable = os.environ["FOLIO_CONFIG_ADAPTER"]
         invocation = [executable, *arguments]
         if privileged and scope == "system" and os.geteuid() != 0:
             invocation = [
@@ -840,170 +837,6 @@ class Workflow:
             self.say(json.dumps(result, ensure_ascii=False, indent=2))
         return result
 
-    def doctor(self, arguments):
-        if arguments:
-            raise Failure("Usage: folio doctor", "invalid")
-        findings = []
-        for scope in ("system", "user"):
-            flag = "--" + scope
-            try:
-                observed = self.scoped(scope, "status")["data"]
-            except Failure:
-                findings.append(
-                    {
-                        "scope": scope,
-                        "code": "backend-unavailable",
-                        "message": "Manager is unavailable or access is denied.",
-                        "nextCommand": (
-                            "systemctl status" if scope == "system" else "systemctl --user status"
-                        )
-                        + " folio-manager.service",
-                    }
-                )
-                continue
-            pending_maintenance = any(
-                record.get("phase") not in {"complete", "restored", "aborted"}
-                for record in observed.get("maintenance", {}).values()
-            )
-            if pending_maintenance:
-                findings.append(
-                    {
-                        "scope": scope,
-                        "code": "maintenance-required",
-                        "message": "Offline maintenance is incomplete; inspect its recorded phase before restoring.",
-                        "nextCommand": "folio " + flag + " status",
-                    }
-                )
-            if observed.get("recovery"):
-                findings.append(
-                    {
-                        "scope": scope,
-                        "code": "recovery-required",
-                        "message": "Deployment effects require explicit recovery. Inspect retained tasks before rollback.",
-                        "nextCommand": "folio " + flag + " status",
-                    }
-                )
-            if not observed.get("configurationSaved", True):
-                findings.append(
-                    {
-                        "scope": scope,
-                        "code": "configuration-unsaved",
-                        "message": "Configuration persistence requires recovery.",
-                        "nextCommand": (
-                            "journalctl -u" if scope == "system" else "journalctl --user -u"
-                        )
-                        + " folio-manager.service -n 50",
-                    }
-                )
-            if (
-                observed.get("health") in {"degraded", "unavailable", "unknown"}
-                and not observed.get("recovery")
-                and not pending_maintenance
-            ):
-                findings.append(
-                    {
-                        "scope": scope,
-                        "code": "deployment-pending",
-                        "message": "Desired configuration and observed deployment are not verified as current.",
-                        "nextCommand": "folio plan",
-                    }
-                )
-            if os.environ.get("FOLIO_CONFIG_ADAPTER"):
-                try:
-                    document = self.scoped(scope, "config", ["show"])["data"]["configuration"]
-                    catalogue = json.loads(Path(os.environ["FOLIO_CATALOGUE"]).read_text())
-                    checks = runpy.run_path(os.environ["FOLIO_REQUIREMENTS_COMMAND"])["findings"]
-                    for message in checks(document, catalogue):
-                        findings.append(
-                            {
-                                "scope": scope,
-                                "code": "module-prerequisite-missing",
-                                "message": message,
-                                "nextCommand": "folio " + flag + " modules list",
-                            }
-                        )
-                    if scope == "user":
-                        descriptor_path = Path("/run/folio/public/system-descriptor.json")
-                        if descriptor_path.is_file():
-                            descriptor = json.loads(descriptor_path.read_text())
-                            for module in document["folio-environment:environment"]["modules"]:
-                                if not module.get("enabled"):
-                                    continue
-                                required = (
-                                    catalogue.get(module["name"], {})
-                                    .get("requirements", {})
-                                    .get("user", {})
-                                    .get("capabilities", [])
-                                )
-                                for capability in required:
-                                    if not descriptor.get("capabilities", {}).get(capability):
-                                        findings.append(
-                                            {
-                                                "scope": scope,
-                                                "code": "system-capability-missing",
-                                                "message": module["name"]
-                                                + " requires system capability "
-                                                + capability,
-                                                "nextCommand": "folio --system modules list",
-                                            }
-                                        )
-                except (Failure, OSError, ValueError, KeyError):
-                    findings.append(
-                        {
-                            "scope": scope,
-                            "code": "configuration-unavailable",
-                            "message": "Configuration or installed model metadata could not be read.",
-                            "nextCommand": "folio " + flag + " config show",
-                        }
-                    )
-        state = self.root.parent.parent
-        application_tasks = []
-        for path in (state / "applications/tasks").glob("*.json"):
-            try:
-                task = json.loads(path.read_text())
-            except (OSError, ValueError):
-                continue
-            application_tasks.append(task)
-        latest_application = max(
-            application_tasks, key=lambda t: t.get("createdAt", ""), default=None
-        )
-        for task in application_tasks:
-            if task.get("recoveryRequired") or (
-                task == latest_application and task.get("phase") in {"failed", "interrupted"}
-            ):
-                findings.append(
-                    {
-                        "scope": "applications",
-                        "code": "application-task-needs-attention",
-                        "message": "An application task failed or needs recovery; inspect its recorded effects.",
-                        "nextCommand": "folio apps status " + task["id"],
-                    }
-                )
-        jobs = [self.job(path.stem) for path in (self.root / "jobs").glob("w-*.json")]
-        latest_jobs = {}
-        for job in sorted(jobs, key=lambda j: j["createdAt"]):
-            latest_jobs[job["operation"]] = job
-        for job in latest_jobs.values():
-            if job["phase"] in {"failed", "interrupted", "queued"}:
-                findings.append(
-                    {
-                        "scope": "workflow",
-                        "code": "workflow-" + job["phase"],
-                        "message": job.get("error") or "Workflow is queued.",
-                        "nextCommand": "folio status " + job["id"],
-                    }
-                )
-        for finding in findings:
-            self.say(
-                f"{finding['scope']}: {finding['message']}\n  {finding['nextCommand']}", "warning"
-            )
-        if not findings:
-            self.say(
-                "Both configuration scopes are current; no deployment recovery is pending.",
-                "success",
-            )
-        return {"health": "degraded" if findings else "healthy", "findings": findings}
-
     def execute(self, operation, arguments):
         parser = Parser(prog=f"folio {operation}")
         parser.add_argument("plan_id")
@@ -1272,7 +1105,7 @@ def main():
         command, *arguments = sys.argv[1:]
         if command == "plan":
             result = workflow.plan(arguments)
-        elif command in {"history", "doctor", "status", "resume"}:
+        elif command in {"history", "status", "resume"}:
             result = getattr(workflow, command)(arguments)
         elif command == "--worker":
             result = workflow.work(arguments[0])

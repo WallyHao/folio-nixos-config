@@ -27,7 +27,7 @@ recovery records describe what actually happened.
 | **Persistent operations and recovery** | Independent systemd workers survive client exit. Durable journals expose partial results, explicit resume and retained rollback. |
 | **Shared appearance with visible inheritance** | System defaults, personal overrides and module settings resolve consistently; public preference origins remain inspectable. |
 | **Explicit application ownership** | Native apps follow Nix generations. Flatpak apps use a separate recorded lifecycle, explicit adoption and data-preserving removal. |
-| **Local desktop controls** | The browser panel uses module backends for networking, devices, software, settings and diagnostics, with no cloud service or external frontend assets. |
+| **Local desktop controls** | The browser panel uses module backends for networking, devices, software and settings, with no cloud service or external frontend assets. |
 
 Folio currently targets `x86_64-linux`. Its desktop combines Niri, Everforest,
 Maple Mono NF CN, Fcitx5/Rime, Foot and Zsh. A dedicated `folio` target supports the
@@ -62,7 +62,6 @@ folio config explain /preferences/font-size
 folio config set /preferences/font-size 18
 folio theme set everforest-light
 folio config unset /preferences/font-size
-folio doctor
 folio panel
 ```
 
@@ -93,10 +92,8 @@ folio build PLAN_ID
 folio apply PLAN_ID
 ```
 
-`folio doctor` is read-only. It inspects service availability, prerequisites,
-configuration persistence, deployment drift and interrupted work, and reports
-concrete next commands. `folio history` and `folio status` provide the underlying
-records. History remains partially readable when one scope is unavailable.
+`folio history` and `folio status` expose deployment records and observed state.
+History remains partially readable when one scope is unavailable.
 
 ### CLI conventions
 
@@ -813,7 +810,6 @@ nix build --out-link modules/panel/result .#folio
 | Device | CPU, memory, graphics, displays, interfaces, uptime and available batteries. |
 | Software | Flathub search, explicit ownership/adoption, install/remove and durable task progress. |
 | Settings | Public appearance preferences, inheritance/reset and conflict-safe draft saving. |
-| Diagnostics | Read-only doctor findings and suggested next commands. |
 
 The responsive interface uses Folio's colors and fonts. Unsaved settings survive
 background refresh; a stale save preserves the draft and reports a conflict.
@@ -898,7 +894,6 @@ disposable disks and roots. No host disk passthrough or network bridge is requir
 ### Diagnose before changing recovery state
 
 ```sh
-folio doctor
 folio status
 folio status TASK_OR_WORKFLOW_ID
 folio history

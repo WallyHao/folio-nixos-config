@@ -125,9 +125,6 @@ try:
         expect(page.locator("#system-theme")).to_have_text("everforest-dark")
         expect(page.locator("#setting-appearance")).to_have_count(0)
         page.screenshot(path=str(output / "settings.png"), full_page=True)
-        page.locator('[data-page="health"]').click()
-        expect(page.locator("#health-findings")).to_contain_text("folio plan")
-        page.screenshot(path=str(output / "diagnostics.png"), full_page=True)
         page.locator('[data-page="devices"]').click()
         client.fail = True
         page.locator("#refresh").click()

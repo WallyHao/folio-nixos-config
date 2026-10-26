@@ -39,7 +39,7 @@ FIELDS = {
 ERRORS = {
     "backend-unavailable": (
         "Service unavailable or access denied.",
-        "Run folio doctor for service and permission checks.",
+        "Check the service status and your account permissions before retrying.",
     ),
     "configuration-conflict": (
         "Configuration changed while you were editing.",
@@ -47,7 +47,7 @@ ERRORS = {
     ),
     "invalid-configuration": (
         "Settings did not pass configuration validation.",
-        "Check the values and module prerequisites with folio doctor.",
+        "Review the values with folio config show and the module prerequisites with folio modules list.",
     ),
     "backend-timeout": (
         "The service did not respond in time.",
@@ -55,7 +55,7 @@ ERRORS = {
     ),
     "permission-denied": (
         "Your account cannot perform this operation.",
-        "Run folio doctor to check the required services and permissions.",
+        "Check your account permissions for the requested operation.",
     ),
     "model-upgrade-required": (
         "Installed models do not match this client.",
@@ -237,8 +237,6 @@ class Handler(BaseHTTPRequestHandler):
 
                 async def read():
                     client = self.server.client
-                    if self.path == "/api/doctor":
-                        return await client.doctor()
                     if self.path == "/api/settings":
                         return await client.settings()
                     if self.path == "/api/apps":
@@ -374,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "error": "Unable to save settings",
                     "code": "backend-invalid-response",
-                    "hint": "Run folio doctor before retrying.",
+                    "hint": "Run folio status to inspect the services before retrying.",
                 },
             )
         finally:

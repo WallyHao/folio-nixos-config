@@ -6,7 +6,7 @@ if "$no_wait" && [[ "$command" != build && "$command" != apply && "$command" != 
   emit_error invalid '--no-wait applies to deployment tasks and VM builds' 2
 fi
 export FOLIO_SCOPE=$scope FOLIO_JSON=$json FOLIO_ENVIRONMENT=$environment FOLIO_COMMAND=$command FOLIO_NO_WAIT=$no_wait
-if [[ "$command" == doctor || "$command" == resume ]]; then exec @workflow@ "$command" "${arguments[@]:1}"; fi
+if [[ "$command" == resume ]]; then exec @workflow@ "$command" "${arguments[@]:1}"; fi
 if ! "$scope_explicit"; then
   case "$command" in
     plan|history|build|apply|rollback|status)

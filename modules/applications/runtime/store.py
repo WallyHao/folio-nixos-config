@@ -60,7 +60,9 @@ class Store:
             )
             envelope = json.loads(reply.stdout)
         except (OSError, ValueError, subprocess.TimeoutExpired):
-            raise StoreError("Applications backend unavailable. Run folio doctor.") from None
+            raise StoreError(
+                "Applications backend unavailable. Run systemctl --user status folio-applications.service."
+            ) from None
         if reply.returncode or envelope.get("status") != "success":
             raise StoreError(envelope.get("error") or "Applications backend rejected the request")
         return envelope

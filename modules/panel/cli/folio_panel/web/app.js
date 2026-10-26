@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1) || sessionStorage.getItem("folio-panel-token") || "";
 if (location.hash) { sessionStorage.setItem("folio-panel-token", token); history.replaceState(null, "", "/"); }
 const state = {page: "wifi", wifi: null, devices: null, proxy: null, network: "", delays: new Map(), busy: false, testing: false, stopTesting: false};
-const descriptions = {wifi: ["Wi-Fi", "Manage wireless networks and connections."], proxy: ["Proxy", "Choose a routing mode and manage proxy nodes."], devices: ["Sound & display", "Manage sound outputs and display brightness."], information: ["Device", "Hardware, operating system and connection details."], apps: ["Software", "Find, install and manage Flatpak applications."], settings: ["Settings", "Save personal preferences and review their inherited defaults."], health: ["Diagnostics", "Inspect deployment state and find the next recovery step."]};
+const descriptions = {wifi: ["Wi-Fi", "Manage wireless networks and connections."], proxy: ["Proxy", "Choose a routing mode and manage proxy nodes."], devices: ["Sound & display", "Manage sound outputs and display brightness."], information: ["Device", "Hardware, operating system and connection details."], apps: ["Software", "Find, install and manage Flatpak applications."], settings: ["Settings", "Save personal preferences and review their inherited defaults."]};
 function element(tag, cls, text) { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = String(text); return node; }
 function message(text, error = false) { $("notice").hidden = !text; $("notice").textContent = text; $("notice").className = error ? "error" : ""; }
 async function api(path, body) {
@@ -141,7 +141,7 @@ async function refresh(quiet = false) {
   $("refresh").disabled = true;
   try {
     if (page === "apps") { await window.folioStore.refresh(); return; }
-    if (page === "settings" || page === "health") { await window.folioSettings.refresh(); return; }
+    if (page === "settings") { await window.folioSettings.refresh(); return; }
     const data = await api(page);
     if (generation !== current) return;
     state[page] = data;
