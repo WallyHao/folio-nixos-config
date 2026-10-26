@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="174" height="24" viewBox="0 0 174 24" role="img" aria-labelledby="home-manager-title">
+  <title id="home-manager-title">Home Manager: standalone</title>
+  <defs>
+    <clipPath id="home-manager-badge">
+      <rect width="174" height="24" rx="4"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#home-manager-badge)">
+    <rect width="174" height="24" fill="#2d353b"/>
+    <rect x="94" width="80" height="24" fill="#dbbc7f"/>
+  </g>
+  <g font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">
+    <text x="47" y="16" fill="#e4ddc7">Home Manager</text>
+    <text x="134" y="16" fill="#1b2521" font-weight="600">standalone</text>
+  </g>
+</svg>

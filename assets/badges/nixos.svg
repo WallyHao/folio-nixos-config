@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="142" height="24" viewBox="0 0 142 24" role="img" aria-labelledby="nixos-title">
+  <title id="nixos-title">NixOS: x86_64-linux</title>
+  <defs>
+    <clipPath id="nixos-badge">
+      <rect width="142" height="24" rx="4"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#nixos-badge)">
+    <rect width="142" height="24" fill="#2d353b"/>
+    <rect x="48" width="94" height="24" fill="#7fbbb3"/>
+  </g>
+  <g font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">
+    <text x="24" y="16" fill="#e4ddc7">NixOS</text>
+    <text x="95" y="16" fill="#1b2521" font-weight="600">x86_64-linux</text>
+  </g>
+</svg>

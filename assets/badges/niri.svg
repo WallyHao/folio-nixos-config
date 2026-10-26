@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="76" height="24" viewBox="0 0 76 24" role="img" aria-labelledby="niri-title">
+  <title id="niri-title">桌面: Niri</title>
+  <defs>
+    <clipPath id="niri-badge">
+      <rect width="76" height="24" rx="4"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#niri-badge)">
+    <rect width="76" height="24" fill="#2d353b"/>
+    <rect x="38" width="38" height="24" fill="#a7c080"/>
+  </g>
+  <g font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">
+    <text x="19" y="16" fill="#e4ddc7">桌面</text>
+    <text x="57" y="16" fill="#1b2521" font-weight="600">Niri</text>
+  </g>
+</svg>
