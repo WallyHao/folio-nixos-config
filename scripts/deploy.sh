@@ -121,6 +121,10 @@ if [[ "$action" == init ]]; then initialize "$@"; exit; fi
 if [[ "$action" == help || "$action" == --help ]]; then usage; exit; fi
 (( $# == 0 )) || fail "Unexpected arguments for $action."
 case "$action" in build|boot|switch|home|plan) ;; *) fail "Unknown action: $action." ;; esac
+if [[ "$action" == plan ]]; then
+  need folio
+  exec folio plan --source "$root"
+fi
 require_local
 cd -- "$root"
 case "$action" in
@@ -154,9 +158,5 @@ case "$action" in
     folio --user build "$plan_id"
     folio --user apply "$plan_id"
     printf '%s\n' 'User environment deployed. Log out and back in to start the configured desktop session.'
-    ;;
-  plan)
-    need folio
-    exec folio plan --source "$root"
     ;;
 esac
