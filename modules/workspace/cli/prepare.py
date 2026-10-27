@@ -10,6 +10,8 @@ import subprocess
 import sys
 
 from folio_workspace_health import (
+    HELPER,
+    SUDO,
     connectivity_check,
     privileged_disk_check,
     privileged_repair,
@@ -39,7 +41,7 @@ class Console:
 
 
 def backend(action, console):
-    args = ["sudo", "-n", "--", "/run/current-system/sw/bin/folio-workspace-system", action]
+    args = [SUDO, "-n", "--", HELPER, action]
     if action == "cleanup":
         args.append("--apply")
     with subprocess.Popen(

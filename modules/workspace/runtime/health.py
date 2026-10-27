@@ -10,6 +10,7 @@ import time
 
 
 HELPER = "/run/current-system/sw/bin/folio-workspace-system"
+SUDO = "/run/wrappers/bin/sudo"
 CHECK_PATHS = ("/", "/home", "/nix", "/boot")
 CONFIG = Path("/etc/folio/workspace-checks.json")
 
@@ -151,7 +152,7 @@ def disk_check():
 
 
 def privileged_disk_check():
-    result = command(["sudo", "-n", "--", HELPER, "disk-check"], timeout=15)
+    result = command([SUDO, "-n", "--", HELPER, "disk-check"], timeout=15)
     data = json.loads(result.stdout)
     if not isinstance(data.get("findings"), list) or data.get("name") != "Storage and mounts":
         raise ValueError("Invalid disk check response")
@@ -161,7 +162,7 @@ def privileged_disk_check():
 def privileged_repair(action, units=None):
     payload = json.dumps({"units": units}) if units is not None else None
     result = command(
-        ["sudo", "-n", "--", HELPER, action, "--apply"],
+        [SUDO, "-n", "--", HELPER, action, "--apply"],
         timeout=35 * max(1, len(units or [])) + 30,
         input=payload,
     )

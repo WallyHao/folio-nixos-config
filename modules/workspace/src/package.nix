@@ -21,7 +21,6 @@ in
   client = pkgs.writeShellApplication {
     name = "folio-prepare";
     runtimeInputs = [
-      pkgs.sudo
       pkgs.systemd
       pkgs.curl
       pkgs.getent
