@@ -24,7 +24,8 @@ in
           linger = true;
           inherit (user) uid home;
           extraGroups = user.groups or [ ];
-          shell = lib.mkDefault (
+          # Override NixOS's default shell while allowing an explicit host choice.
+          shell = lib.mkOverride 900 (
             if (user.login-shell or "bash") == "bash" then
               pkgs.bashInteractive
             else if builtins.elem "terminal" context.enabledModules then
