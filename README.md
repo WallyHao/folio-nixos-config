@@ -226,6 +226,16 @@ nix-shell -p just jq --run 'just home'
 | `just home` | 通过 Folio 管理器构建并应用当前用户环境。 |
 | `just plan` | 审阅后续系统与用户的配置改动。 |
 
+启用系统级 `vm` 模块后会安装 Docker。Docker 服务和 socket 均不会在开机时启动；需要时手动启动，使用完后可以停止：
+
+```sh
+sudo systemctl start docker
+sudo docker ps
+sudo systemctl stop docker docker.socket
+```
+
+Docker 命令默认使用 `sudo`，无需将账户加入 `docker` 组。
+
 ### 5. 后续更新与回退
 
 首次安装完成后，偏好与模块选择保存在 Folio 配置库中，修改 Nix 初始默认值不会覆盖它们。
