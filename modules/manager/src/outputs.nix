@@ -76,7 +76,7 @@ let
     devices = import ../../devices/default.nix { inherit pkgs lib; };
     appearance = import ../../appearance/default.nix { inherit pkgs lib; };
     input = import ../../input/default.nix { inherit pkgs lib; };
-    emacs = import ../../emacs/default.nix { inherit pkgs lib; };
+    neovim = import ../../neovim/default.nix { inherit pkgs lib; };
     agents = import ../../agents/default.nix { inherit pkgs lib; };
     isaac = import ../../isaac/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };

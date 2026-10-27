@@ -13,6 +13,8 @@ let
     "appearance-contrast"
   ];
   integration = fast ++ [
+    "neovim-runtime"
+    "neovim-migration"
     "tools"
     "agents"
     "agents-colors"

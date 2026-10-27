@@ -14,13 +14,15 @@ let
     ${lib.concatMapStringsSep "\n" (model: ''
       for scope in user system; do
         if [[ -f "$out/models/$scope/${model.name}" ]]; then
-          cp ${model.path} "$out/models/$scope/${model.name}"
+          rm "$out/models/$scope/${model.name}"
+          cp ${model.path} "$out/models/$scope/${model.previousName or model.name}"
         fi
       done
     '') oldModels}
     jq '."folio-environment:environment" |= (
       .preferences.scheme="everforest" | .preferences.appearance="dark" |
-      .modules |= map(if .name=="appearance" then ."folio-appearance:appearance".appearance="light" else . end))' \
+      .modules |= map(if .name=="appearance" then ."folio-appearance:appearance".appearance="light"
+        elif .name=="neovim" then .name="emacs" else . end))' \
       $out/user.json >user.json
     mv user.json $out/user.json
   '';

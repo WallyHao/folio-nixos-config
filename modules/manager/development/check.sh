@@ -21,13 +21,16 @@ sources() {
 case "$mode" in
   style|format)
     mapfile -d '' -t nix_files < <(sources '*.nix')
+    mapfile -d '' -t lua_files < <(sources '*.lua')
     if [[ "$mode" == format ]]; then
       nixfmt flake.nix "${nix_files[@]}"
       ruff format modules
+      if (( ${#lua_files[@]} )); then stylua "${lua_files[@]}"; fi
     else
       nixfmt --check flake.nix "${nix_files[@]}"
       ruff format --check modules
       ruff check modules
+      if (( ${#lua_files[@]} )); then stylua --check "${lua_files[@]}"; fi
       while IFS= read -r -d '' file; do bash -n "$file"; done < <(sources '*.sh')
       shellcheck "${BASH_SOURCE[0]}"
       if [[ -e .git ]]; then git diff --check; fi

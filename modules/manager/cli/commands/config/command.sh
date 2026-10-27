@@ -57,7 +57,7 @@ case "$action" in
     fi ;;
   edit)
     jq --indent 2 . "$work/normalized.json" >"$work/draft.json"
-    read -r -a editor <<<"${VISUAL:-${EDITOR:-emacs}}"
+    read -r -a editor <<<"${VISUAL:-${EDITOR:-nvim}}"
     if ! "${editor[@]}" "$work/draft.json" >&2; then finish failure null 'Editor failed'; fi
     if ! jq -e 'type == "object"' "$work/draft.json" >/dev/null; then
       finish invalid null 'Edited configuration is not a JSON object'

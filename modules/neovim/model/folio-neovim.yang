@@ -1,0 +1,18 @@
+module folio-neovim {
+  yang-version 1.1;
+  namespace "urn:folio:neovim";
+  prefix fnv;
+  import folio-environment { prefix fe; revision-date 2026-10-27; }
+  organization "Folio";
+  description "Neovim preferences; personal documents and editor state remain user-owned.";
+  revision 2026-10-27 { description "Replace Emacs with the Koru-inspired Neovim environment."; }
+  augment '/fe:environment/fe:modules' {
+    when "fe:name = 'neovim'";
+    container neovim {
+      when "../../fe:scope = 'user'";
+      presence "Neovim settings are supplied.";
+      leaf notes-directory { type string { length '1..1024'; pattern '[^\r\n]+'; } default '~/Documents/documents'; }
+      leaf default-editor { type boolean; default true; }
+    }
+  }
+}

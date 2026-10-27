@@ -48,7 +48,7 @@ with subtest("current network and developer contributions coexist in the deploye
     observed = folio("--system network status")
     assert observed["status"] == "success", observed
     user(
-        "/home/folio/.nix-profile/bin/git --version; /home/folio/.nix-profile/bin/codex --version; /home/folio/.nix-profile/bin/emacs --batch --eval '(princ emacs-version)'"
+        "/home/folio/.nix-profile/bin/git --version; /home/folio/.nix-profile/bin/codex --version; /home/folio/.nix-profile/bin/nvim --version"
     )
     user(
         "setsid --wait /home/folio/.nix-profile/bin/zsh -ic 'print -r -- folio-release-shell' </dev/null"

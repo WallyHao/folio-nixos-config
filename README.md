@@ -58,7 +58,7 @@ Folio 是我日常使用的 NixOS 与独立 Home Manager 配置，面向 `x86_64
 | 终端与 Shell | Foot、Zsh、Powerlevel10k |
 | 文件与检索 | Yazi、eza、fd、fzf、ripgrep、zoxide |
 | 系统监控 | Btop |
-| 编辑与笔记 | Emacs、Org、Org-roam |
+| 编辑与笔记 | Neovim，集成文件检索、补全与语言服务 |
 | 编程助手 | Codex CLI、Pi |
 | 浏览器 | Zen Browser Beta |
 | 文档与图像 | Zathura、imv、Typst |
@@ -75,14 +75,14 @@ Folio 是我日常使用的 NixOS 与独立 Home Manager 配置，面向 `x86_64
 
 - **硬件适配**：主要用于我的笔记本与主机。迁移到其他设备前，需要调整磁盘标识、账户及硬件设置。
 - **开发工具链**：组织与维护方式尚未定型，完整的开发环境仍在整理中。
-- **编辑器配置**：Emacs、Org 与 Org-roam 已接入，具体工作流还在完善。
+- **编辑器配置**：Neovim 已接入统一主题与常用语言服务，笔记和项目工作流仍在完善。
 - **验证范围**：构建与虚拟机检查之外，显卡、无线网络和休眠等功能仍需在实体设备上验证。
 
 ## 参考资料
 
 - [配置与开发指南](docs/development.md)：配置入口、开发约定与检查方式。
 - [技术参考](docs/reference.md)：详细操作、部署与维护说明。
-- [Koru](https://github.com/WallyHao/koru-nixos-dotfiles)：我的早期配置，也是这份 README 的展示参考。
+- [Koru](https://github.com/WallyHao/koru-nixos-dotfiles)：我的早期配置，也是 README 排版与 Neovim 配色的参考。
 - [霞鹜文楷 GB](https://github.com/lxgw/LxgwWenKaiGB)：当前默认字体的上游项目。
 - [Flatpak](https://flatpak.org/)：用于安装和管理桌面应用，与 Nix 原生软件配合使用。
 

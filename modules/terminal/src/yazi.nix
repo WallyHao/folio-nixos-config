@@ -36,7 +36,7 @@ in
         show_symlink = true;
       };
       # Use the default editor and desktop MIME associations rather than
-      # depending directly on the Emacs or applications modules.
+      # depending directly on the editor or applications modules.
       opener.edit = [
         {
           run = "$EDITOR %s";

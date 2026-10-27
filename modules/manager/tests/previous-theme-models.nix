@@ -7,7 +7,6 @@ let
     "applications"
     "desktop"
     "devices"
-    "emacs"
     "input"
     "manager"
     "network"
@@ -24,3 +23,11 @@ pkgs.lib.concatMap (
     path = ../../. + "/${owner}/model/revisions/${entry.from}/${entry.module}.yang";
   }) (import (../../. + "/${owner}/theme-migrations.nix") { inherit pkgs; })
 ) owners
+++ [
+  {
+    owner = "neovim";
+    name = "folio-neovim.yang";
+    previousName = "folio-emacs.yang";
+    path = ../../neovim/model/revisions/2026-10-20/folio-emacs.yang;
+  }
+]

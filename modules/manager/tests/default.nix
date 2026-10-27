@@ -223,14 +223,20 @@ catalogueLib.exclusive "check names" [
         prepareInput = collection.packages.manager-input;
         runtime = collection.packages.manager-runtime;
         cli = collection.packages.manager-cli;
-        editor = catalogue.emacs.packages.editor;
+        editor = catalogue.neovim.packages.editor;
         modules = adapters "system";
       }
     ) { };
     tools = import ./developer-environment.nix {
       inherit pkgs;
       generation = userHome.activationPackage;
-      editor = catalogue.emacs.packages.editor;
+      editor = catalogue.neovim.packages.editor;
+    };
+    neovim-migration = import ../../neovim/tests/migration.nix {
+      inherit pkgs bootstrap;
+      repository = catalogue.sysrepo.packages.tools;
+      maintenance = catalogue.sysrepo.packages.maintenance;
+      history = catalogue.neovim.packages.schema-history;
     };
     catalogue = import ./catalogue.nix { inherit pkgs catalogueLib; };
     foundation = import ../../sysrepo/tests/foundation.nix {

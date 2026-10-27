@@ -27,6 +27,8 @@ pkgs.runCommand "folio-developer-tools"
       test ! -f "$startup" || substituteInPlace "$startup" --replace '/home/folio' "$HOME"
     done
     zsh -i -c '[[ -n "$HISTFILE" ]] && (( $+functions[compdef] )) && (( $+functions[ll] ))'
+    env EDITOR=old-editor VISUAL=old-editor __HM_SESS_VARS_SOURCED=1 zsh -c \
+      '[[ "$EDITOR" == "${editor}/bin/nvim" && "$VISUAL" == "$EDITOR" ]]'
     test "$(stat -c %a "$XDG_STATE_HOME/folio/zsh")" = 700
     test "$(stat -c %a "$XDG_CACHE_HOME/zsh")" = 700
     git config --global --get init.defaultBranch | ${pkgs.gnugrep}/bin/grep -x main
@@ -73,8 +75,8 @@ pkgs.runCommand "folio-developer-tools"
     assert any(rule['name'] == 'Downloads' for rule in icons['dirs'])
     assert any(rule['name'] == 'rs' for rule in icons['exts'])
     PY
-    ${editor}/bin/emacs --batch --load ${../../emacs/tests/org-roam.el}
+    ${editor}/bin/nvim --headless -i NONE '+lua dofile("${../../neovim/tests/smoke.lua}")' '+qa!'
     mkdir $out
-    cp "$HOME/.config/folio/emacs/settings.el" $out/settings.el
-    printf 'Shell, Git, Codex packaging/theme and Emacs Org-roam behavior passed.\n' >$out/result
+    cp "$HOME/.config/folio/neovim/settings.json" $out/editor-settings.json
+    printf 'Shell, Git, Codex packaging/theme and Neovim behavior passed.\n' >$out/result
   ''

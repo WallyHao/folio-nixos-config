@@ -78,7 +78,7 @@ pkgs.testers.runNixOSTest {
         assert json.loads(user("folio --json --system config show"))["data"]["configuration"]["folio-environment:environment"]["preferences"]["font-size"] == 20
         observed = json.loads(user("folio-repository system cfg --export --datastore operational --module folio-environment --format json"))
         assert observed["folio-environment:environment"]["configuration"]["saved"] is True
-        result = json.loads(user("folio --json --system modules enable emacs; test $? -eq 2"))
+        result = json.loads(user("folio --json --system modules enable neovim; test $? -eq 2"))
         assert result["status"] == "invalid"
         assert machine.succeed("cat /proc/sys/kernel/random/boot_id").strip() == boot
   '';

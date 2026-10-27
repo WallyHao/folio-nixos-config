@@ -324,7 +324,7 @@ contributions, rather than claiming every module is enabled by default.
 | `appearance` | Console appearance where applicable | Fonts, cursor, GTK and shared appearance resources |
 | `input` | — | Fcitx5/Rime and session integration |
 | `terminal` | Shell registration | Foot, Zsh, tools, Yazi, Typst and Git/GitHub CLI |
-| `emacs` | — | Emacs, Org and Org-roam |
+| `neovim` | — | Neovim, file search, completion, language services and formatting |
 | `agents` | — | Codex and Pi |
 | `applications` | Flatpak infrastructure | Native applications and owned Flatpak lifecycle |
 | `panel` | — | Local browser frontend package; no selectable system/user adapter |
@@ -473,11 +473,44 @@ shell's directory on exit. Markdown uses `$EDITOR`; PDFs and images use desktop
 associations. The applications module supplies Zathura and imv, controlled by
 `applications.native.zathura` and `.imv`.
 
-Emacs provides Org/Org-roam, backlinks, completion and Everforest preferences.
-`C-c n f` finds notes, `C-c n b` shows backlinks and `C-c n h` opens the start page.
+Neovim is the default editor (`nvim`, with `vi`/`vim` aliases). Its restrained
+syntax colors and Powerline status line draw on
+[Koru's theme bridge](https://github.com/WallyHao/koru-nixos-dotfiles/blob/b276a4a61197b7831fbbe2e44af418a3b19ae768/home/neovim.nix),
+adapted to Folio's selected palette and dark/light appearance. Terminal Neovim
+inherits Foot's font, currently LXGW WenKai Mono GB.
+
+Plugins, Tree-sitter parsers, language servers and formatters are installed by
+Nix; startup does not bootstrap a plugin manager or download tools. Telescope
+provides file/content search; nvim-cmp and LuaSnip provide completion; Gitsigns,
+Lualine and Which-key provide Git marks, status and shortcut help. Bundled language
+services cover Nix, Lua, Python, Bash, JSON, YAML and JavaScript/TypeScript.
+Formatting is explicit rather than on save, using Nixfmt, Stylua, Ruff, Shfmt
+and Prettier according to file type.
+
+The leader key is **Space**:
+
+| Shortcut | Action |
+| --- | --- |
+| `<leader>ff` / `<leader>fg` | Find files / search project contents |
+| `<leader>fb` / `<leader>fr` | Buffers / recent files |
+| `<leader>fn` / `<leader>e` | Find notes / browse the current directory |
+| `<leader>cf` / `<leader>cd` | Format / show diagnostics |
+| `gd` / `gr` / `K` | Definition / references / documentation |
+| `<leader>rn` / `<leader>ca` | Rename / code action |
+| `<leader>w` / `<leader>q` | Save / close window |
+| `<C-Space>` / `<CR>` | Open completion / accept the selected entry |
+
 Notes default to `~/Documents/documents`; configure
-`folio-emacs:emacs.notes-directory` to reuse another location. Personal additions
-can live in the unmanaged `~/.config/folio/emacs/local.el`.
+`/modules/neovim/notes-directory` to reuse another location. Personal additions
+can live in the unmanaged `~/.config/folio/neovim/local.lua`, loaded after the
+managed configuration. Undo/history remain under Neovim's normal XDG state paths.
+
+The paired model upgrade replaces the former Emacs selection with `neovim`,
+preserving its enabled state, default-editor preference and notes directory.
+It removes the managed Emacs package/settings on activation, while retaining
+personal notes, databases and local configuration. Org files remain on disk;
+Org-roam indexing, backlinks and Emacs keybindings are not provided by Neovim.
+Only the frozen historical Emacs models needed for migration remain in source.
 
 ### Codex and Pi
 
@@ -923,7 +956,8 @@ explicitly. The applications catalogue requires model revision `2026-10-26`.
 
 Maintenance upgrades the schema, normalized data and matching closure together.
 Module-owned transforms are bound to exact revision hashes; changing a schema
-without advancing its revision is rejected. The candidate must match the isolated
+without advancing its revision is rejected. An explicit hash-bound replacement
+by a different model may share its calendar revision date. The candidate must match the isolated
 migration result and all model/tool/configuration identities before installation.
 A source file containing arbitrary desired JSON is not sufficient.
 
@@ -1165,7 +1199,7 @@ check validates the actual installation defaults and compares normalized documen
 rather than assuming one personal font size.
 
 The shared `tools` check exercises the generated developer environment across
-terminal, agents and Emacs; its fixture lives with manager integration tests.
+terminal, agents and Neovim; its fixture lives with manager integration tests.
 Capability-specific behavior remains under each owning module's `tests/`.
 
 Python unit tests use `test_*.py`; executable acceptance scripts retain scenario
@@ -1179,6 +1213,7 @@ from the isolated regression tests that exercise them.
 | `configuration`, `cli-workflow` | Real sysrepo commits, stale edits, private drafts, reviewed planning and durable workflow behavior. |
 | `user-deployment`, `system-scope`, `system-deployment` | Profile effects, access policy, cross-scope deployment, retained rollback and guest power observation. |
 | `agents-migration` | Paired schema/data upgrade and restore with hash-bound transitions. |
+| `neovim-runtime`, `neovim-migration` | Editor startup, four palettes, search, parsing, formatting, Python LSP, and editor-model replacement/restore with personal data preserved. |
 | `applications-store`, `applications-native`, `applications` | Catalogue ownership, native delivery and application lifecycle. |
 | `panel`, `panel-browser`, `panel-network` | HTTP boundaries, Chromium interactions/layout and native network integration. |
 | `appearance`, `desktop-focus-fade`, `desktop` | GTK resources, sampled focus-ring behavior and session integration. |

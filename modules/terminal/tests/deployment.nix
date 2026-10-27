@@ -39,7 +39,7 @@ let
   selected = prepared "folio-tools-selected" source "${bootstrap}/user.json" bootstrap;
   disabledConfig = pkgs.runCommand "folio-tools-disabled.json" { nativeBuildInputs = [ pkgs.jq ]; } ''
     jq '."folio-environment:environment".modules |= map(
-      if (.name=="emacs" or .name=="agents") then .enabled=false
+      if (.name=="neovim" or .name=="agents") then .enabled=false
       elif .name=="terminal" then ."folio-terminal:terminal".tools.fzf=false |
         ."folio-terminal:terminal".git.enabled=false else . end)' \
       ${bootstrap}/user.json >$out
@@ -86,6 +86,9 @@ pkgs.testers.runNixOSTest {
         pkgs.shellcheck-minimal
         pkgs.lndir
         pkgs.perl
+        # Rebuilt profile paths also regenerate HM's fontconfig XML offline.
+        pkgs.python3Packages.xmltodict
+        pkgs.libxml2Python
       ];
     };
   };
@@ -119,26 +122,27 @@ pkgs.testers.runNixOSTest {
     ${pkgs.lib.optionalString (legacy != null) ''
       with subtest("paired terminal revision and new tool model upgrade"):
           user("${runtime}/bin/folio-manager-maintain user ${oldBootstrap} upgrade developer-models ${upgraded}", 600)
-          user("folio-repository user ctl --list | grep folio-emacs")
+          user("folio-repository user ctl --list | grep folio-neovim")
     ''}
     configure("${bootstrap}/user.json")
     apply("${selected}")
-    with subtest("real profile delivery and disposable note indexing"):
+    with subtest("real profile delivery and editor startup"):
         # Interactive job control must not share the driver's controlling terminal.
         user("setsid --wait timeout --kill-after=2 30 zsh -i -c '[[ -n $HISTFILE ]] && (( $+functions[compdef] )) && (( $+functions[ll] ))' </dev/null >/home/folio/shell-check.log 2>&1", 40)
         user("command -v fzf; git init /home/folio/test-repository; git -C /home/folio/test-repository symbolic-ref HEAD | grep refs/heads/main; codex --version; pi --version")
         user("test -s /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.codex/auth.json")
-        user("emacs --batch --load ${../../emacs/tests/org-roam.el}")
-        user("printf keep > /home/folio/Documents/documents/keep; printf keep > /home/folio/.codex/personal-state; git -C /home/folio/test-repository config user.email disposable@example.invalid")
+        user("nvim --headless -i NONE '+lua dofile(\"${../../neovim/tests/smoke.lua}\")' '+qa!'")
+        user("mkdir -p /home/folio/Documents/documents; printf keep > /home/folio/Documents/documents/keep; printf keep > /home/folio/.codex/personal-state; git -C /home/folio/test-repository config user.email disposable@example.invalid")
+        user("mkdir -p /home/folio/.local/state/nvim; printf keep > /home/folio/.local/state/nvim/personal-state")
         user("mkdir -p /home/folio/.dsh; printf keep >/home/folio/.dsh/personal-state; printf keep >/home/folio/.local/state/folio/pi/personal-state")
     configure("${disabledConfig}")
     apply("${disabled}")
     with subtest("selection removes only owned contributions"):
-        user("test ! -e /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.config/folio/emacs/settings.el; test ! -e /home/folio/.config/git/config")
+        user("test ! -e /home/folio/.codex/themes/folio.tmTheme; test ! -e /home/folio/.config/folio/neovim/settings.json; test ! -e /home/folio/.config/git/config")
         user("test -z \"$(command -v fzf || true)\"; test -n \"$(command -v jq)\"")
         user("test -z \"$(command -v dsh || true)\"; test -z \"$(command -v pi || true)\"; grep keep /home/folio/.dsh/personal-state; grep keep /home/folio/.local/state/folio/pi/personal-state; test ! -e /home/folio/.config/folio/pi")
         user("grep keep /home/folio/Documents/documents/keep; grep keep /home/folio/.codex/personal-state; ${pkgs.gitMinimal}/bin/git -C /home/folio/test-repository config --local user.email | grep disposable@example.invalid")
-        user("test -s /home/folio/.local/state/folio/emacs/org-roam.db")
+        user("test -z \"$(command -v nvim || true)\"; grep keep /home/folio/.local/state/nvim/personal-state")
         assert folio("status")["data"]["health"]=="healthy"
     with subtest("offline snapshot resumes the larger profile within its readiness budget"):
         user("${runtime}/bin/folio-manager-maintain user ${bootstrap} snapshot tools-snapshot", 90)

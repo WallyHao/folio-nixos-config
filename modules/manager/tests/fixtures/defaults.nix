@@ -80,7 +80,7 @@
             enabled = true;
           }
           {
-            name = "emacs";
+            name = "neovim";
             enabled = true;
           }
           {

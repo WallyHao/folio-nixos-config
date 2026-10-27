@@ -3,6 +3,7 @@ let
   tools = [
     pkgs.nixfmt
     pkgs.ruff
+    pkgs.stylua
     pkgs.shellcheck
     pkgs.git
     pkgs.findutils

@@ -19,7 +19,15 @@ let
   previousBootstrap =
     pkgs.lib.concatMapStringsSep "\n" (model: ''
       for scope in user system; do
-        if [[ -f "$out/models/$scope/${model.name}" ]]; then cp ${model.path} "$out/models/$scope/${model.name}"; fi
+        if [[ -f "$out/models/$scope/${model.name}" ]]; then
+          rm "$out/models/$scope/${model.name}"
+          cp ${model.path} "$out/models/$scope/${model.previousName or model.name}"
+          jq --arg scope "$scope" --arg name "${model.name}" --arg previous "${
+            model.previousName or model.name
+          }" \
+            '.models[$scope] |= map(if .name==$name then .name=$previous else . end)' $out/identities.json >identity.json
+          mv identity.json $out/identities.json
+        fi
       done
     '') previousModels
     + ''
@@ -37,10 +45,11 @@ let
     cp -RL ${bootstrap}/. $out/
     chmod -R u+w $out
     ${previousBootstrap}
-    cp ${agentsHistory}/2026-10-22/folio-agents.yang $out/models/user/folio-agents.yang
+    cp --remove-destination ${agentsHistory}/2026-10-22/folio-agents.yang $out/models/user/folio-agents.yang
     jq '."folio-environment:environment".modules |= map(
       if .name=="agents" then ."folio-agents:agents"={
         codex:{enabled:false,theme:false,"shell-completion":false},dsh:{enabled:true}}
+      elif .name=="neovim" then .name="emacs"
       else . end)' ${bootstrap}/user.json >$out/user.json
     jq --arg hash "$(sha256sum <$out/models/user/folio-agents.yang | cut -d' ' -f1)" \
       '.models.user |= map(if .name=="folio-agents.yang" then .sha256=$hash else . end)' \
@@ -128,11 +137,12 @@ let
     rm $out/models/user/folio-agents.yang
     cp ${agentsHistory}/2026-10-19/folio-codex.yang $out/models/user/
     cp ${terminalHistory}/2026-10-19/folio-git.yang $out/models/user/
-    cp ${terminalHistory}/2026-10-21/folio-terminal.yang $out/models/user/
-    cp ${applicationsHistory}/2026-10-18/folio-applications.yang $out/models/user/
+    cp --remove-destination ${terminalHistory}/2026-10-21/folio-terminal.yang $out/models/user/
+    cp --remove-destination ${applicationsHistory}/2026-10-18/folio-applications.yang $out/models/user/
     jq '."folio-environment:environment".modules |=
       (map(if .name=="agents" then {name:"codex",enabled:true,
          "folio-codex:codex":{theme:false,"shell-completion":false}}
+       elif .name=="neovim" then .name="emacs"
        else . end) + [{name:"git",enabled:true,"folio-git:git":{
          "user-name":"Fixture Contributor","user-email":"fixture@example.invalid",
          "github-cli":false,"default-branch":"trunk","pull-rebase":false}}])' \
@@ -174,6 +184,8 @@ pkgs.testers.runNixOSTest {
       pkgs.shellcheck-minimal
       pkgs.lndir
       pkgs.perl
+      pkgs.python3Packages.xmltodict
+      pkgs.libxml2Python
     ];
     environment.systemPackages = [
       pkgs.jq

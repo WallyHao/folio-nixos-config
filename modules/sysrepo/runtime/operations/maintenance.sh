@@ -143,7 +143,7 @@ migrate_document() {
     to=$(jq -er .revision <<<"$target"); target_hash=$(jq -er .sha256 <<<"$target")
     for (( hop=0; hop<32; hop++ )); do
       [[ "$name" != "$target_name" || "$from" != "$to" || "$hash" != "$target_hash" ]] || break
-      [[ "$from" != "$to" ]] || emit invalid 'A model changed without a new YANG revision' 2
+      [[ "$name" != "$target_name" || "$from" != "$to" ]] || emit invalid 'A model changed without a new YANG revision' 2
       entry=$(jq -c --arg name "$name" --arg from "$from" --arg hash "$hash" \
         '[.[] | select(.module==$name and .from==$from and .fromSha256==$hash)]' "$new_bootstrap/migrations.json")
       count=$(jq length <<<"$entry")
@@ -157,8 +157,12 @@ migrate_document() {
       jq -e 'type=="object"' "$work/migrated.json" >/dev/null
       mv "$work/migrated.json" "$work/migrating.json"
       next_revision=$(jq -er '.[0].to' <<<"$entry")
-      [[ "$next_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && "$next_revision" > "$from" ]] ||
-        emit invalid 'Migration revisions must advance monotonically' 2
+      # Revisions are ordered within a model. An explicit hash-bound replacement
+      # may have the same date, since its revision belongs to a different model.
+      if [[ ! "$next_revision" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
+        { [[ ! "$next_revision" > "$from" ]] && [[ "$next_name" == "$name" || "$next_revision" != "$from" ]]; }; then
+        emit invalid 'Migration revisions must advance within a model and never go backwards' 2
+      fi
       name=$next_name; from=$next_revision; hash=$(jq -er '.[0].toSha256' <<<"$entry")
     done
     [[ "$name" == "$target_name" && "$from" == "$to" && "$hash" == "$target_hash" ]] || emit unavailable 'Migration chain does not reach the target revision' 3

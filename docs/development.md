@@ -117,7 +117,7 @@ nix run path:.#check -- format
 nix run path:.#check -- style
 ```
 
-The formatter applies Nixfmt and Ruff to repository-owned Nix and Python sources.
+The formatter applies Nixfmt, Ruff and Stylua to repository-owned Nix, Python and Lua sources.
 `nix fmt` uses the same formatter once new files are tracked by Git; explicit
 `path:.` commands also include files that have not yet been staged.
 The style entry verifies formatting, Python correctness rules, Bash syntax and
