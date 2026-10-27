@@ -112,7 +112,7 @@ expect_code 4 folio --json config import stale.json --expected-digest "$(jq -r .
 expect_code 2 folio --json config set /preferences/font-size 100
 expect_code 2 folio --json config set /modules/terminal/name '"other"'
 expect_code 2 folio --json modules disable appearance
-folio --json modules list | jq -e 'any(.data[]; .name=="isaac" and .enabled==false and .selected==false)'
+folio --json modules list | jq -e 'any(.data[]; .name=="vm" and .enabled==false and .selected==false)'
 
 # Generic Flathub selections survive real libyang normalization and persistence.
 folio --json config show | jq '.data.configuration |

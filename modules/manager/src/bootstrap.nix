@@ -34,7 +34,7 @@ pkgs.runCommand "folio-bootstrap" { } ''
     pkgs.writeText "descriptor.json" (
       builtins.toJSON {
         format = 1;
-        environment = "portable";
+        environment = (context "system").identity.environment;
         platform = system;
         users = defaults.system."folio-environment:environment".users;
         preferences = defaults.system."folio-environment:environment".preferences;

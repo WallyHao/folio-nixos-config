@@ -1,6 +1,8 @@
 /.agents/
 /.aws/
 /.codex/
+/folio-target.json
+/modules/manager/configuration/targets/local/
 /result
 /result-*
 /modules/panel/result

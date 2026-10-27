@@ -1,6 +1,11 @@
 # Adapted from Sylphy locale/time/TTY/journald/zram/Nix policy at 9cba023d90c4485b.
 { context }:
-{ pkgs, ... }:
+{
+  pkgs,
+  lib,
+  folioInput ? null,
+  ...
+}:
 let
   settings = context.settings;
   sync = settings.time-sync or { };
@@ -9,10 +14,13 @@ let
   nix = settings.nix or { };
   colors = context.theme;
   palette = colors.palettes.${context.globals.appearance};
+  # Keep installer values during bootstrap, then let reviewed desired data own
+  # these preferences even when the installation snapshot still declares them.
+  preference = if folioInput == null then lib.mkDefault else lib.mkForce;
 in
 {
-  time.timeZone = settings.time-zone or "Asia/Shanghai";
-  i18n.defaultLocale = settings.locale or "en_US.UTF-8";
+  time.timeZone = preference (settings.time-zone or "Asia/Shanghai");
+  i18n.defaultLocale = preference (settings.locale or "en_US.UTF-8");
   console = {
     keyMap = settings.console-keymap or "us";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-v${

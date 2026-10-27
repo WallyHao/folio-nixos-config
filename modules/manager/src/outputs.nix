@@ -78,7 +78,6 @@ let
     input = import ../../input/default.nix { inherit pkgs lib; };
     neovim = import ../../neovim/default.nix { inherit pkgs lib; };
     agents = import ../../agents/default.nix { inherit pkgs lib; };
-    isaac = import ../../isaac/default.nix { inherit pkgs lib; };
     network = import ../../network/default.nix { inherit pkgs lib; };
     workspace = import ../../workspace/default.nix {
       inherit pkgs lib;
@@ -92,6 +91,10 @@ let
       devices = catalogue.devices.packages.panel;
       repository = catalogue.sysrepo.packages.tools;
     };
+  }
+  // lib.optionalAttrs (selectedTarget == "folio") {
+    # Isaac belongs exclusively to the author's personal target.
+    isaac = import ../../isaac/default.nix { inherit pkgs lib; };
   };
   collection = catalogueLib.collect catalogue;
   targets = import ../configuration/targets { inherit catalogue; };
@@ -179,18 +182,25 @@ in
     folio = catalogue.panel.packages.cli;
   };
   nixosModules.portable = systemModule;
-  nixosConfigurations.portable = portableSystem;
-  nixosConfigurations.folio =
-    if selectedTarget == "folio" then
-      portableSystem
-    else
-      (import ./outputs.nix {
-        inherit inputs;
-        targetName = "folio";
-      }).nixosConfigurations.portable;
+  nixosConfigurations = {
+    portable = portableSystem;
+    folio =
+      if selectedTarget == "folio" then
+        portableSystem
+      else
+        (import ./outputs.nix {
+          inherit inputs;
+          targetName = "folio";
+        }).nixosConfigurations.portable;
+  }
+  // lib.optionalAttrs (selectedTarget == "local") {
+    local = portableSystem;
+  };
   lib.folio.identities = identities;
   lib.folio.initialConfiguration = defaults;
-  lib.folio.checkGroups = import ../tests/groups.nix;
+  lib.folio.checkGroups = lib.mapAttrs (
+    _: names: builtins.filter (name: name != "isaac-runtime" || selectedTarget == "folio") names
+  ) (import ../tests/groups.nix);
   formatter.${system} = development.formatter;
   apps.${system}.check = {
     type = "app";
@@ -199,6 +209,7 @@ in
   lib.folio.targets = {
     portable = "Disposable UEFI guest";
     folio = "Existing migrated USB system shared by the Intel/NVIDIA laptop and AMD/NVIDIA desktop";
+    local = "Existing NixOS installation initialized with just init";
   };
   homeConfigurations.folio = userHome;
   devShells.${system}.default = pkgs.mkShell {

@@ -7,6 +7,7 @@
 | Current font, timezone or application setting | `folio config` or the panel | Saves desired data; review, build and apply to activate. |
 | Initial module choices and personal preferences | `modules/manager/configuration/defaults.nix` | Used when initializing a repository or evaluating an unprepared checkout. |
 | Accounts, disk identities or target-specific module choices | `modules/manager/configuration/targets/folio.nix` | Supplies the installation's initial differences and NixOS target modules. |
+| Shared deployment on another machine | `just init`, then `modules/manager/configuration/targets/local/` | Reuses installed NixOS modules; `host.nix` adds hardware settings, `host.json` supplies initial identity. See the README deployment guide. |
 | Field types, ranges or structural constraints | The capability's `model/` | Requires a versioned model migration when the model changes. |
 | Generated files, packages or service behavior | The capability's `src/` and `runtime/` | Rebuilt through the reviewed source workflow. |
 

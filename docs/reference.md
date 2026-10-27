@@ -5,7 +5,7 @@ Detailed architecture, configuration, deployment and recovery notes.
 [Project overview](../README.md) · [Architecture](#architecture-and-configuration) · [Modules](#module-catalogue) · [Recovery](#recovery-and-model-upgrades) · [Verification](#development-and-verification)
 
 > This reference contains operational details for an existing Folio installation.
-> The [main README](../README.md) explains the design, its evolution and current limitations.
+> For a fresh NixOS installation, start with the [deployment guide](../README.md#部署指南).
 
 Folio combines NixOS and standalone Home Manager with YANG models and sysrepo.
 One CLI manages machine policy, personal preferences and application operations;
@@ -32,7 +32,8 @@ recovery records describe what actually happened.
 Folio currently targets `x86_64-linux`. Its desktop combines Niri, Everforest,
 LXGW WenKai Mono GB, Fcitx5/Rime, Foot and Zsh. A dedicated `folio` target supports the
 existing USB installation; `portable` provides a disposable UEFI test environment.
-The physical target is specific to that installation, rather than a general installer.
+The `local` target, initialized with `just init`, reuses the current installation's
+hardware, storage, boot loader and accounts on desktops and laptops.
 
 ## Contents
 
@@ -328,7 +329,7 @@ contributions, rather than claiming every module is enabled by default.
 | `agents` | — | Codex and Pi |
 | `applications` | Flatpak infrastructure | Native applications and owned Flatpak lifecycle |
 | `panel` | — | Local browser frontend package; no selectable system/user adapter |
-| `isaac` | — | Optional Isaac Sim / Isaac Lab setup and inspection commands |
+| `isaac` | — | Isaac Sim / Isaac Lab commands, only in the author's `folio` target |
 
 For modules with selectable adapters, disabling removes their managed contribution
 on apply. Stored settings and personal application data are preserved.
@@ -549,8 +550,9 @@ settings fail explicitly. Update the root lock and rebuild to update packaged cl
 
 ### Isaac Sim / Isaac Lab
 
-The optional `isaac` user module installs commands, then leaves large environment
-setup explicit:
+Isaac is an author-specific feature, excluded entirely from the shared `local`
+target. Only the author's `folio` target provides the optional `isaac` user
+module, which installs commands and leaves environment setup explicit:
 
 ```sh
 folio modules enable isaac
@@ -865,6 +867,7 @@ NetworkManager outside Folio configuration. The panel does not need sudo.
 | --- | --- |
 | `folio` | Existing migrated USB installation shared between the supported laptop and desktop. |
 | `portable` | Disposable x86_64 UEFI guest for development and acceptance. |
+| `local` | Installed desktop/laptop initialized with `just init`; uses its own installation snapshot, excludes Isaac. |
 
 ```sh
 nix eval --json .#lib.folio.targets
@@ -874,6 +877,13 @@ nix build --no-link .#nixosConfigurations.portable.config.system.build.toplevel
 
 An ordinary checkout defaults to `portable`. Installed bootstrap `target.json`
 and frozen `folio-target.json` retain hardware selection across future plans.
+`just init` writes a local `folio-target.json` and machine data under
+`modules/manager/configuration/targets/local/`. Use the README bootstrap commands
+and `path:` flake URLs so ignored machine files are included. The `local` target
+sets `folio.manageStorage = false`; the installation snapshot owns storage and
+the boot loader, including BIOS/GRUB and non-ext4 layouts. `just deploy` uses
+`nixos-rebuild boot`, then `just home` performs a recorded user deployment after
+reboot. Subsequent changes use `just plan` and Folio build/apply.
 Within a frozen source, `nixosConfigurations.portable` is the manager's stable
 entry for the selected target. The environment/account identity remains separate
 from the hardware target. Evaluation never autodetects the host.
