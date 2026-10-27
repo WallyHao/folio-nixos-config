@@ -35,9 +35,9 @@ def main():
     subtitle = outlines(SUBTITLE, "LXGW WenKai GB:style=Regular", 22, 169)
     directory = ROOT / "assets" / "branding"
     directory.mkdir(parents=True, exist_ok=True)
-    for mode, foreground, secondary in (
-        ("light", "#40534a", "#63776b"),
-        ("dark", "#d3c6aa", "#a7c080"),
+    for mode, foreground in (
+        ("light", "#40534a"),
+        ("dark", "#d3c6aa"),
     ):
         (directory / f"header-{mode}.svg").write_text(
             '<svg xmlns="http://www.w3.org/2000/svg" width="760" height="204" '
@@ -46,7 +46,7 @@ def main():
             f'  <desc id="description">{SUBTITLE}</desc>\n'
             "  <!-- TeX Gyre Pagella / LXGW WenKai GB; outlined for consistent rendering. -->\n"
             f'  <path fill="{foreground}" d="{title}"/>\n'
-            f'  <path fill="{secondary}" d="{subtitle}"/>\n'
+            f'  <path fill="{foreground}" d="{subtitle}"/>\n'
             "</svg>\n",
             encoding="utf-8",
         )
